@@ -1,0 +1,58 @@
+{
+  "1": [
+    {
+      "id": "1-1",
+      "content": "Saya pernah mengalami masalah serupa. Coba cek thermal paste CPU-nya, kemungkinan sudah kering. Juga pastikan semua fan berfungsi dengan baik. Kalau PSU 500W untuk GTX 1060 agak borderline, coba test dengan PSU yang lebih besar.",
+      "author": "PCExpert",
+      "avatar": "/placeholder.svg?height=40&width=40",
+      "createdAt": "2024-01-15T11:00:00Z",
+      "likes": 8,
+      "media": []
+    },
+    {
+      "id": "1-2",
+      "content": "Kemungkinan besar PSU atau overheat. Coba monitor suhu saat gaming pakai HWiNFO64. Kalau suhu CPU/GPU di atas 80°C, itu masalahnya. Untuk PSU, coba test dengan yang 650W ke atas.",
+      "author": "TechGuru",
+      "avatar": "/placeholder.svg?height=40&width=40",
+      "createdAt": "2024-01-15T12:15:00Z",
+      "likes": 15,
+      "media": [
+        {
+          "type": "image",
+          "url": "https://images.pexels.com/photos/1714208/pexels-photo-1714208.jpeg"
+        }
+      ]
+    }
+  ],
+  "2": [
+    {
+      "id": "2-1",
+      "content": "Coba boot dari USB Windows 11 dan pilih 'Repair your computer' > 'Troubleshoot' > 'Advanced options' > 'Startup Repair'. Kalau tidak berhasil, coba 'System File Checker' dari Command Prompt.",
+      "author": "WindowsExpert",
+      "avatar": "/placeholder.svg?height=40&width=40",
+      "createdAt": "2024-01-14T16:00:00Z",
+      "likes": 12,
+      "media": []
+    },
+    {
+      "id": "2-2",
+      "content": "SYSTEM_SERVICE_EXCEPTION biasanya driver issue. Coba uninstall driver yang baru diinstall, terutama driver GPU atau audio. Boot ke safe mode, uninstall driver, restart normal.",
+      "author": "DriverSpecialist",
+      "avatar": "/placeholder.svg?height=40&width=40",
+      "createdAt": "2024-01-14T17:30:00Z",
+      "likes": 18,
+      "media": []
+    }
+  ],
+  "3": [
+    {
+      "id": "3-1",
+      "content": "B450M mungkin perlu update BIOS untuk support RTX 4060. Cek website ASUS untuk BIOS update terbaru. Juga pastikan power connector 8-pin ke VGA terpasang dengan benar.",
+      "author": "HardwareGuru",
+      "avatar": "/placeholder.svg?height=40&width=40",
+      "createdAt": "2024-01-13T10:30:00Z",
+      "likes": 20,
+      "media": []
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+[
+  {
+    "id": "1",
+    "title": "Komputer sering restart sendiri, sudah coba ganti RAM",
+    "content": "Halo semua, komputer saya sering restart sendiri terutama saat main game. Sudah coba ganti RAM tapi masih sama. Ada yang punya pengalaman serupa?\n\nSpesifikasi:\n- CPU: Intel i5-8400\n- RAM: 16GB DDR4\n- GPU: GTX 1060 6GB\n- PSU: 500W\n\nSudah dicoba:\n1. Ganti RAM dengan yang baru\n2. Cek suhu CPU (normal 60-70°C)\n3. Update driver\n\nMohon bantuannya!",
+    "author": "TechUser123",
+    "avatar": "/placeholder.svg?height=40&width=40",
+    "category": "Hardware",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "likes": 5,
+    "replies": 3,
+    "tags": ["restart", "gaming", "ram", "troubleshooting"],
+    "isResolved": false,
+    "media": [
+      {
+        "type": "image",
+        "url": "https://images.pexels.com/photos/163100/circuit-circuit-board-resistor-computer-163100.jpeg"
+      }
+    ]
+  },
+  {
+    "id": "2",
+    "title": "Blue screen saat startup Windows 11",
+    "content": "Setelah update Windows 11, komputer saya sering blue screen saat startup. Error code: SYSTEM_SERVICE_EXCEPTION. Bagaimana cara mengatasinya?\n\nYang sudah dicoba:\n1. Safe mode bisa masuk normal\n2. System restore gagal\n3. SFC /scannow tidak menemukan error\n\nApakah ada yang pernah mengalami hal serupa?",
+    "author": "WindowsUser",
+    "avatar": "/placeholder.svg?height=40&width=40",
+    "category": "Software",
+    "timestamp": "2024-01-14T15:20:00Z",
+    "likes": 8,
+    "replies": 7,
+    "tags": ["windows11", "bluescreen", "startup", "bsod"],
+    "isResolved": true,
+    "media": []
+  },
+  {
+    "id": "3",
+    "title": "Motherboard tidak detect VGA card baru",
+    "content": "Baru beli VGA RTX 4060, tapi motherboard tidak mendeteksi. Sudah coba slot PCIe yang berbeda. PSU 650W seharusnya cukup. Ada saran?\n\nDetail:\n- Motherboard: ASUS B450M\n- VGA lama: GTX 1050 Ti (masih berfungsi)\n- VGA baru: RTX 4060\n- PSU: Seasonic 650W 80+ Gold\n\nLED VGA menyala, fan berputar, tapi tidak ada display.",
+    "author": "GamerPro",
+    "avatar": "/placeholder.svg?height=40&width=40",
+    "category": "Hardware",
+    "timestamp": "2024-01-13T09:45:00Z",
+    "likes": 12,
+    "replies": 15,
+    "tags": ["vga", "motherboard", "rtx4060", "pcie"],
+    "isResolved": false,
+    "media": [
+      {
+        "type": "image",
+        "url": "https://images.pexels.com/photos/2582937/pexels-photo-2582937.jpeg"
+      }
+    ]
+  },
+  {
+    "id": "4",
+    "title": "Laptop overheat saat gaming, thermal throttling",
+    "content": "Laptop gaming saya mengalami overheat parah saat main game berat. CPU temperature mencapai 95°C dan terjadi thermal throttling.\n\nLaptop: ASUS ROG Strix G15\nCPU: AMD Ryzen 7 5800H\nGPU: RTX 3060\n\nSudah dicoba:\n- Undervolting CPU\n- Cleaning fan dan heatsink\n- Ganti thermal paste\n\nMasih panas, ada saran lain?",
+    "author": "LaptopGamer",
+    "avatar": "/placeholder.svg?height=40&width=40",
+    "category": "Hardware",
+    "timestamp": "2024-01-12T14:30:00Z",
+    "likes": 6,
+    "replies": 9,
+    "tags": ["laptop", "overheat", "gaming", "thermal"],
+    "isResolved": false,
+    "media": []
+  },
+  {
+    "id": "5",
+    "title": "SSD tidak terdeteksi setelah update BIOS",
+    "content": "Setelah update BIOS, SSD M.2 saya tidak terdeteksi lagi. Padahal sebelumnya normal. BIOS version terbaru dari manufacturer.\n\nSSD: Samsung 980 PRO 1TB\nMotherboard: MSI B550 Tomahawk\n\nDi BIOS tidak muncul di storage devices. Sudah coba slot M.2 yang lain, sama saja.",
+    "author": "PCBuilder",
+    "avatar": "/placeholder.svg?height=40&width=40",
+    "category": "Hardware",
+    "timestamp": "2024-01-11T11:15:00Z",
+    "likes": 4,
+    "replies": 6,
+    "tags": ["ssd", "bios", "m2", "storage"],
+    "isResolved": true,
+    "media": []
+  }
+]

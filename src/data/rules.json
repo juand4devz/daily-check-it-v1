@@ -1,0 +1,202 @@
+{
+  "thresholds": {
+    "sangat_tinggi": 0.8,
+    "tinggi": 0.6,
+    "sedang": 0.4,
+    "rendah": 0.2
+  },
+  "rules": [
+    {
+      "gejala": "G1",
+      "kerusakan": "KK1",
+      "mass": 0.7,
+      "keterangan": "Komputer tidak menyala menunjukkan kemungkinan besar kerusakan motherboard"
+    },
+    {
+      "gejala": "G1",
+      "kerusakan": "KK6",
+      "mass": 0.6,
+      "keterangan": "Tidak menyala juga bisa disebabkan power supply yang rusak"
+    },
+    {
+      "gejala": "G2",
+      "kerusakan": "KK1",
+      "mass": 0.5,
+      "keterangan": "LED menyala tapi tidak ada tampilan mengindikasikan masalah motherboard"
+    },
+    {
+      "gejala": "G2",
+      "kerusakan": "KK2",
+      "mass": 0.6,
+      "keterangan": "Masalah tampilan sering disebabkan RAM yang bermasalah"
+    },
+    {
+      "gejala": "G2",
+      "kerusakan": "KK4",
+      "mass": 0.7,
+      "keterangan": "Tidak ada tampilan kemungkinan besar masalah VGA card"
+    },
+    {
+      "gejala": "G3",
+      "kerusakan": "KK1",
+      "mass": 0.8,
+      "keterangan": "Bunyi beep berulang adalah indikator kuat kerusakan motherboard"
+    },
+    {
+      "gejala": "G3",
+      "kerusakan": "KK2",
+      "mass": 0.6,
+      "keterangan": "Beep code juga mengindikasikan masalah RAM"
+    },
+    {
+      "gejala": "G4",
+      "kerusakan": "KK2",
+      "mass": 0.7,
+      "keterangan": "BSOD sering disebabkan masalah RAM"
+    },
+    {
+      "gejala": "G4",
+      "kerusakan": "KK3",
+      "mass": 0.5,
+      "keterangan": "BSOD bisa juga disebabkan hard disk yang bermasalah"
+    },
+    {
+      "gejala": "G5",
+      "kerusakan": "KK5",
+      "mass": 0.8,
+      "keterangan": "Restart sendiri biasanya karena overheating processor"
+    },
+    {
+      "gejala": "G5",
+      "kerusakan": "KK6",
+      "mass": 0.4,
+      "keterangan": "Power supply tidak stabil bisa menyebabkan restart"
+    },
+    {
+      "gejala": "G6",
+      "kerusakan": "KK2",
+      "mass": 0.6,
+      "keterangan": "Performa lambat sering disebabkan RAM yang tidak optimal"
+    },
+    {
+      "gejala": "G6",
+      "kerusakan": "KK3",
+      "mass": 0.7,
+      "keterangan": "Hard disk yang lambat menyebabkan performa sistem menurun"
+    },
+    {
+      "gejala": "G7",
+      "kerusakan": "KK5",
+      "mass": 0.9,
+      "keterangan": "Overheat adalah indikator langsung masalah thermal processor"
+    },
+    {
+      "gejala": "G8",
+      "kerusakan": "KK5",
+      "mass": 0.6,
+      "keterangan": "Kipas bermasalah berkontribusi pada overheating"
+    },
+    {
+      "gejala": "G9",
+      "kerusakan": "KK3",
+      "mass": 0.9,
+      "keterangan": "Hard disk tidak terdeteksi menunjukkan kerusakan storage"
+    },
+    {
+      "gejala": "G10",
+      "kerusakan": "KK1",
+      "mass": 0.5,
+      "keterangan": "USB port tidak berfungsi bisa masalah motherboard"
+    },
+    {
+      "gejala": "G11",
+      "kerusakan": "KK1",
+      "mass": 0.4,
+      "keterangan": "Audio tidak keluar bisa masalah onboard sound motherboard"
+    },
+    {
+      "gejala": "G12",
+      "kerusakan": "KK1",
+      "mass": 0.5,
+      "keterangan": "Input device tidak responsif bisa masalah port motherboard"
+    },
+    {
+      "gejala": "G13",
+      "kerusakan": "KK1",
+      "mass": 0.4,
+      "keterangan": "WiFi bermasalah bisa karena network controller motherboard"
+    },
+    {
+      "gejala": "G14",
+      "kerusakan": "KK2",
+      "mass": 0.6,
+      "keterangan": "Aplikasi crash sering disebabkan masalah RAM"
+    },
+    {
+      "gejala": "G15",
+      "kerusakan": "KK3",
+      "mass": 0.7,
+      "keterangan": "Startup lambat biasanya karena hard disk bermasalah"
+    },
+    {
+      "gejala": "G16",
+      "kerusakan": "KK4",
+      "mass": 0.8,
+      "keterangan": "Layar berkedip menunjukkan masalah VGA card"
+    },
+    {
+      "gejala": "G16",
+      "kerusakan": "KK8",
+      "mass": 0.7,
+      "keterangan": "Pada laptop, layar bergaris bisa masalah panel LCD"
+    },
+    {
+      "gejala": "G17",
+      "kerusakan": "KK1",
+      "mass": 0.9,
+      "keterangan": "Bau terbakar sangat mengindikasikan kerusakan serius motherboard"
+    },
+    {
+      "gejala": "G17",
+      "kerusakan": "KK6",
+      "mass": 0.6,
+      "keterangan": "Bau terbakar juga bisa dari power supply"
+    },
+    {
+      "gejala": "G18",
+      "kerusakan": "KK5",
+      "mass": 0.7,
+      "keterangan": "Mati mendadak sering karena thermal protection processor"
+    },
+    {
+      "gejala": "G18",
+      "kerusakan": "KK6",
+      "mass": 0.5,
+      "keterangan": "Power supply tidak stabil menyebabkan shutdown mendadak"
+    },
+    {
+      "gejala": "G19",
+      "kerusakan": "KK7",
+      "mass": 0.9,
+      "keterangan": "Baterai tidak mengisi adalah indikator langsung kerusakan baterai laptop"
+    },
+    {
+      "gejala": "G20",
+      "kerusakan": "KK1",
+      "mass": 0.5,
+      "keterangan": "Touchpad tidak berfungsi bisa masalah motherboard laptop"
+    },
+    {
+      "gejala": "G21",
+      "kerusakan": "KK8",
+      "mass": 0.9,
+      "keterangan": "Layar retak atau rusak adalah kerusakan langsung panel LCD laptop"
+    },
+    {
+      "gejala": "G22",
+      "kerusakan": "KK7",
+      "mass": 0.6,
+      "keterangan": "Port charging rusak mempengaruhi sistem charging baterai"
+    }
+  ]
+}
