@@ -4,6 +4,7 @@ import { SidebarNav } from './app-sidebar';
 import { Header } from './header';
 import { usePathname } from "next/navigation"
 import { ThemeProvider } from './theme-provider';
+import { SessionProvider } from 'next-auth/react';
 
 interface MainLayoutProps {
     children: React.ReactNode
@@ -22,21 +23,23 @@ export default function GeneralLayout({ children }: MainLayoutProps) {
     }
 
     return (
-        <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-        >
-            <SidebarProvider>
-                {!disableSideheader.includes(pathname) && <SidebarNav />}
-                <SidebarInset>
-                    {!disableSideheader.includes(pathname) && <Header />}
-                    {/* <main className="flex-1 p-4"> */}
-                    {children}
-                    {/* </main> */}
-                </SidebarInset>
-            </SidebarProvider>
-        </ThemeProvider>
+        <SessionProvider>
+            <ThemeProvider
+                attribute="class"
+                defaultTheme="system"
+                enableSystem
+                disableTransitionOnChange
+            >
+                <SidebarProvider>
+                    {!disableSideheader.includes(pathname) && <SidebarNav />}
+                    <SidebarInset>
+                        {!disableSideheader.includes(pathname) && <Header />}
+                        {/* <main className="flex-1 p-4"> */}
+                        {children}
+                        {/* </main> */}
+                    </SidebarInset>
+                </SidebarProvider>
+            </ThemeProvider>
+        </SessionProvider>
     )
 }

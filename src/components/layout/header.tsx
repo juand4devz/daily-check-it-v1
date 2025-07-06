@@ -15,6 +15,11 @@ import {
 } from "@/components/ui/breadcrumb"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "../ui/button"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu"
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
+import { signIn, useSession } from "next-auth/react"
+import AuthButton, { SignOut } from "../auth/auth-button"
+import Link from "next/link"
 
 export function Header() {
     const pathname = usePathname()
@@ -47,6 +52,9 @@ export function Header() {
         })
     }
 
+    const { data: session } = useSession()
+    console.log(session)
+
     return (
         <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex items-center gap-2 px-4 w-full">
@@ -58,8 +66,40 @@ export function Header() {
 
                 <div className="ml-auto flex items-center gap-2">
                     <ThemeToggle />
-                    <Button>Login</Button>
-                    <Button variant="destructive">Signout</Button>
+                    <AuthButton provider='github' name='Github' />
+                    <AuthButton provider='google' name='Google' />
+                    <Button onClick={() => signIn()} variant="secondary">Login</Button>
+                    <Button variant="secondary"><Link href="/register">register</Link></Button>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger>
+                            <Avatar className='h-10 w-10 border-4'>
+                                {session?.user?.image ? (
+                                    <AvatarImage src={session?.user?.image} alt='Profile Picture' height={50} width={50} />
+                                ) : (
+                                    <AvatarFallback>
+                                        {(() => {
+                                            const name = session?.user?.name || '';
+                                            const words = name.trim().split(' ');
+                                            if (words.length >= 2) {
+                                                return (words[0][0] + words[1][0]).toUpperCase();
+                                            }
+                                            return name.slice(0, 2).toUpperCase();
+                                        })()}
+                                    </AvatarFallback>
+                                )}
+                            </Avatar>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className='mr-14 mt-2 min-w-40'>
+                            <DropdownMenuLabel>Account</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem>{session?.user?.name}</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem>{session?.user?.email}</DropdownMenuItem>
+                            <DropdownMenuItem>
+                                <SignOut />
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </div>
         </header>

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 
 export function ForumListSkeleton() {
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 m-2 md:m-6">
       {Array.from({ length: 5 }).map((_, i) => (
         <Card key={i} className="p-4">
           <div className="flex items-start gap-4">
