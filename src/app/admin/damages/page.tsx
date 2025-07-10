@@ -1,3 +1,4 @@
+// /admin/kerusakan/page.tsx
 "use client"
 import { useState, useEffect, useRef } from "react"
 import type React from "react"
@@ -8,11 +9,10 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Edit, Trash2, DollarSign, Clock, AlertTriangle, Download, Upload, Search, RefreshCw } from "lucide-react"
-import kerusakanData from "@/data/kerusakan.json"
+import { Plus, Edit, Trash2, DollarSign, Clock, AlertTriangle, Download, Upload, Search, RefreshCw, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
-import type { Kerusakan } from "@/types"
+import type { Kerusakan } from "@/types" // Use the updated Kerusakan type from types.ts
 
 const tingkatKerusakanOptions: Array<Kerusakan["tingkat_kerusakan"]> = ["Ringan", "Sedang", "Berat"]
 
@@ -28,7 +28,8 @@ export default function KerusakanPage() {
     const [searchQuery, setSearchQuery] = useState("")
     const [filterTingkat, setFilterTingkat] = useState<string>("all")
     const [isLoading, setIsLoading] = useState(true)
-    const [isImporting, setIsImporting] = useState(false)
+    const [isImporting, setIsImporting] = useState(false) // For file processing
+    const [isSendingImport, setIsSendingImport] = useState(false) // For API call
     const fileInputRef = useRef<HTMLInputElement>(null)
     const router = useRouter()
 
@@ -43,29 +44,26 @@ export default function KerusakanPage() {
     const loadData = async (): Promise<void> => {
         try {
             setIsLoading(true)
-            // Simulate API delay
-            await new Promise((resolve) => setTimeout(resolve, 500))
+            const response = await fetch("/api/damages") // Fetch from new API
+            if (!response.ok) {
+                const errorDetail = await response.text()
+                throw new Error(`Gagal memuat data kerusakan: ${response.status} ${errorDetail}`)
+            }
+            const fetchedData: Kerusakan[] = await response.json()
 
-            const convertedData: Kerusakan[] = Array.isArray(kerusakanData)
-                ? kerusakanData.map((item: Record<string, unknown>) => ({
-                    kode: String(item.kode || item.id || ""),
-                    nama: String(item.nama || item.nama_kerusakan || ""),
-                    deskripsi: String(item.deskripsi || ""),
-                    tingkat_kerusakan: (item.tingkat_kerusakan as Kerusakan["tingkat_kerusakan"]) || "Ringan",
-                    estimasi_biaya: String(item.estimasi_biaya || ""),
-                    waktu_perbaikan: String(item.waktu_perbaikan || ""),
-                    prior_probability: Number(item.prior_probability) || 0.1,
-                    solusi: String(item.solusi || ""),
-                    gejala_terkait: Array.isArray(item.gejala_terkait) ? (item.gejala_terkait as string[]) : [],
-                }))
-                : []
+            // Sort data by 'kode' (KK1, KK2, etc.)
+            const sortedData = fetchedData.sort((a, b) => {
+                const numA = parseInt(a.kode.replace('KK', '')) || 0;
+                const numB = parseInt(b.kode.replace('KK', '')) || 0;
+                return numA - numB;
+            });
 
-            setKerusakanList(convertedData)
-            toast.success("Data kerusakan berhasil dimuat")
+            setKerusakanList(sortedData)
+            toast.success("Data kerusakan berhasil dimuat.")
         } catch (error) {
             console.error("Error loading data:", error)
-            toast.error("Gagal memuat data kerusakan")
-            setKerusakanList([])
+            toast.error(error instanceof Error ? error.message : "Gagal memuat data kerusakan")
+            setKerusakanList([]) // Clear list on error
         } finally {
             setIsLoading(false)
         }
@@ -92,24 +90,35 @@ export default function KerusakanPage() {
     }
 
     const handleEdit = (kerusakan: Kerusakan): void => {
-        router.push(`/admin/damages/edit/${kerusakan.kode}`)
+        // Use kerusakan.id for navigation, assuming your edit page route is /admin/damages/edit/[id]
+        router.push(`/admin/damages/edit/${kerusakan.id}`)
     }
 
-    const handleDelete = async (kode: string): Promise<void> => {
-        const kerusakan = kerusakanList.find((k) => k.kode === kode)
-        if (!kerusakan) return
-
+    const handleDelete = async (id: string, namaKerusakan: string): Promise<void> => {
         toast("Konfirmasi Hapus", {
-            description: `Apakah Anda yakin ingin menghapus kerusakan "${kerusakan.nama}"?`,
+            description: `Apakah Anda yakin ingin menghapus kerusakan "${namaKerusakan}"? Tindakan ini tidak dapat dibatalkan.`,
             action: {
                 label: "Hapus",
-                onClick: () => {
+                onClick: async () => {
                     try {
-                        setKerusakanList((prev) => prev.filter((k) => k.kode !== kode))
-                        toast.success("Kerusakan berhasil dihapus")
-                    } catch (error) {
-                        console.error("Error deleting:", error)
-                        toast.error("Gagal menghapus kerusakan")
+                        const response = await fetch(`/api/kerusakan/${id}`, { // Use the ID-based API route
+                            method: "DELETE",
+                        });
+
+                        if (!response.ok) {
+                            const errorDetail = await response.text();
+                            throw new Error(`Gagal menghapus kerusakan: ${response.status} ${errorDetail}`);
+                        }
+
+                        await loadData(); // Reload data after successful deletion
+                        toast.success("Kerusakan berhasil dihapus.");
+                    } catch (caughtError: unknown) {
+                        console.error("Error deleting:", caughtError);
+                        let errorMessage = "Gagal menghapus kerusakan.";
+                        if (caughtError instanceof Error) {
+                            errorMessage = caughtError.message;
+                        }
+                        toast.error(errorMessage);
                     }
                 },
             },
@@ -145,52 +154,149 @@ export default function KerusakanPage() {
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
         const file = event.target.files?.[0]
-        if (!file) return
+        if (!file) {
+            toast.error("Tidak ada file yang dipilih.")
+            return
+        }
 
         if (file.type !== "application/json") {
-            toast.error("File harus berformat JSON")
+            toast.error("File harus berformat JSON.")
             return
         }
 
         try {
-            setIsImporting(true)
+            setIsImporting(true) // Indicate file processing
             const text = await file.text()
-            const importedData = JSON.parse(text) as Record<string, unknown>[]
+            const importedData: unknown = JSON.parse(text)
 
             if (!Array.isArray(importedData)) {
-                throw new Error("Format data tidak valid")
+                toast.error("Format data tidak valid: Harap impor array JSON.")
+                return
             }
 
-            // Validate data structure
-            const validatedData: Kerusakan[] = importedData.map((item, index) => {
-                if (!item.kode || !item.nama) {
-                    throw new Error(`Data tidak valid pada baris ${index + 1}`)
+            // Validate data structure and cast to Kerusakan[]
+            const validatedData: Kerusakan[] = importedData.map((item: any, index: number) => {
+                // Basic type checking for required fields and default values
+                if (typeof item.id !== 'string' || !item.id.trim()) {
+                    throw new Error(`Data tidak valid pada baris ${index + 1}: 'id' tidak valid atau kosong.`);
                 }
-                return {
-                    kode: String(item.kode),
-                    nama: String(item.nama),
-                    deskripsi: String(item.deskripsi || ""),
-                    tingkat_kerusakan: (item.tingkat_kerusakan as Kerusakan["tingkat_kerusakan"]) || "Ringan",
-                    estimasi_biaya: String(item.estimasi_biaya || ""),
-                    waktu_perbaikan: String(item.waktu_perbaikan || ""),
-                    prior_probability: Number(item.prior_probability) || 0.1,
-                    solusi: String(item.solusi || ""),
-                    gejala_terkait: Array.isArray(item.gejala_terkait) ? (item.gejala_terkait as string[]) : [],
+                if (typeof item.kode !== 'string' || !item.kode.trim()) {
+                    throw new Error(`Data tidak valid pada baris ${index + 1}: 'kode' tidak valid atau kosong.`);
                 }
-            })
+                if (typeof item.nama !== 'string' || !item.nama.trim()) {
+                    throw new Error(`Data tidak valid pada baris ${index + 1}: 'nama' tidak valid atau kosong.`);
+                }
 
-            setKerusakanList(validatedData)
-            toast.success(`Berhasil mengimpor ${validatedData.length} data kerusakan`)
-        } catch (error) {
-            console.error("Import error:", error)
-            toast.error(error instanceof Error ? error.message : "Gagal mengimpor data")
+                // Ensure 'tingkat_kerusakan' is one of the valid options, default to "Ringan"
+                const tingkat: Kerusakan["tingkat_kerusakan"] = tingkatKerusakanOptions.includes(item.tingkat_kerusakan as any)
+                    ? item.tingkat_kerusakan
+                    : "Ringan";
+
+                // Ensure prior_probability is a valid number
+                const priorProb: number = typeof item.prior_probability === 'number' && item.prior_probability > 0 && item.prior_probability <= 0.5
+                    ? item.prior_probability
+                    : 0.1; // Default or fallback
+
+                return {
+                    id: item.id,
+                    kode: item.kode,
+                    nama: item.nama,
+                    deskripsi: item.deskripsi || "",
+                    tingkat_kerusakan: tingkat,
+                    estimasi_biaya: item.estimasi_biaya || "",
+                    waktu_perbaikan: item.waktu_perbaikan || "",
+                    prior_probability: priorProb,
+                    solusi: item.solusi || "",
+                    gejala_terkait: Array.isArray(item.gejala_terkait) ? item.gejala_terkait.map(String) : [],
+                    createdAt: item.createdAt || undefined, // Keep existing timestamps if available
+                    updatedAt: item.updatedAt || undefined,
+                } as Kerusakan;
+            });
+
+            // Show toast for replacement confirmation
+            toast("Konfirmasi Impor Data", {
+                description: `Ditemukan ${validatedData.length} entri kerusakan dalam file. Pilih tindakan:`,
+                action: {
+                    label: "Tambah Baru Saja",
+                    onClick: async () => {
+                        toast.dismiss(); // Dismiss the confirmation toast
+                        await sendImportData("kerusakan", validatedData, false); // No replace
+                    },
+                },
+                cancel: {
+                    label: "Ganti yang Ada",
+                    onClick: async () => {
+                        toast.dismiss(); // Dismiss the confirmation toast
+                        await sendImportData("kerusakan", validatedData, true); // Replace existing
+                    },
+                },
+                duration: Infinity, // Keep toast open until action is taken
+            });
+
+        } catch (caughtError: unknown) {
+            console.error("Terjadi kesalahan saat memproses file impor:", caughtError);
+            let errorMessage = "Gagal membaca atau memproses file JSON.";
+            if (caughtError instanceof Error) {
+                errorMessage = caughtError.message;
+            }
+            toast.error(errorMessage);
         } finally {
-            setIsImporting(false)
+            setIsImporting(false); // File processing finished
             if (fileInputRef.current) {
-                fileInputRef.current.value = ""
+                fileInputRef.current.value = ""; // Clear file input
             }
         }
-    }
+    };
+
+    // Generic function to send data to the import API
+    const sendImportData = async (
+        dataType: "gejala" | "kerusakan", // Explicitly define accepted types
+        data: any[], // Use any[] as it could be Gejala[] or Kerusakan[]
+        replaceExisting: boolean
+    ): Promise<void> => {
+        setIsSendingImport(true); // Indicate API call is in progress
+        try {
+            const response = await fetch("/api/import-data", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    dataType,
+                    data,
+                    replaceExisting,
+                }),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || `Gagal melakukan import: ${response.status}`);
+            }
+
+            toast.success(result.message || "Data berhasil diimpor.");
+            if (result.importedCount > 0) {
+                toast.info(`${result.importedCount} data baru ditambahkan.`);
+            }
+            if (result.replacedCount > 0) {
+                toast.info(`${result.replacedCount} data diganti.`);
+            }
+            if (result.skippedCount > 0) {
+                toast.info(`${result.skippedCount} data dilewati (ID sudah ada).`);
+            }
+            await loadData(); // Reload data after successful import
+        } catch (caughtError: unknown) {
+            console.error("Terjadi kesalahan saat mengirim data impor:", caughtError);
+            let errorMessage = "Gagal mengimpor data ke database.";
+            if (caughtError instanceof Error) {
+                errorMessage = caughtError.message;
+            }
+            toast.error(errorMessage);
+        } finally {
+            setIsSendingImport(false); // API call finished
+        }
+    };
+
 
     const getTingkatColor = (tingkat: string): string => {
         switch (tingkat) {
@@ -222,7 +328,7 @@ export default function KerusakanPage() {
 
     const stats = getStatistics()
 
-    if (isLoading) {
+    if (isLoading || isSendingImport) { // Show loading for initial fetch or import operation
         return (
             <div className="container mx-auto px-4 py-8 ">
                 <div className="animate-pulse space-y-6">
@@ -249,8 +355,8 @@ export default function KerusakanPage() {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" onClick={handleImport} disabled={isImporting}>
-                        {isImporting ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                    <Button variant="outline" onClick={handleImport} disabled={isImporting || isSendingImport}>
+                        {isImporting || isSendingImport ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                         Import
                     </Button>
                     <Button variant="outline" onClick={handleExport}>
@@ -358,109 +464,117 @@ export default function KerusakanPage() {
                     <CardDescription>Kelola data kerusakan yang digunakan dalam sistem diagnosa</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="overflow-x-auto">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Kode</TableHead>
-                                    <TableHead>Nama & Deskripsi</TableHead>
-                                    <TableHead>Tingkat</TableHead>
-                                    <TableHead>Probabilitas</TableHead>
-                                    <TableHead>Info Perbaikan</TableHead>
-                                    <TableHead>Gejala Terkait</TableHead>
-                                    <TableHead>Aksi</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredData.length === 0 ? (
+                    {isLoading || isSendingImport ? (
+                        <div className="flex justify-center items-center h-48">
+                            <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                                            {searchQuery || filterTingkat !== "all"
-                                                ? "Tidak ada kerusakan yang sesuai dengan filter"
-                                                : "Belum ada data kerusakan"}
-                                        </TableCell>
+                                        <TableHead>Kode</TableHead>
+                                        <TableHead>Nama & Deskripsi</TableHead>
+                                        <TableHead>Tingkat</TableHead>
+                                        <TableHead>Probabilitas</TableHead>
+                                        <TableHead>Info Perbaikan</TableHead>
+                                        <TableHead>Gejala Terkait</TableHead>
+                                        <TableHead>Aksi</TableHead>
                                     </TableRow>
-                                ) : (
-                                    filteredData.map((item) => (
-                                        <TableRow key={item.kode} className="hover:bg-muted/50">
-                                            <TableCell>
-                                                <Badge variant="outline" className="font-mono">
-                                                    {item.kode}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="max-w-xs">
-                                                <div>
-                                                    <p className="font-medium line-clamp-1">{item.nama}</p>
-                                                    <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{item.deskripsi}</p>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge className={getTingkatColor(item.tingkat_kerusakan)}>
-                                                    <AlertTriangle className="h-3 w-3 mr-1" />
-                                                    {item.tingkat_kerusakan}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="text-center">
-                                                    <div className="font-mono text-sm font-medium">{item.prior_probability.toFixed(3)}</div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {(item.prior_probability * 100).toFixed(1)}%
-                                                    </div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="space-y-1 text-xs">
-                                                    {item.estimasi_biaya && (
-                                                        <div className="flex items-center gap-1 text-muted-foreground">
-                                                            <DollarSign className="h-3 w-3" />
-                                                            <span className="truncate max-w-24" title={item.estimasi_biaya}>
-                                                                {item.estimasi_biaya}
-                                                            </span>
-                                                        </div>
-                                                    )}
-                                                    {item.waktu_perbaikan && (
-                                                        <div className="flex items-center gap-1 text-muted-foreground">
-                                                            <Clock className="h-3 w-3" />
-                                                            <span>{item.waktu_perbaikan}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex flex-wrap gap-1">
-                                                    {item.gejala_terkait.slice(0, 3).map((gejala) => (
-                                                        <Badge key={gejala} variant="secondary" className="text-xs">
-                                                            {gejala}
-                                                        </Badge>
-                                                    ))}
-                                                    {item.gejala_terkait.length > 3 && (
-                                                        <Badge variant="secondary" className="text-xs">
-                                                            +{item.gejala_terkait.length - 3}
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex gap-1">
-                                                    <Button variant="ghost" size="sm" onClick={() => handleEdit(item)} className="h-8 w-8 p-0">
-                                                        <Edit className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleDelete(item.kode)}
-                                                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredData.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                                                {searchQuery || filterTingkat !== "all"
+                                                    ? "Tidak ada kerusakan yang sesuai dengan filter"
+                                                    : "Belum ada data kerusakan"}
                                             </TableCell>
                                         </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
+                                    ) : (
+                                        filteredData.map((item) => (
+                                            // Ensure no whitespace immediately after <TableRow key={item.id} ...>
+                                            <TableRow key={item.id} className="hover:bg-muted/50">
+                                                <TableCell>
+                                                    <Badge variant="outline" className="font-mono">
+                                                        {item.kode}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="max-w-xs">
+                                                    <div>
+                                                        <p className="font-medium line-clamp-1">{item.nama}</p>
+                                                        <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{item.deskripsi}</p>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge className={getTingkatColor(item.tingkat_kerusakan)}>
+                                                        <AlertTriangle className="h-3 w-3 mr-1" />
+                                                        {item.tingkat_kerusakan}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="text-center">
+                                                        <div className="font-mono text-sm font-medium">{item.prior_probability.toFixed(3)}</div>
+                                                        <div className="text-xs text-muted-foreground">
+                                                            {(item.prior_probability * 100).toFixed(1)}%
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="space-y-1 text-xs">
+                                                        {item.estimasi_biaya && (
+                                                            <div className="flex items-center gap-1 text-muted-foreground">
+                                                                <DollarSign className="h-3 w-3" />
+                                                                <span className="truncate max-w-24" title={item.estimasi_biaya}>
+                                                                    {item.estimasi_biaya}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {item.waktu_perbaikan && (
+                                                            <div className="flex items-center gap-1 text-muted-foreground">
+                                                                <Clock className="h-3 w-3" />
+                                                                <span>{item.waktu_perbaikan}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {item.gejala_terkait.slice(0, 3).map((gejala) => (
+                                                            <Badge key={gejala} variant="secondary" className="text-xs">
+                                                                {gejala}
+                                                            </Badge>
+                                                        ))}
+                                                        {item.gejala_terkait.length > 3 && (
+                                                            <Badge variant="secondary" className="text-xs">
+                                                                +{item.gejala_terkait.length - 3}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex gap-1">
+                                                        <Button variant="ghost" size="sm" onClick={() => handleEdit(item)} className="h-8 w-8 p-0">
+                                                            <Edit className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => handleDelete(item.id, item.nama)}
+                                                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                            // Ensure no whitespace immediately before </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 

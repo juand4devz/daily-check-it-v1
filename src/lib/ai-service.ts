@@ -1,3 +1,4 @@
+// /lib/ai-service.ts
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { diagnosisExplainerRole } from "./role-ai/diagnosis-explainer"
 import { detectContradictions, suggestAlternativeDiagnosis } from "./role-ai/logical-rules"

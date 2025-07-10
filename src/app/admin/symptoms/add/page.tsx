@@ -1,19 +1,21 @@
-"use client"
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Slider } from "@/components/ui/slider"
-import { ArrowLeft, Save, Plus, X, RefreshCw } from "lucide-react"
-import { toast } from "sonner"
-import gejalaData from "@/data/gejala.json"
-import type { Gejala, MassFunctionEntry } from "@/types"
+// /admin/symptoms/add/page.tsx
+"use client";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
+import { ArrowLeft, Save, Plus, X, RefreshCw, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import type { Gejala, MassFunctionEntry, Kerusakan } from "@/types";
+import { Combobox } from "@/components/ui/combobox"; // Import the new Combobox component
 
+// --- Constants ---
 const categories = [
   "Power",
   "Display",
@@ -34,21 +36,16 @@ const categories = [
   "OS",
   "Security",
   "Peripheral",
-]
+];
 
-const devices = ["computer", "laptop"]
-const kerusakanOptions = Array.from({ length: 23 }, (_, i) => `KK${i + 1}`)
+const devices = ["computer", "laptop"];
 
-interface ExistingGejala {
-  kode: string
-  [key: string]: unknown
-}
-
+// --- Main Component ---
 export default function AddGejalaPage() {
-  const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
-  const [isGeneratingCode, setIsGeneratingCode] = useState(false)
-  const [formData, setFormData] = useState<Gejala>({
+  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [formData, setFormData] = useState<Omit<Gejala, 'id'>>({
     kode: "",
     nama: "",
     deskripsi: "",
@@ -56,143 +53,245 @@ export default function AddGejalaPage() {
     perangkat: [],
     mass_function: { uncertainty: 0.1 },
     gambar: "",
-  })
-  const [massFunctions, setMassFunctions] = useState<MassFunctionEntry[]>([{ kerusakan: "KK1", value: 0.1 }])
+  });
+  const [massFunctions, setMassFunctions] = useState<MassFunctionEntry[]>([
+    { kerusakan: "", value: 0.1 }, // Initialize with empty string for no default selection
+  ]);
+  const [existingGejalaCodes, setExistingGejalaCodes] = useState<string[]>([]);
+  const [kerusakanData, setKerusakanData] = useState<Kerusakan[]>([]); // Renamed from kerusakanOptions to avoid conflict with Combobox options
+  const [isKerusakanLoading, setIsKerusakanLoading] = useState(true);
 
+  // --- Fetch Existing Gejala Codes for Code Generation & Validation ---
   useEffect(() => {
-    generateNextCode()
-  }, [])
+    const fetchExistingGejalaCodes = async () => {
+      try {
+        const response = await fetch("/api/gejala");
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Gagal mengambil kode gejala yang ada: ${response.status} ${errorText}`);
+        }
+        const gejalaList: Gejala[] = await response.json();
+        setExistingGejalaCodes(gejalaList.map(g => g.kode));
+      } catch (caughtError: unknown) {
+        console.error("Terjadi kesalahan saat mengambil kode gejala:", caughtError);
+        let errorMessage = "Gagal memuat kode gejala yang ada.";
+        if (caughtError instanceof Error) {
+          errorMessage = caughtError.message;
+        }
+        toast.error(errorMessage);
+      }
+    };
 
-  const generateNextCode = async (): Promise<void> => {
+    fetchExistingGejalaCodes();
+  }, []);
+
+  // --- Fetch Kerusakan Data for Mass Function Options (Dynamic & Sorted) ---
+  useEffect(() => {
+    const fetchKerusakanData = async () => {
+      setIsKerusakanLoading(true);
+      try {
+        const response = await fetch("/api/damages");
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Gagal memuat data kerusakan: ${response.status} ${errorText}`);
+        }
+        const fetchedData: Kerusakan[] = await response.json();
+        // Sort fetchedData by 'kode' (KK1, KK2, etc.)
+        const sortedData = fetchedData.sort((a, b) => {
+          const numA = parseInt(a.kode.replace('KK', '')) || 0;
+          const numB = parseInt(b.kode.replace('KK', '')) || 0;
+          return numA - numB;
+        });
+        setKerusakanData(sortedData);
+      } catch (caughtError: unknown) {
+        console.error("Terjadi kesalahan saat memuat data kerusakan:", caughtError);
+        let errorMessage = "Gagal memuat daftar kerusakan untuk mass function.";
+        if (caughtError instanceof Error) {
+          errorMessage = caughtError.message;
+        }
+        toast.error(errorMessage);
+        setKerusakanData([]);
+      } finally {
+        setIsKerusakanLoading(false);
+      }
+    };
+
+    fetchKerusakanData();
+  }, []);
+
+  // --- Code Generation ---
+  const generateNextCode = useCallback(async (): Promise<void> => {
+    setIsGeneratingCode(true);
     try {
-      setIsGeneratingCode(true)
+      let nextNumber = 1;
+      let nextCode = `G${nextNumber}`;
 
-      // Get existing codes
-      const existingCodes = (gejalaData as ExistingGejala[])
-        .map((item) => item.kode)
-        .filter((code): code is string => Boolean(code))
-
-      // Find the next available code
-      let nextNumber = 1
-      let nextCode = `G${nextNumber}`
-
-      while (existingCodes.includes(nextCode)) {
-        nextNumber++
-        nextCode = `G${nextNumber}`
+      while (existingGejalaCodes.includes(nextCode)) {
+        nextNumber++;
+        nextCode = `G${nextNumber}`;
       }
 
-      setFormData((prev) => ({ ...prev, kode: nextCode }))
-      toast.success(`Kode otomatis: ${nextCode}`)
-    } catch (error) {
-      console.error("Error generating code:", error)
-      toast.error("Gagal generate kode otomatis")
+      setFormData((prev) => ({ ...prev, kode: nextCode }));
+      toast.success(`Kode otomatis: ${nextCode}`);
+    } catch (caughtError: unknown) {
+      console.error("Terjadi kesalahan saat membuat kode:", caughtError);
+      let errorMessage = "Gagal membuat kode otomatis.";
+      if (caughtError instanceof Error) {
+        errorMessage = caughtError.message;
+      }
+      toast.error(errorMessage);
     } finally {
-      setIsGeneratingCode(false)
+      setIsGeneratingCode(false);
     }
-  }
+  }, [existingGejalaCodes]);
 
-  const addMassFunction = (): void => {
-    const usedKerusakan = massFunctions.map((mf) => mf.kerusakan)
-    const availableKerusakan = kerusakanOptions.filter((kk) => !usedKerusakan.includes(kk))
+  useEffect(() => {
+    if (existingGejalaCodes.length > 0 && formData.kode === "" && !isGeneratingCode) {
+      generateNextCode();
+    }
+  }, [existingGejalaCodes, formData.kode, generateNextCode, isGeneratingCode]);
+
+  // --- Mass Function Management ---
+  const addMassFunction = useCallback((): void => {
+    if (kerusakanData.length === 0) {
+      toast.error("Data kerusakan belum dimuat atau tidak tersedia.");
+      return;
+    }
+
+    const usedKerusakanCodes = massFunctions.map((mf) => mf.kerusakan);
+    const availableKerusakan = kerusakanData.filter(
+      (kerusakan) => !usedKerusakanCodes.includes(kerusakan.kode)
+    );
 
     if (availableKerusakan.length === 0) {
-      toast.error("Semua kerusakan sudah digunakan")
-      return
+      toast.error("Semua kerusakan sudah digunakan dalam mass function.");
+      return;
     }
 
-    setMassFunctions((prev) => [...prev, { kerusakan: availableKerusakan[0], value: 0.1 }])
-    toast.success("Mass function baru ditambahkan")
-  }
+    setMassFunctions((prev) => [
+      ...prev,
+      { kerusakan: availableKerusakan[0].kode, value: 0.1 },
+    ]);
+    toast.success("Mass function baru ditambahkan.");
+  }, [massFunctions, kerusakanData]);
 
-  const removeMassFunction = (index: number): void => {
+  const removeMassFunction = useCallback((index: number): void => {
     if (massFunctions.length <= 1) {
-      toast.error("Minimal harus ada satu mass function")
-      return
+      toast.error("Minimal harus ada satu mass function.");
+      return;
     }
-    setMassFunctions((prev) => prev.filter((_, i) => i !== index))
-    toast.success("Mass function dihapus")
-  }
+    setMassFunctions((prev) => prev.filter((_, i) => i !== index));
+    toast.success("Mass function dihapus.");
+  }, [massFunctions]);
 
-  const updateMassFunction = (index: number, field: keyof MassFunctionEntry, value: string | number): void => {
-    setMassFunctions((prev) => prev.map((item, i) => (i === index ? { ...item, [field]: value } : item)))
-  }
+  const updateMassFunction = useCallback(
+    (index: number, field: keyof MassFunctionEntry, value: string | number): void => {
+      setMassFunctions((prev) =>
+        prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+      );
+    },
+    []
+  );
 
-  const validateForm = (): boolean => {
+  // Helper to get Combobox options from fetched kerusakan data
+  const getKerusakanComboboxOptions = useCallback(() => {
+    return kerusakanData.map(k => ({
+      value: k.kode,
+      label: `${k.kode} - ${k.nama}`
+    }));
+  }, [kerusakanData]);
+
+  // --- Form Validation ---
+  const validateForm = useCallback((): boolean => {
     if (!formData.kode.trim()) {
-      toast.error("Kode gejala harus diisi")
-      return false
+      toast.error("Kode gejala harus diisi.");
+      return false;
     }
 
     if (!formData.nama.trim()) {
-      toast.error("Nama gejala harus diisi")
-      return false
+      toast.error("Nama gejala harus diisi.");
+      return false;
     }
 
     if (formData.perangkat.length === 0) {
-      toast.error("Minimal pilih satu perangkat")
-      return false
+      toast.error("Minimal pilih satu perangkat.");
+      return false;
     }
 
-    const totalMass = massFunctions.reduce((sum, entry) => sum + entry.value, 0)
-    if (totalMass > 1.0) {
-      toast.error("Total mass function tidak boleh melebihi 1.0")
-      return false
+    const massFunctionKerusakanCodes = massFunctions.map((mf) => mf.kerusakan);
+    const uniqueMassFunctionKerusakan = new Set(massFunctionKerusakanCodes);
+    if (massFunctionKerusakanCodes.length !== uniqueMassFunctionKerusakan.size) {
+      toast.error("Tidak boleh ada kerusakan yang duplikat dalam mass function.");
+      return false;
     }
 
-    const kerusakanCodes = massFunctions.map((mf) => mf.kerusakan)
-    const uniqueKerusakan = new Set(kerusakanCodes)
-    if (kerusakanCodes.length !== uniqueKerusakan.size) {
-      toast.error("Tidak boleh ada kerusakan yang duplikat dalam mass function")
-      return false
+    if (existingGejalaCodes.includes(formData.kode) && !isGeneratingCode) {
+      toast.error(`Kode gejala '${formData.kode}' sudah digunakan. Gunakan kode lain.`);
+      return false;
     }
 
-    // Check if code already exists
-    const existingCodes = (gejalaData as ExistingGejala[]).map((item) => item.kode)
-    if (existingCodes.includes(formData.kode)) {
-      toast.error("Kode gejala sudah digunakan")
-      return false
+    // Check if any selected kerusakan in mass function is actually valid (exists in fetched options)
+    if (massFunctions.some(mf => !kerusakanData.some(ko => ko.kode === mf.kerusakan))) {
+      toast.error("Terdapat kerusakan yang tidak valid dalam mass function.");
+      return false;
     }
 
-    return true
-  }
+    // Ensure all mass function entries have a selected kerusakan
+    if (massFunctions.some(mf => !mf.kerusakan)) {
+      toast.error("Semua entri mass function harus memiliki kerusakan yang dipilih.");
+      return false;
+    }
 
+    return true;
+  }, [formData, massFunctions, existingGejalaCodes, isGeneratingCode, kerusakanData]);
+
+  // --- Save Handler ---
   const handleSave = async (): Promise<void> => {
-    if (!validateForm()) return
+    if (!validateForm()) return;
 
     toast("Konfirmasi Simpan", {
       description: "Simpan gejala baru ke dalam sistem?",
       action: {
         label: "Simpan",
         onClick: async () => {
-          setIsLoading(true)
+          setIsLoading(true);
           try {
-            // Build mass function from entries
-            const massFunction: Record<string, number> = {}
-            const totalMass = massFunctions.reduce((sum, entry) => sum + entry.value, 0)
-
+            const massFunction: Record<string, number> = {};
             massFunctions.forEach((entry) => {
               if (entry.value > 0) {
-                massFunction[entry.kerusakan] = entry.value
+                massFunction[entry.kerusakan] = entry.value;
               }
-            })
+            });
 
-            massFunction["uncertainty"] = Math.max(0.05, 1 - totalMass)
-
-            const updatedGejala: Gejala = {
+            const gejalaToSave: Omit<Gejala, 'id'> = {
               ...formData,
               mass_function: massFunction,
+            };
+
+            const response = await fetch("/api/gejala", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(gejalaToSave),
+            });
+
+            if (!response.ok) {
+              const errorData: { error?: string } = await response.json();
+              throw new Error(errorData.error || `Gagal menyimpan gejala: ${response.status}`);
             }
 
-            // Simulate API call
-            await new Promise((resolve) => setTimeout(resolve, 1500))
-
-            toast.success("Gejala berhasil ditambahkan")
-            router.push("/admin/gejala")
-          } catch (error) {
-            console.error("Error saving:", error)
-            toast.error("Terjadi kesalahan saat menyimpan data")
+            toast.success("Gejala berhasil ditambahkan.");
+            router.push("/admin/symptoms");
+          } catch (caughtError: unknown) {
+            console.error("Terjadi kesalahan saat menyimpan:", caughtError);
+            let errorMessage = "Terjadi kesalahan saat menyimpan data.";
+            if (caughtError instanceof Error) {
+              errorMessage = caughtError.message;
+            }
+            toast.error(errorMessage);
           } finally {
-            setIsLoading(false)
+            setIsLoading(false);
           }
         },
       },
@@ -200,21 +299,32 @@ export default function AddGejalaPage() {
         label: "Batal",
         onClick: () => toast.dismiss(),
       },
-    })
-  }
+    });
+  };
 
-  const handleInputChange = <K extends keyof Gejala>(field: K, value: Gejala[K]): void => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-  }
+  // --- Input Change Handlers ---
+  const handleInputChange = useCallback(
+    <K extends keyof Omit<Gejala, 'id'>>(field: K, value: Omit<Gejala, 'id'>[K]): void => {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+    },
+    []
+  );
 
-  const toggleDevice = (device: string): void => {
-    setFormData((prev) => ({
-      ...prev,
-      perangkat: prev.perangkat.includes(device)
-        ? prev.perangkat.filter((d) => d !== device)
-        : [...prev.perangkat, device],
-    }))
-  }
+  const toggleDevice = useCallback(
+    (device: string): void => {
+      setFormData((prev) => ({
+        ...prev,
+        perangkat: prev.perangkat.includes(device)
+          ? prev.perangkat.filter((d) => d !== device)
+          : [...prev.perangkat, device],
+      }));
+    },
+    []
+  );
+
+  // Calculate current total for display
+  const currentTotalMass = massFunctions.reduce((sum, mf) => sum + mf.value, 0);
+  const currentUncertainty = Math.max(0.05, 1 - currentTotalMass);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
@@ -226,7 +336,8 @@ export default function AddGejalaPage() {
         </Button>
         <h1 className="text-3xl font-bold">Tambah Gejala Baru</h1>
         <p className="text-muted-foreground mt-1">
-          Isi informasi gejala dan atur nilai kepercayaan untuk setiap kemungkinan kerusakan
+          Isi informasi gejala dan atur nilai kepercayaan untuk setiap
+          kemungkinan kerusakan.
         </p>
       </div>
 
@@ -236,7 +347,7 @@ export default function AddGejalaPage() {
           <Card>
             <CardHeader>
               <CardTitle>Informasi Dasar</CardTitle>
-              <CardDescription>Data utama gejala</CardDescription>
+              <CardDescription>Data utama gejala.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
@@ -248,6 +359,7 @@ export default function AddGejalaPage() {
                     onChange={(e) => handleInputChange("kode", e.target.value)}
                     placeholder="G1, G2, dst..."
                     className="font-mono"
+                    disabled={isGeneratingCode}
                   />
                   <Button
                     type="button"
@@ -264,7 +376,7 @@ export default function AddGejalaPage() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Kode akan di-generate otomatis atau Anda bisa mengubahnya
+                  Kode akan di-generate otomatis atau Anda bisa mengubahnya.
                 </p>
               </div>
 
@@ -291,12 +403,15 @@ export default function AddGejalaPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="kategori">Kategori</Label>
-                <Select value={formData.kategori} onValueChange={(value) => handleInputChange("kategori", value)}>
+                <Select
+                  value={formData.kategori}
+                  onValueChange={(value) => handleInputChange("kategori", value)}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map((cat) => (
+                    {categories.map((cat: string) => (
                       <SelectItem key={cat} value={cat}>
                         {cat}
                       </SelectItem>
@@ -308,7 +423,7 @@ export default function AddGejalaPage() {
               <div className="space-y-3">
                 <Label>Perangkat yang Berlaku *</Label>
                 <div className="flex gap-2">
-                  {devices.map((device) => (
+                  {devices.map((device: string) => (
                     <Button
                       key={device}
                       type="button"
@@ -320,7 +435,9 @@ export default function AddGejalaPage() {
                     </Button>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground">Pilih perangkat yang berlaku untuk gejala ini</p>
+                <p className="text-xs text-muted-foreground">
+                  Pilih perangkat yang berlaku untuk gejala ini.
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -340,7 +457,9 @@ export default function AddGejalaPage() {
         <Card>
           <CardHeader>
             <CardTitle>Nilai Kepercayaan (Mass Function)</CardTitle>
-            <CardDescription>Atur tingkat kepercayaan untuk setiap kerusakan</CardDescription>
+            <CardDescription>
+              Atur tingkat kepercayaan untuk setiap kerusakan. Total nilai boleh melebihi 1.0, akan dinormalisasi di backend.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex justify-between items-center">
@@ -350,19 +469,35 @@ export default function AddGejalaPage() {
                 variant="outline"
                 size="sm"
                 onClick={addMassFunction}
-                disabled={massFunctions.length >= kerusakanOptions.length}
+                disabled={isKerusakanLoading || massFunctions.length >= kerusakanData.length}
               >
-                <Plus className="h-4 w-4 mr-1" />
+                {isKerusakanLoading ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4 mr-1" />
+                )}
                 Tambah
               </Button>
             </div>
 
-            <div className="space-y-4 max-h-80 overflow-y-auto">
-              {massFunctions.map((entry, index) => (
-                <Card key={index} className="p-4 border-2">
-                  <div className="space-y-4">
+            {isKerusakanLoading && (
+              <div className="flex items-center justify-center h-20 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin mr-2" /> Memuat data kerusakan...
+              </div>
+            )}
+
+            {!isKerusakanLoading && kerusakanData.length === 0 && (
+              <p className="text-red-500 text-sm">Tidak ada data kerusakan yang tersedia. Silakan tambahkan kerusakan terlebih dahulu.</p>
+            )}
+
+            <div className="space-y-3 max-h-60 overflow-y-auto">
+              {massFunctions.map((entry: MassFunctionEntry, index: number) => (
+                <Card key={index} className="p-3 border-2">
+                  <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <Label className="text-sm font-medium">Kerusakan #{index + 1}</Label>
+                      <Label className="text-sm font-medium">
+                        Kerusakan #{index + 1}
+                      </Label>
                       {massFunctions.length > 1 && (
                         <Button
                           type="button"
@@ -376,32 +511,34 @@ export default function AddGejalaPage() {
                       )}
                     </div>
 
-                    <Select
+                    {/* NEW: Use Combobox for Kerusakan selection */}
+                    <Combobox
+                      options={getKerusakanComboboxOptions().filter(option =>
+                        option.value === entry.kerusakan || // Always show current selection
+                        !massFunctions.some(mf => mf.kerusakan === option.value) // Filter out other already selected options
+                      )}
                       value={entry.kerusakan}
                       onValueChange={(value) => updateMassFunction(index, "kerusakan", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {kerusakanOptions
-                          .filter((kk) => kk === entry.kerusakan || !massFunctions.some((mf) => mf.kerusakan === kk))
-                          .map((kk) => (
-                            <SelectItem key={kk} value={kk}>
-                              {kk}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
+                      placeholder="Pilih Kerusakan..."
+                      searchPlaceholder="Cari kerusakan..."
+                      emptyMessage="Kerusakan tidak ditemukan."
+                      disabled={isKerusakanLoading}
+                    />
 
                     <div>
                       <div className="flex justify-between items-center mb-2">
-                        <Label className="text-sm">Nilai: {entry.value.toFixed(3)}</Label>
-                        <Badge variant="outline">{(entry.value * 100).toFixed(1)}%</Badge>
+                        <Label className="text-sm">
+                          Nilai: {entry.value.toFixed(3)}
+                        </Label>
+                        <Badge variant="outline">
+                          {(entry.value * 100).toFixed(1)}%
+                        </Badge>
                       </div>
                       <Slider
                         value={[entry.value]}
-                        onValueChange={([value]) => updateMassFunction(index, "value", value)}
+                        onValueChange={([value]: number[]) =>
+                          updateMassFunction(index, "value", value)
+                        }
                         min={0.01}
                         max={0.95}
                         step={0.001}
@@ -415,29 +552,42 @@ export default function AddGejalaPage() {
 
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
               <div className="flex justify-between items-center mb-2">
-                <Label className="text-sm font-medium text-blue-800">Uncertainty (Ketidakpastian)</Label>
+                <Label className="text-sm font-medium text-blue-800">
+                  Uncertainty (Ketidakpastian)
+                </Label>
                 <Badge variant="outline" className="bg-blue-100 text-blue-800">
-                  {(Math.max(0.05, 1 - massFunctions.reduce((sum, mf) => sum + mf.value, 0)) * 100).toFixed(1)}%
+                  {(currentUncertainty * 100).toFixed(1)}%
                 </Badge>
               </div>
               <p className="text-xs text-blue-700">
-                Nilai: {Math.max(0.05, 1 - massFunctions.reduce((sum, mf) => sum + mf.value, 0)).toFixed(3)}
+                Nilai: {currentUncertainty.toFixed(3)}
               </p>
-              <p className="text-xs text-blue-600 mt-1">Nilai uncertainty otomatis dihitung dari sisa mass function</p>
+              <p className="text-xs text-blue-600 mt-1">
+                Nilai uncertainty ini dihitung otomatis dan merupakan sisa dari total mass function.
+              </p>
             </div>
 
             <div className="text-sm text-muted-foreground space-y-1">
-              <p>• Total mass function: {massFunctions.reduce((sum, mf) => sum + mf.value, 0).toFixed(3)}</p>
-              <p>• Maksimal total: 1.000</p>
-              <p>• Sisa untuk uncertainty: {(1 - massFunctions.reduce((sum, mf) => sum + mf.value, 0)).toFixed(3)}</p>
+              <p>
+                • Total mass function yang dimasukkan:{" "}
+                {currentTotalMass.toFixed(3)}
+              </p>
+              <p>
+                • Nilai ini akan dinormalisasi di backend untuk perhitungan Dempster-Shafer.
+              </p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Action Buttons */}
+      {/* Tombol Aksi */}
       <div className="mt-8 flex justify-end gap-4">
-        <Button type="button" variant="outline" onClick={() => router.back()} disabled={isLoading}>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => router.back()}
+          disabled={isLoading}
+        >
           Batal
         </Button>
         <Button onClick={handleSave} disabled={isLoading}>
@@ -455,5 +605,5 @@ export default function AddGejalaPage() {
         </Button>
       </div>
     </div>
-  )
+  );
 }

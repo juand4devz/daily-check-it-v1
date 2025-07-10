@@ -1,3 +1,5 @@
+// /lib/role-ai/logical-rules.ts
+
 /**
  * Logical Rules for Symptom Contradiction Detection
  *
@@ -87,12 +89,12 @@ export function detectContradictions(selectedSymptoms: string[]): {
   const severity =
     contradictions.length > 0
       ? contradictions.reduce(
-          (max, rule) => {
-            const severityOrder = { low: 1, medium: 2, high: 3 }
-            return severityOrder[rule.severity] > severityOrder[max] ? rule.severity : max
-          },
-          "low" as "high" | "medium" | "low",
-        )
+        (max, rule) => {
+          const severityOrder = { low: 1, medium: 2, high: 3 }
+          return severityOrder[rule.severity] > severityOrder[max] ? rule.severity : max
+        },
+        "low" as "high" | "medium" | "low",
+      )
       : "none"
 
   return {

@@ -1,3 +1,4 @@
+// /component/diagnosis/explanation-card.tsx
 "use client"
 
 import { useState, useEffect } from "react"
@@ -5,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Brain, Loader2, AlertCircle, Sparkles, Zap, Crown } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -31,6 +31,7 @@ interface StoredResult {
     severity_level: string
   }
   timestamp: string
+  selectedGejalaDetails?: { kode: string; nama: string }[] // Add this line
 }
 
 interface ExplanationCardProps {
@@ -141,22 +142,36 @@ export function ExplanationCard({ diagnosisData }: ExplanationCardProps) {
         topDiagnosis: topResult,
         analysis: diagnosisData.analysis,
         timestamp: diagnosisData.timestamp,
-      }
+        // Menambahkan variabel baru ke context yang berisi format gejala
+        selectedSymptomsFormatted: (diagnosisData.selectedGejalaDetails || [])
+          .map((gejala, i) => `${i + 1}. ${gejala.kode} - ${gejala.nama}`)
+          .join("\n"),
+      };
 
       const prompt = `Jelaskan hasil diagnosa berikut dengan SINGKAT dan MUDAH DIPAHAMI (maksimal 3000 karakter):
+      
+      Gejala yang dipilih:
+      ${context.selectedSymptomsFormatted}
+      
+      Diagnosa utama: ${diagnosisData.result?.[0]
+          ? `${diagnosisData.result[0].nama} (${(
+            diagnosisData.result[0].belief * 100
+          ).toFixed(1)}%)`
+          : "Tidak tersedia"
+        }
+      
+      Berikan penjelasan SINGKAT yang mencakup:
+      1. Apakah gejala yang dipilih saling berkaitan secara logis? Jika tidak, nyatakan dengan jujur bahwa gejala tampak tidak konsisten atau acak.
+      2. Mengapa diagnosa ini muncul berdasarkan gejala yang dipilih? (1-2 kalimat)
+      3. Apa arti tingkat kepercayaan (misalnya: “belief 40.5%”) dari diagnosa utama? (1 kalimat)
+      4. Langkah praktis yang disarankan untuk pengguna (maksimal 3 poin)
+      
+      CATATAN PENTING:
+      - Jika nama gejala tidak jelas, berikan peringatan eksplisit agar pengguna memeriksa kembali input-nya.
+      - Jika hasil diagnosa tidak relevan dengan gejala, sampaikan secara jujur bahwa sistem belum mampu menarik kesimpulan yang tepat.
+      - Gunakan bahasa Indonesia yang sederhana, tidak bertele-tele, dan langsung ke inti.
+      - Maksimal 3000 karakter, fokus pada hal penting dan mudah dipahami.`;
 
-Gejala yang dipilih: ${context.symptoms.join(", ")}
-Diagnosa utama: ${context.topDiagnosis?.nama} (${((context.topDiagnosis?.belief || 0) * 100).toFixed(1)}%)
-Tingkat akurasi: ${context.analysis?.accuracy_percentage}%
-Kategori dominan: ${context.analysis?.dominant_category}
-Tingkat keparahan: ${context.analysis?.severity_level}
-
-Berikan penjelasan SINGKAT yang mencakup:
-1. Mengapa diagnosa ini muncul berdasarkan gejala (1-2 kalimat)
-2. Apa arti tingkat kepercayaan dan akurasi (1 kalimat)
-3. Langkah praktis yang disarankan (maksimal 3 poin)
-
-PENTING: Gunakan bahasa Indonesia yang sederhana, jangan bertele-tele, langsung ke intinya. Maksimal 3000 karakter, fokus pada informasi penting saja.`
 
       console.log("🧠 Sending diagnosis explanation request with context: diagnosis (Gemini Pro Priority)")
 

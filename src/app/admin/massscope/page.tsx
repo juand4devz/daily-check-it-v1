@@ -1,297 +1,290 @@
-"use client"
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { Download, Filter, RefreshCw, Grid3X3, List, Search, Eye, EyeOff, Maximize2, Minimize2 } from "lucide-react"
-import gejalaData from "@/data/gejala.json"
-import kerusakanData from "@/data/kerusakan.json"
-import { toast } from "sonner"
+// /admin/massscope/page.tsx
+"use client";
+import { useState, useEffect, useCallback } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+// Removed Table, TableBody, TableCell, TableHead, TableHeader, TableRow imports to use raw HTML table elements
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+// Removed Sheet imports
+import { Download, Filter, RefreshCw, Grid3X3, List, Search, Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
 
-interface MassFunction {
-    gejala: string
-    namaGejala: string
-    kategori: string
-    kerusakan: string
-    namaKerusakan: string
-    value: number
-    uncertainty: number
-}
+import type { Gejala, Kerusakan, CombinedMassFunctionData } from "@/types";
 
+// --- Interfaces ---
 interface MatrixData {
-    gejalaList: string[]
-    kerusakanListFiltered: string[]
-    matrix: Record<string, Record<string, number>>
+    gejalaList: string[]; // List of gejala codes
+    kerusakanListFiltered: string[]; // List of kerusakan codes
+    matrix: Record<string, Record<string, number>>; // matrix[gejalaKode][kerusakanKode] = value
 }
 
-interface GejalaWithMassFunction {
-    kode: string
-    nama: string
-    kategori: string
-    mass_function?: Record<string, number>
-}
-
-interface KerusakanWithInfo {
-    kode: string
-    nama: string
+interface MassScopeStatistics {
+    totalGejala: number;
+    totalKerusakan: number;
+    totalRelations: number;
+    averageMass: number;
 }
 
 export default function MassFunctionPage() {
-    const [massFunctionData, setMassFunctionData] = useState<MassFunction[]>([])
-    const [filteredData, setFilteredData] = useState<MassFunction[]>([])
-    const [searchQuery, setSearchQuery] = useState("")
-    const [selectedKategori, setSelectedKategori] = useState("all")
-    const [selectedKerusakan, setSelectedKerusakan] = useState("all")
-    const [isLoading, setIsLoading] = useState(true)
-    const [viewMode, setViewMode] = useState<"matrix" | "list">("matrix")
-    const [showZeroValues, setShowZeroValues] = useState(false)
-    const [isFullscreen, setIsFullscreen] = useState(false)
+    const [allGejala, setAllGejala] = useState<Gejala[]>([]);
+    const [allKerusakan, setAllKerusakan] = useState<Kerusakan[]>([]);
+    const [massFunctionData, setMassFunctionData] = useState<CombinedMassFunctionData[]>([]);
+    const [filteredData, setFilteredData] = useState<CombinedMassFunctionData[]>([]);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [selectedKategori, setSelectedKategori] = useState("all");
+    const [selectedKerusakan, setSelectedKerusakan] = useState("all");
+    const [isLoading, setIsLoading] = useState(true);
+    const [viewMode, setViewMode] = useState<"matrix" | "list">("matrix");
+    const [showZeroValues, setShowZeroValues] = useState(false);
 
-    // Get unique categories and kerusakan for filters
-    const categories = Array.from(
-        new Set(
-            (gejalaData as GejalaWithMassFunction[])
-                .map((g) => g.kategori)
-                .filter((cat): cat is string => typeof cat === "string"),
-        ),
-    )
+    // Derived values for filters (dynamic)
+    const categoriesOptions = Array.from(
+        new Set(allGejala.map((g) => g.kategori))
+    ).filter((cat): cat is string => typeof cat === "string");
 
-    const kerusakanList = (kerusakanData as KerusakanWithInfo[])
+    const kerusakanFilterOptions = allKerusakan
         .map((k) => ({ kode: k.kode, nama: k.nama }))
-        .filter((k): k is { kode: string; nama: string } => typeof k.kode === "string" && typeof k.nama === "string")
+        .sort((a, b) => {
+            const numA = parseInt(a.kode.replace("KK", "")) || 0;
+            const numB = parseInt(b.kode.replace("KK", "")) || 0;
+            return numA - numB;
+        });
 
     useEffect(() => {
-        loadMassFunctionData()
-    }, [])
+        fetchAllData();
+    }, []);
 
     useEffect(() => {
-        filterData()
-    }, [massFunctionData, searchQuery, selectedKategori, selectedKerusakan])
+        prepareMassFunctionData(allGejala, allKerusakan);
+    }, [allGejala, allKerusakan]);
 
-    const loadMassFunctionData = (): void => {
-        setIsLoading(true)
+    useEffect(() => {
+        filterData();
+    }, [massFunctionData, searchQuery, selectedKategori, selectedKerusakan, showZeroValues]);
+
+    // --- Data Fetching from API ---
+    const fetchAllData = async (): Promise<void> => {
+        setIsLoading(true);
         try {
-            const data: MassFunction[] = []
+            const [gejalaRes, kerusakanRes] = await Promise.all([
+                fetch("/api/gejala"),
+                fetch("/api/damages"),
+            ]);
 
-            const typedGejalaData = gejalaData as GejalaWithMassFunction[]
-            const typedKerusakanData = kerusakanData as KerusakanWithInfo[]
+            if (!gejalaRes.ok) {
+                const errorText = await gejalaRes.text();
+                throw new Error(`Gagal memuat data gejala: ${gejalaRes.status} ${errorText}`);
+            }
+            if (!kerusakanRes.ok) {
+                const errorText = await kerusakanRes.text();
+                throw new Error(`Gagal memuat data kerusakan: ${kerusakanRes.status} ${errorText}`);
+            }
 
-            typedGejalaData.forEach((gejala) => {
-                const massFunction = gejala.mass_function || {}
-                const uncertainty = typeof massFunction.uncertainty === "number" ? massFunction.uncertainty : 0
+            const fetchedGejala: Gejala[] = await gejalaRes.json();
+            const fetchedKerusakan: Kerusakan[] = await kerusakanRes.json();
 
-                Object.entries(massFunction).forEach(([kerusakanKode, value]) => {
-                    if (kerusakanKode !== "uncertainty" && typeof value === "number") {
-                        const kerusakan = typedKerusakanData.find((k) => k.kode === kerusakanKode)
-
-                        data.push({
-                            gejala: gejala.kode,
-                            namaGejala: gejala.nama,
-                            kategori: gejala.kategori,
-                            kerusakan: kerusakanKode,
-                            namaKerusakan: typeof kerusakan?.nama === "string" ? kerusakan.nama : kerusakanKode,
-                            value: value,
-                            uncertainty: uncertainty,
-                        })
-                    }
-                })
-            })
-
-            setMassFunctionData(data)
+            setAllGejala(fetchedGejala);
+            setAllKerusakan(fetchedKerusakan);
+            toast.success("Data gejala dan kerusakan berhasil dimuat.");
         } catch (error) {
-            console.error("Error loading mass function data:", error)
-            toast.error("Gagal memuat data mass function")
+            console.error("Error fetching all data:", error);
+            toast.error(error instanceof Error ? error.message : "Gagal memuat data utama.");
+            setAllGejala([]);
+            setAllKerusakan([]);
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
 
-    const filterData = (): void => {
-        let filtered = massFunctionData
+    // --- Data Preparation (Combines Gejala & Kerusakan for Mass Function Display) ---
+    const prepareMassFunctionData = useCallback((gejalaData: Gejala[], kerusakanData: Kerusakan[]): void => {
+        const preparedData: CombinedMassFunctionData[] = [];
+
+        gejalaData.forEach((gejala) => {
+            const massFunction = gejala.mass_function || {};
+            const uncertainty = typeof massFunction.uncertainty === "number" ? massFunction.uncertainty : 0;
+
+            Object.entries(massFunction).forEach(([kerusakanKode, value]) => {
+                if (kerusakanKode !== "uncertainty" && typeof value === "number") {
+                    const kerusakan = kerusakanData.find((k) => k.kode === kerusakanKode);
+
+                    preparedData.push({
+                        gejalaId: gejala.id,
+                        gejalaKode: gejala.kode,
+                        gejalaNama: gejala.nama,
+                        kategori: gejala.kategori,
+                        kerusakanKode: kerusakanKode,
+                        kerusakanNama: kerusakan?.nama || `Unknown Kerusakan (${kerusakanKode})`,
+                        value: value,
+                        uncertainty: uncertainty,
+                    });
+                }
+            });
+        });
+        setMassFunctionData(preparedData);
+    },
+        []
+    );
+
+    // --- Filtering Logic ---
+    const filterData = useCallback((): void => {
+        let filtered = massFunctionData;
 
         if (searchQuery) {
-            const query = searchQuery.toLowerCase()
+            const query = searchQuery.toLowerCase();
             filtered = filtered.filter(
                 (item) =>
-                    item.namaGejala.toLowerCase().includes(query) ||
-                    item.gejala.toLowerCase().includes(query) ||
-                    item.namaKerusakan.toLowerCase().includes(query) ||
-                    item.kerusakan.toLowerCase().includes(query),
-            )
+                    item.gejalaNama.toLowerCase().includes(query) ||
+                    item.gejalaKode.toLowerCase().includes(query) ||
+                    item.kerusakanNama.toLowerCase().includes(query) ||
+                    item.kerusakanKode.toLowerCase().includes(query)
+            );
         }
 
         if (selectedKategori !== "all") {
-            filtered = filtered.filter((item) => item.kategori === selectedKategori)
+            filtered = filtered.filter((item) => item.kategori === selectedKategori);
         }
 
         if (selectedKerusakan !== "all") {
-            filtered = filtered.filter((item) => item.kerusakan === selectedKerusakan)
+            filtered = filtered.filter((item) => item.kerusakanKode === selectedKerusakan);
         }
 
-        setFilteredData(filtered)
-    }
+        if (!showZeroValues) {
+            filtered = filtered.filter((item) => item.value > 0);
+        }
 
+        setFilteredData(filtered);
+    },
+        [massFunctionData, searchQuery, selectedKategori, selectedKerusakan, showZeroValues]
+    );
+
+    // --- Export Data to CSV ---
     const exportData = (): void => {
+        if (filteredData.length === 0) {
+            toast.info("Tidak ada data untuk diekspor.");
+            return;
+        }
         const csvContent = [
-            ["Gejala", "Nama Gejala", "Kategori", "Kerusakan", "Nama Kerusakan", "Mass Value", "Uncertainty"],
+            ["Gejala Kode", "Nama Gejala", "Kategori", "Kerusakan Kode", "Nama Kerusakan", "Mass Value", "Uncertainty"],
             ...filteredData.map((item) => [
-                item.gejala,
-                item.namaGejala,
+                item.gejalaKode,
+                item.gejalaNama,
                 item.kategori,
-                item.kerusakan,
-                item.namaKerusakan,
+                item.kerusakanKode,
+                item.kerusakanNama,
                 item.value.toFixed(3),
                 item.uncertainty.toFixed(3),
             ]),
         ]
             .map((row) => row.join(","))
-            .join("\n")
+            .join("\n");
 
-        const blob = new Blob([csvContent], { type: "text/csv" })
-        const url = URL.createObjectURL(blob)
-        const link = document.createElement("a")
-        link.href = url
-        link.download = "mass-function-data.csv"
-        link.click()
-        URL.revokeObjectURL(url)
-        toast.success("Data berhasil diekspor")
-    }
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "mass-function-data.csv";
+        document.body.appendChild(link);
+        link.click();
+        URL.revokeObjectURL(url);
+        toast.success("Data berhasil diekspor");
+    };
 
+    // --- Utility Functions for Styling ---
     const getValueColor = (value: number): string => {
-        if (value >= 0.7) return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
-        if (value >= 0.4) return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300"
-        if (value >= 0.2) return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
-        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-    }
+        if (value >= 0.7) return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+        if (value >= 0.4) return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
+        if (value >= 0.2) return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300";
+        return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+    };
 
     const getValueIntensity = (value: number): number => {
-        return Math.min(100, Math.max(10, value * 100))
-    }
+        return Math.min(100, Math.max(10, value * 100));
+    };
 
-    const getCellBackgroundColor = (value: number, isDark = false): string => {
-        const intensity = getValueIntensity(value)
-        if (isDark) {
-            return `rgba(59, 130, 246, ${(intensity / 100) * 0.6})`
-        }
-        return `rgba(59, 130, 246, ${intensity / 100})`
-    }
+    const getCellBackgroundColor = (value: number): string => {
+        const intensity = getValueIntensity(value);
+        return `rgba(59, 130, 246, ${intensity / 100})`;
+    };
 
-    // Create matrix view data
-    const createMatrixData = (): MatrixData => {
-        const gejalaList = Array.from(new Set(filteredData.map((item) => item.gejala)))
-        const kerusakanListFiltered = Array.from(new Set(filteredData.map((item) => item.kerusakan)))
+    // --- Create Matrix Data ---
+    const createMatrixData = useCallback((): MatrixData => {
+        const uniqueGejalaCodes = Array.from(new Set(filteredData.map((item) => item.gejalaKode))).sort((a, b) => {
+            const numA = parseInt(a.replace("G", "")) || 0;
+            const numB = parseInt(b.replace("G", "")) || 0;
+            return numA - numB;
+        });
 
-        const matrix: Record<string, Record<string, number>> = {}
+        const uniqueKerusakanCodes = Array.from(new Set(filteredData.map((item) => item.kerusakanKode))).sort((a, b) => {
+            const numA = parseInt(a.replace("KK", "")) || 0;
+            const numB = parseInt(b.replace("KK", "")) || 0;
+            return numA - numB;
+        });
 
-        gejalaList.forEach((gejala) => {
-            matrix[gejala] = {}
-            kerusakanListFiltered.forEach((kerusakan) => {
-                const item = filteredData.find((d) => d.gejala === gejala && d.kerusakan === kerusakan)
-                matrix[gejala][kerusakan] = item?.value || 0
-            })
-        })
+        const matrix: Record<string, Record<string, number>> = {};
 
-        return { gejalaList, kerusakanListFiltered, matrix }
-    }
+        uniqueGejalaCodes.forEach((gejalaKode) => {
+            matrix[gejalaKode] = {};
+            uniqueKerusakanCodes.forEach((kerusakanKode) => {
+                const item = filteredData.find((d) => d.gejalaKode === gejalaKode && d.kerusakanKode === kerusakanKode);
+                matrix[gejalaKode][kerusakanKode] = item?.value || 0;
+            });
+        });
 
-    const { gejalaList, kerusakanListFiltered, matrix } = createMatrixData()
+        return { gejalaList: uniqueGejalaCodes, kerusakanListFiltered: uniqueKerusakanCodes, matrix };
+    },
+        [filteredData]
+    );
 
-    const calculateAverageMass = (): string => {
-        if (filteredData.length === 0) return "0.000"
-        const total = filteredData.reduce((sum, item) => sum + item.value, 0)
-        return (total / filteredData.length).toFixed(3)
-    }
+    const { gejalaList, kerusakanListFiltered, matrix } = createMatrixData();
 
-    const FilterSheet = () => (
-        <Sheet>
-            <SheetTrigger asChild>
-                <Button variant="outline" size="sm" className="lg:hidden bg-transparent">
-                    <Filter className="h-4 w-4 mr-2" />
-                    Filter
-                </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-80">
-                <SheetHeader>
-                    <SheetTitle>Filter Data</SheetTitle>
-                    <SheetDescription>Gunakan filter untuk menyaring data mass function</SheetDescription>
-                </SheetHeader>
-                <div className="space-y-4 mt-6">
-                    <div>
-                        <label className="text-sm font-medium mb-2 block">Cari</label>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Cari gejala atau kerusakan..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10"
-                            />
-                        </div>
-                    </div>
-                    <div>
-                        <label className="text-sm font-medium mb-2 block">Kategori</label>
-                        <Select value={selectedKategori} onValueChange={setSelectedKategori}>
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Semua Kategori</SelectItem>
-                                {categories.map((cat) => (
-                                    <SelectItem key={cat} value={cat}>
-                                        {cat}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div>
-                        <label className="text-sm font-medium mb-2 block">Kerusakan</label>
-                        <Select value={selectedKerusakan} onValueChange={setSelectedKerusakan}>
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Semua Kerusakan</SelectItem>
-                                {kerusakanList.map((k) => (
-                                    <SelectItem key={k.kode} value={k.kode}>
-                                        {k.kode} - {k.nama}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium">Tampilkan nilai 0</label>
-                        <Button variant="ghost" size="sm" onClick={() => setShowZeroValues(!showZeroValues)}>
-                            {showZeroValues ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                        </Button>
-                    </div>
-                </div>
-            </SheetContent>
-        </Sheet>
-    )
+    // --- Calculate Mass Scope Statistics ---
+    const calculateStatistics = useCallback((): MassScopeStatistics => {
+        const totalGejala = new Set(filteredData.map((item) => item.gejalaKode)).size;
+        const totalKerusakan = new Set(filteredData.map((item) => item.kerusakanKode)).size;
+        const totalRelations = filteredData.length;
+
+        let sumOfMassValues = 0;
+        let countOfMassValues = 0;
+
+        filteredData.forEach((item) => {
+            if (showZeroValues || item.value > 0) {
+                sumOfMassValues += item.value;
+                countOfMassValues++;
+            }
+        });
+
+        const averageMass = countOfMassValues > 0 ? sumOfMassValues / countOfMassValues : 0;
+
+        return {
+            totalGejala,
+            totalKerusakan,
+            totalRelations,
+            averageMass,
+        };
+    },
+        [filteredData, showZeroValues]
+    );
+
+    const stats = calculateStatistics();
 
     if (isLoading) {
         return (
             <div className="container mx-auto px-4 py-8">
-                <div className="text-center">
-                    <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
-                    <p>Memuat data mass function...</p>
+                <div className="text-center animate-pulse">
+                    <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-500" />
+                    <p className="text-muted-foreground">Memuat data mass function...</p>
                 </div>
             </div>
-        )
+        );
     }
 
     return (
-        <div
-            className={`container mx-auto px-2 sm:px-4 py-4 sm:py-8 ${isFullscreen ? "fixed inset-0 z-50 bg-background overflow-auto" : ""}`}
-        >
+        <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
             {/* Header */}
             <div className="mb-4 sm:mb-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -301,17 +294,40 @@ export default function MassFunctionPage() {
                             Visualisasi nilai kepercayaan (mass function) dalam bentuk tabel matrix
                         </p>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => setIsFullscreen(!isFullscreen)}>
-                            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-                        </Button>
-                        <FilterSheet />
-                    </div>
                 </div>
             </div>
 
-            {/* Desktop Filters */}
-            <Card className="mb-4 sm:mb-6 hidden lg:block">
+            {/* Statistics */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
+                <Card>
+                    <CardContent className="p-3 sm:p-4">
+                        <div className="text-lg sm:text-2xl font-bold text-blue-600">{stats.totalGejala}</div>
+                        <div className="text-xs sm:text-sm text-muted-foreground">Total Gejala</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="p-3 sm:p-4">
+                        <div className="text-lg sm:text-2xl font-bold text-green-600">{stats.totalKerusakan}</div>
+                        <div className="text-xs sm:text-sm text-muted-foreground">Total Kerusakan</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="p-3 sm:p-4">
+                        <div className="text-lg sm:text-2xl font-bold text-orange-600">{stats.totalRelations}</div>
+                        <div className="text-xs sm:text-sm text-muted-foreground">Total Relasi (non-nol)</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="p-3 sm:p-4">
+                        <div className="text-lg sm:text-2xl font-bold text-purple-600">{stats.averageMass.toFixed(3)}</div>
+                        <div className="text-xs sm:text-sm text-muted-foreground">Rata-rata Mass</div>
+                    </CardContent>
+                </Card>
+            </div>
+
+
+            {/* Filters & Export (always visible, responsive layout) */}
+            <Card className="mb-4 sm:mb-6">
                 <CardHeader className="pb-4">
                     <CardTitle className="flex items-center gap-2 text-lg">
                         <Filter className="h-5 w-5" />
@@ -319,28 +335,29 @@ export default function MassFunctionPage() {
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                        <div>
-                            <label className="text-sm font-medium mb-2 block">Cari</label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="md:col-span-2 lg:col-span-2">
+                            <label htmlFor="searchQuery" className="text-sm font-medium mb-2 block">Cari</label>
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
+                                    id="searchQuery"
                                     placeholder="Cari gejala atau kerusakan..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="pl-10"
+                                    className="pl-10 w-full"
                                 />
                             </div>
                         </div>
                         <div>
-                            <label className="text-sm font-medium mb-2 block">Kategori</label>
+                            <label htmlFor="categoryFilter" className="text-sm font-medium mb-2 block">Kategori Gejala</label>
                             <Select value={selectedKategori} onValueChange={setSelectedKategori}>
-                                <SelectTrigger>
+                                <SelectTrigger id="categoryFilter" className="w-full">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">Semua Kategori</SelectItem>
-                                    {categories.map((cat) => (
+                                    {categoriesOptions.map((cat) => (
                                         <SelectItem key={cat} value={cat}>
                                             {cat}
                                         </SelectItem>
@@ -349,14 +366,14 @@ export default function MassFunctionPage() {
                             </Select>
                         </div>
                         <div>
-                            <label className="text-sm font-medium mb-2 block">Kerusakan</label>
+                            <label htmlFor="kerusakanFilter" className="text-sm font-medium mb-2 block">Kerusakan</label>
                             <Select value={selectedKerusakan} onValueChange={setSelectedKerusakan}>
-                                <SelectTrigger>
+                                <SelectTrigger id="kerusakanFilter" className="w-full">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">Semua Kerusakan</SelectItem>
-                                    {kerusakanList.map((k) => (
+                                    {kerusakanFilterOptions.map((k) => (
                                         <SelectItem key={k.kode} value={k.kode}>
                                             {k.kode} - {k.nama}
                                         </SelectItem>
@@ -364,53 +381,21 @@ export default function MassFunctionPage() {
                                 </SelectContent>
                             </Select>
                         </div>
-                        <div className="flex flex-col gap-2">
-                            <label className="text-sm font-medium">Opsi</label>
+                        <div className="col-span-full flex flex-col sm:flex-row items-start sm:items-center gap-2 mt-2 justify-between">
                             <div className="flex items-center gap-2">
-                                <Button
-                                    variant={showZeroValues ? "default" : "outline"}
-                                    size="sm"
-                                    onClick={() => setShowZeroValues(!showZeroValues)}
-                                >
-                                    {showZeroValues ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                                </Button>
-                                <Button onClick={exportData} size="sm">
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Export
+                                <label className="text-sm font-medium whitespace-nowrap">Tampilkan Nilai Nol</label>
+                                <Button variant="ghost" size="sm" onClick={() => setShowZeroValues(!showZeroValues)}>
+                                    {showZeroValues ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                 </Button>
                             </div>
+                            <Button onClick={exportData} size="sm" className="w-full sm:w-auto">
+                                <Download className="mr-2 h-4 w-4" />
+                                Export Data
+                            </Button>
                         </div>
                     </div>
                 </CardContent>
             </Card>
-
-            {/* Statistics */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
-                <Card>
-                    <CardContent className="p-3 sm:p-4">
-                        <div className="text-lg sm:text-2xl font-bold text-blue-600">{gejalaList.length}</div>
-                        <div className="text-xs sm:text-sm text-muted-foreground">Total Gejala</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="p-3 sm:p-4">
-                        <div className="text-lg sm:text-2xl font-bold text-green-600">{kerusakanListFiltered.length}</div>
-                        <div className="text-xs sm:text-sm text-muted-foreground">Total Kerusakan</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="p-3 sm:p-4">
-                        <div className="text-lg sm:text-2xl font-bold text-orange-600">{filteredData.length}</div>
-                        <div className="text-xs sm:text-sm text-muted-foreground">Total Relasi</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="p-3 sm:p-4">
-                        <div className="text-lg sm:text-2xl font-bold text-purple-600">{calculateAverageMass()}</div>
-                        <div className="text-xs sm:text-sm text-muted-foreground">Rata-rata Mass</div>
-                    </CardContent>
-                </Card>
-            </div>
 
             {/* View Mode Tabs */}
             <Tabs
@@ -418,21 +403,18 @@ export default function MassFunctionPage() {
                 onValueChange={(value) => setViewMode(value as "matrix" | "list")}
                 className="mb-4 sm:mb-6"
             >
-                <TabsList className="grid w-full grid-cols-2 max-w-md">
-                    <TabsTrigger value="matrix" className="flex items-center gap-2">
+                <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
+                    <TabsTrigger value="matrix" className="flex items-center justify-center gap-2">
                         <Grid3X3 className="h-4 w-4" />
-                        <span className="hidden sm:inline">Matrix View</span>
-                        <span className="sm:hidden">Matrix</span>
+                        <span>Matrix</span>
                     </TabsTrigger>
-                    <TabsTrigger value="list" className="flex items-center gap-2">
+                    <TabsTrigger value="list" className="flex items-center justify-center gap-2">
                         <List className="h-4 w-4" />
-                        <span className="hidden sm:inline">List View</span>
-                        <span className="sm:hidden">List</span>
+                        <span>List</span>
                     </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="matrix" className="mt-4">
-                    {/* Matrix View */}
                     <Card>
                         <CardHeader className="pb-4">
                             <CardTitle className="text-lg sm:text-xl">Matrix Mass Function</CardTitle>
@@ -442,94 +424,99 @@ export default function MassFunctionPage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <div className="relative">
-                                <ScrollArea className="w-full">
-                                    <div className="min-w-full">
-                                        <Table>
-                                            <TableHeader className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                                                <TableRow>
-                                                    <TableHead className="sticky left-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 w-32 sm:w-40 border-r">
-                                                        <div className="font-semibold">Gejala</div>
-                                                    </TableHead>
-                                                    {kerusakanListFiltered.map((kerusakan) => (
-                                                        <TableHead key={kerusakan} className="text-center min-w-16 sm:min-w-20 p-1 sm:p-2">
-                                                            <div className="transform -rotate-45 origin-center whitespace-nowrap text-xs sm:text-sm font-medium">
-                                                                {kerusakan}
+                            {/* This is the core fix for sticky header/column and hydration error */}
+                            <div className="relative overflow-auto" style={{ maxHeight: '60vh' }}>
+                                <table className="w-full caption-bottom text-sm border-collapse"> {/* Added border-collapse for sticky */}
+                                    <thead>
+                                        <tr className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-background/95 [&_th]:backdrop-blur [&_th]:supports-[backdrop-filter]:bg-background/60">
+                                            <th className="sticky left-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 w-32 sm:w-40 border-r p-2 sm:p-4 text-left align-bottom"> {/* Added align-bottom */}
+                                                <div className="font-semibold whitespace-nowrap">Gejala</div>
+                                            </th>
+                                            {kerusakanListFiltered.map((kerusakanKode) => {
+                                                const kerusakan = allKerusakan.find((k) => k.kode === kerusakanKode);
+                                                return (
+                                                    <th key={kerusakanKode} className="text-center min-w-[80px] sm:min-w-[100px] p-1 sm:p-2 align-bottom"> {/* Added align-bottom */}
+                                                        <div
+                                                            className="transform -rotate-45 origin-center whitespace-nowrap text-xs sm:text-sm font-medium"
+                                                            title={kerusakan?.nama || kerusakanKode}
+                                                        >
+                                                            {kerusakanKode}
+                                                        </div>
+                                                    </th>
+                                                );
+                                            })}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {gejalaList.length === 0 && (kerusakanListFiltered.length === 0 || !showZeroValues) ? (
+                                            <tr>
+                                                <td colSpan={kerusakanListFiltered.length + 1} className="text-center py-8 text-muted-foreground">
+                                                    Tidak ada data mass function yang sesuai dengan filter.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            gejalaList.map((gejalaKode) => {
+                                                const gejalaInfo = allGejala.find((g) => g.kode === gejalaKode);
+                                                return (
+                                                    <tr key={gejalaKode} className="hover:bg-muted/50">
+                                                        <td className="sticky left-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 font-medium border-r w-32 sm:w-40 p-2 sm:p-4 align-top">
+                                                            <div className="space-y-1">
+                                                                <Badge variant="outline" className="text-xs">
+                                                                    {gejalaKode}
+                                                                </Badge>
+                                                                <div
+                                                                    className="text-xs text-muted-foreground max-w-28 sm:max-w-32 truncate"
+                                                                    title={gejalaInfo?.nama || "Unknown"}
+                                                                >
+                                                                    {gejalaInfo?.nama || "Unknown"}
+                                                                </div>
+                                                                <Badge variant="secondary" className="text-xs">
+                                                                    {gejalaInfo?.kategori || "Unknown"}
+                                                                </Badge>
                                                             </div>
-                                                        </TableHead>
-                                                    ))}
-                                                </TableRow>
-                                            </TableHeader>
-                                        </Table>
-                                        <ScrollArea className="h-[60vh] sm:h-[70vh]">
-                                            <Table>
-                                                <TableBody>
-                                                    {gejalaList.map((gejala) => {
-                                                        const gejalaInfo = (gejalaData as GejalaWithMassFunction[]).find((g) => g.kode === gejala)
-                                                        return (
-                                                            <TableRow key={gejala} className="hover:bg-muted/50">
-                                                                <TableCell className="sticky left-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 font-medium border-r w-32 sm:w-40 p-2 sm:p-4">
-                                                                    <div className="space-y-1">
-                                                                        <Badge variant="outline" className="text-xs">
-                                                                            {gejala}
-                                                                        </Badge>
-                                                                        <div
-                                                                            className="text-xs text-muted-foreground max-w-28 sm:max-w-32 truncate"
-                                                                            title={gejalaInfo?.nama || "Unknown"}
-                                                                        >
-                                                                            {gejalaInfo?.nama || "Unknown"}
-                                                                        </div>
-                                                                        <Badge variant="secondary" className="text-xs">
-                                                                            {gejalaInfo?.kategori || "Unknown"}
-                                                                        </Badge>
-                                                                    </div>
-                                                                </TableCell>
-                                                                {kerusakanListFiltered.map((kerusakan) => {
-                                                                    const value = matrix[gejala]?.[kerusakan] || 0
-                                                                    const intensity = getValueIntensity(value)
-                                                                    const shouldShow = showZeroValues || value > 0
+                                                        </td>
+                                                        {kerusakanListFiltered.map((kerusakanKodeCol) => {
+                                                            const value = matrix[gejalaKode]?.[kerusakanKodeCol] || 0;
+                                                            const shouldShow = showZeroValues || value > 0;
 
-                                                                    return (
-                                                                        <TableCell
-                                                                            key={`${gejala}-${kerusakan}`}
-                                                                            className="text-center p-1 sm:p-2 min-w-16 sm:min-w-20"
+                                                            return (
+                                                                <td
+                                                                    key={`${gejalaKode}-${kerusakanKodeCol}`}
+                                                                    className="text-center p-1 sm:p-2 min-w-[80px] sm:min-w-[100px] align-middle"
+                                                                >
+                                                                    {shouldShow ? (
+                                                                        <div
+                                                                            className="w-full h-8 sm:h-12 flex items-center justify-center rounded text-xs font-mono font-bold transition-all hover:scale-105 cursor-pointer"
+                                                                            style={{
+                                                                                backgroundColor: getCellBackgroundColor(value),
+                                                                                color: value > 0.5 ? "white" : "black",
+                                                                            }}
+                                                                            title={`${gejalaInfo?.nama || gejalaKode} → ${allKerusakan.find((k) => k.kode === kerusakanKodeCol)?.nama || kerusakanKodeCol}: ${value.toFixed(3)}`}
                                                                         >
-                                                                            {shouldShow && value > 0 ? (
-                                                                                <div
-                                                                                    className="w-full h-8 sm:h-12 flex items-center justify-center rounded text-xs font-mono font-bold transition-all hover:scale-105 cursor-pointer"
-                                                                                    style={{
-                                                                                        backgroundColor: getCellBackgroundColor(value),
-                                                                                        color: intensity > 50 ? "white" : "black",
-                                                                                    }}
-                                                                                    title={`${gejala} → ${kerusakan}: ${value.toFixed(3)}`}
-                                                                                >
-                                                                                    {value.toFixed(2)}
-                                                                                </div>
-                                                                            ) : (
-                                                                                <div className="w-full h-8 sm:h-12 flex items-center justify-center bg-muted/30 rounded text-muted-foreground text-xs">
-                                                                                    {showZeroValues ? "0.00" : "-"}
-                                                                                </div>
-                                                                            )}
-                                                                        </TableCell>
-                                                                    )
-                                                                })}
-                                                            </TableRow>
-                                                        )
-                                                    })}
-                                                </TableBody>
-                                            </Table>
-                                            <ScrollBar orientation="vertical" />
-                                        </ScrollArea>
-                                    </div>
-                                    <ScrollBar orientation="horizontal" />
-                                </ScrollArea>
+                                                                            {value.toFixed(2)}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="w-full h-8 sm:h-12 flex items-center justify-center bg-muted/30 rounded text-muted-foreground text-xs">
+                                                                            -
+                                                                        </div>
+                                                                    )}
+                                                                </td>
+                                                            );
+                                                        })}
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
                             </div>
+                            {/* Scrollbars are now implicitly handled by the overflow-auto on the div */}
+                            {/* If you still want explicit scrollbars, you'd need to re-evaluate Shadcn's ScrollArea usage */}
                         </CardContent>
                     </Card>
                 </TabsContent>
 
                 <TabsContent value="list" className="mt-4">
-                    {/* List View */}
                     <Card>
                         <CardHeader className="pb-4">
                             <CardTitle className="text-lg sm:text-xl">Detail Mass Function</CardTitle>
@@ -539,68 +526,70 @@ export default function MassFunctionPage() {
                         </CardHeader>
                         <CardContent className="p-0">
                             <ScrollArea className="h-[60vh] sm:h-[70vh]">
-                                <Table>
-                                    <TableHeader className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                                        <TableRow>
-                                            <TableHead className="w-20 sm:w-24">Gejala</TableHead>
-                                            <TableHead className="hidden sm:table-cell">Nama Gejala</TableHead>
-                                            <TableHead className="w-20 sm:w-24">Kategori</TableHead>
-                                            <TableHead className="w-20 sm:w-24">Kerusakan</TableHead>
-                                            <TableHead className="hidden sm:table-cell">Nama Kerusakan</TableHead>
-                                            <TableHead className="w-20 sm:w-24">Mass Value</TableHead>
-                                            <TableHead className="hidden lg:table-cell w-20">Uncertainty</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
+                                {/* For List View, we keep Shadcn's Table components */}
+                                <table className="w-full caption-bottom text-sm relative min-w-[700px] md:min-w-full"> {/* Use raw table here too for consistency and potential sticky */}
+                                    <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-background/95 [&_th]:backdrop-blur [&_th]:supports-[backdrop-filter]:bg-background/60">
+                                        <tr>
+                                            <th className="w-20 sm:w-24 text-left p-2 sm:p-4">Kode Gejala</th>
+                                            <th className="hidden sm:table-cell w-32 sm:w-40 text-left p-2 sm:p-4">Nama Gejala</th>
+                                            <th className="w-20 sm:w-24 text-left p-2 sm:p-4">Kategori</th>
+                                            <th className="w-20 sm:w-24 text-left p-2 sm:p-4">Kode Kerusakan</th>
+                                            <th className="hidden sm:table-cell w-32 sm:w-40 text-left p-2 sm:p-4">Nama Kerusakan</th>
+                                            <th className="w-20 sm:w-24 text-left p-2 sm:p-4">Mass Value</th>
+                                            <th className="hidden lg:table-cell w-20 text-left p-2 sm:p-4">Uncertainty</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
                                         {filteredData.length === 0 ? (
-                                            <TableRow>
-                                                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                                            <tr>
+                                                <td colSpan={7} className="text-center py-8 text-muted-foreground">
                                                     Tidak ada data yang sesuai dengan filter
-                                                </TableCell>
-                                            </TableRow>
+                                                </td>
+                                            </tr>
                                         ) : (
                                             filteredData
                                                 .sort((a, b) => b.value - a.value)
                                                 .map((item, index) => (
-                                                    <TableRow key={`${item.gejala}-${item.kerusakan}-${index}`} className="hover:bg-muted/50">
-                                                        <TableCell className="p-2 sm:p-4">
+                                                    <tr key={`${item.gejalaKode}-${item.kerusakanKode}-${index}`} className="hover:bg-muted/50">
+                                                        <td className="p-2 sm:p-4">
                                                             <Badge variant="outline" className="text-xs">
-                                                                {item.gejala}
+                                                                {item.gejalaKode}
                                                             </Badge>
-                                                        </TableCell>
-                                                        <TableCell className="hidden sm:table-cell max-w-xs p-2 sm:p-4">
-                                                            <div className="truncate text-sm" title={item.namaGejala}>
-                                                                {item.namaGejala}
+                                                        </td>
+                                                        <td className="hidden sm:table-cell max-w-xs p-2 sm:p-4">
+                                                            <div className="truncate text-sm" title={item.gejalaNama}>
+                                                                {item.gejalaNama}
                                                             </div>
-                                                        </TableCell>
-                                                        <TableCell className="p-2 sm:p-4">
+                                                        </td>
+                                                        <td className="p-2 sm:p-4">
                                                             <Badge variant="secondary" className="text-xs">
                                                                 {item.kategori}
                                                             </Badge>
-                                                        </TableCell>
-                                                        <TableCell className="p-2 sm:p-4">
+                                                        </td>
+                                                        <td className="p-2 sm:p-4">
                                                             <Badge variant="outline" className="text-xs">
-                                                                {item.kerusakan}
+                                                                {item.kerusakanKode}
                                                             </Badge>
-                                                        </TableCell>
-                                                        <TableCell className="hidden sm:table-cell max-w-xs p-2 sm:p-4">
-                                                            <div className="truncate text-sm" title={item.namaKerusakan}>
-                                                                {item.namaKerusakan}
+                                                        </td>
+                                                        <td className="hidden sm:table-cell max-w-xs p-2 sm:p-4">
+                                                            <div className="truncate text-sm" title={item.kerusakanNama}>
+                                                                {item.kerusakanNama}
                                                             </div>
-                                                        </TableCell>
-                                                        <TableCell className="p-2 sm:p-4">
+                                                        </td>
+                                                        <td className="p-2 sm:p-4">
                                                             <Badge className={getValueColor(item.value)}>{item.value.toFixed(3)}</Badge>
-                                                        </TableCell>
-                                                        <TableCell className="hidden lg:table-cell p-2 sm:p-4">
+                                                        </td>
+                                                        <td className="hidden lg:table-cell p-2 sm:p-4">
                                                             <span className="font-mono text-sm text-muted-foreground">
                                                                 {item.uncertainty.toFixed(3)}
                                                             </span>
-                                                        </TableCell>
-                                                    </TableRow>
+                                                        </td>
+                                                    </tr>
                                                 ))
                                         )}
-                                    </TableBody>
-                                </Table>
+                                    </tbody>
+                                </table>
+                                <ScrollBar orientation="vertical" />
                             </ScrollArea>
                         </CardContent>
                     </Card>
@@ -649,5 +638,5 @@ export default function MassFunctionPage() {
                 </CardContent>
             </Card>
         </div>
-    )
+    );
 }

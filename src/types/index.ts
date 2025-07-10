@@ -1,23 +1,47 @@
+// src/types.ts
 export interface Gejala {
-    kode: string
-    nama: string
-    deskripsi: string
-    kategori: string
-    perangkat: string[]
-    mass_function: Record<string, number>
-    gambar: string
+    id: string; // Firestore document ID
+    kode: string;
+    nama: string;
+    deskripsi: string;
+    kategori: string;
+    perangkat: string[];
+    mass_function: Record<string, number>;
+    gambar: string;
+    createdAt?: string;
+    updatedAt?: string;
 }
 
+export interface MassFunctionEntry {
+    kerusakan: string;
+    value: number;
+}
+
+// Ensure 'id' is present and matches Firestore document ID
 export interface Kerusakan {
-    kode: string
-    nama: string
-    deskripsi: string
-    tingkat_kerusakan: "Ringan" | "Sedang" | "Berat"
-    estimasi_biaya: string
-    waktu_perbaikan: string
-    prior_probability: number
-    solusi: string
-    gejala_terkait: string[]
+    id: string; // This is the Firestore document ID
+    kode: string;
+    nama: string;
+    deskripsi: string;
+    tingkat_kerusakan: "Ringan" | "Sedang" | "Berat";
+    estimasi_biaya: string;
+    waktu_perbaikan: string;
+    prior_probability: number;
+    solusi: string;
+    gejala_terkait: string[];
+    createdAt?: string; // Optional, will be filled in backend
+    updatedAt?: string; // Optional, will be filled in backend
+}
+
+export interface CombinedMassFunctionData {
+    gejalaId: string; // The Firestore ID of the Gejala document
+    gejalaKode: string;
+    gejalaNama: string;
+    kategori: string;
+    kerusakanKode: string;
+    kerusakanNama: string;
+    value: number;
+    uncertainty: number;
 }
 
 export interface DiagnosisResult {

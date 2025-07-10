@@ -1,5 +1,6 @@
+// /admin/damages/edit/[id]/page.tsx
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,33 +11,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, Save, X, Eye } from "lucide-react"
+import { ArrowLeft, Save, X, Eye, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import kerusakanData from "@/data/kerusakan.json"
-import type { Kerusakan } from "@/types"
+import type { Kerusakan } from "@/types" // Use the updated Kerusakan type
 
-const tingkatKerusakan: Array<Kerusakan["tingkat_kerusakan"]> = ["Ringan", "Sedang", "Berat"]
-const gejalaOptions = Array.from({ length: 25 }, (_, i) => `G${i + 1}`)
-
-interface ExistingKerusakan extends Record<string, unknown> {
-    kode: string
-    nama?: string
-    deskripsi?: string
-    tingkat_kerusakan?: string
-    estimasi_biaya?: string
-    waktu_perbaikan?: string
-    prior_probability?: number
-    solusi?: string
-    gejala_terkait?: string[]
-}
+const tingkatKerusakanOptions: Array<Kerusakan["tingkat_kerusakan"]> = ["Ringan", "Sedang", "Berat"]
+// You will likely need to fetch these from your /api/gejala route eventually
+const gejalaOptions = Array.from({ length: 25 }, (_, i) => `G${i + 1}`) // Placeholder for now
 
 export default function EditKerusakanPage() {
     const router = useRouter()
     const params = useParams()
-    const [isLoading, setIsLoading] = useState(false)
+    const [isLoading, setIsLoading] = useState(true) // Set to true for initial data fetch
     const [formData, setFormData] = useState<Kerusakan>({
+        id: "", // Initialize with empty string, will be populated from fetched data
         kode: "",
         nama: "",
         deskripsi: "",
@@ -48,50 +38,77 @@ export default function EditKerusakanPage() {
         gejala_terkait: [],
     })
 
+    // --- Fetch Kerusakan Data for Editing ---
     useEffect(() => {
-        const kerusakanId = params.id as string
-        const kerusakan = (kerusakanData as ExistingKerusakan[]).find((k) => k.kode === kerusakanId)
+        const fetchKerusakanToEdit = async () => {
+            const kerusakanId = params.id as string // This is the Firestore document ID
+            if (!kerusakanId) {
+                toast.error("ID kerusakan tidak valid.")
+                router.push("/admin/damages")
+                return
+            }
 
-        if (kerusakan) {
-            setFormData({
-                kode: kerusakan.kode,
-                nama: kerusakan.nama || "",
-                deskripsi: kerusakan.deskripsi || "",
-                tingkat_kerusakan: (kerusakan.tingkat_kerusakan as Kerusakan["tingkat_kerusakan"]) || "Ringan",
-                estimasi_biaya: kerusakan.estimasi_biaya || "",
-                waktu_perbaikan: kerusakan.waktu_perbaikan || "",
-                prior_probability: kerusakan.prior_probability || 0.1,
-                solusi: kerusakan.solusi || "",
-                gejala_terkait: Array.isArray(kerusakan.gejala_terkait) ? kerusakan.gejala_terkait : [],
-            })
-        } else {
-            toast.error("Data kerusakan tidak ditemukan")
-            router.push("/admin/kerusakan")
+            setIsLoading(true)
+            try {
+                // Fetch single kerusakan by its Firestore document ID
+                const response = await fetch(`/api/damages/${kerusakanId}`)
+                if (!response.ok) {
+                    const errorText = await response.text()
+                    throw new Error(`Gagal memuat kerusakan: ${response.status} ${errorText}`)
+                }
+                const fetchedKerusakan: Kerusakan = await response.json()
+
+                setFormData({
+                    id: fetchedKerusakan.id, // Set the ID from fetched data
+                    kode: fetchedKerusakan.kode,
+                    nama: fetchedKerusakan.nama || "",
+                    deskripsi: fetchedKerusakan.deskripsi || "",
+                    tingkat_kerusakan: fetchedKerusakan.tingkat_kerusakan || "Ringan",
+                    estimasi_biaya: fetchedKerusakan.estimasi_biaya || "",
+                    waktu_perbaikan: fetchedKerusakan.waktu_perbaikan || "",
+                    prior_probability: fetchedKerusakan.prior_probability || 0.1,
+                    solusi: fetchedKerusakan.solusi || "",
+                    gejala_terkait: Array.isArray(fetchedKerusakan.gejala_terkait) ? fetchedKerusakan.gejala_terkait : [],
+                })
+                toast.success(`Data kerusakan '${fetchedKerusakan.kode}' berhasil dimuat.`)
+            } catch (caughtError: unknown) {
+                console.error("Error loading kerusakan data:", caughtError)
+                let errorMessage = "Gagal memuat data kerusakan."
+                if (caughtError instanceof Error) {
+                    errorMessage = caughtError.message
+                }
+                toast.error(errorMessage)
+                router.push("/admin/damages") // Redirect if data load fails
+            } finally {
+                setIsLoading(false)
+            }
         }
-    }, [params.id, router])
 
-    const toggleGejala = (gejalaKode: string): void => {
+        fetchKerusakanToEdit()
+    }, [params.id, router]) // Dependency on params.id
+
+    const toggleGejala = useCallback((gejalaKode: string): void => {
         setFormData((prev) => ({
             ...prev,
             gejala_terkait: prev.gejala_terkait.includes(gejalaKode)
                 ? prev.gejala_terkait.filter((g) => g !== gejalaKode)
                 : [...prev.gejala_terkait, gejalaKode],
         }))
-    }
+    }, [])
 
-    const validateForm = (): boolean => {
-        if (!formData.kode || !formData.nama || !formData.deskripsi) {
-            toast.error("Mohon lengkapi semua field yang wajib diisi")
+    const validateForm = useCallback((): boolean => {
+        if (!formData.kode.trim() || !formData.nama.trim() || !formData.deskripsi.trim()) {
+            toast.error("Mohon lengkapi semua field yang wajib diisi.")
             return false
         }
 
         if (formData.prior_probability <= 0 || formData.prior_probability > 0.5) {
-            toast.error("Prior probability harus antara 0.01 dan 0.50")
+            toast.error("Prior probability harus antara 0.01 dan 0.50.")
             return false
         }
 
         return true
-    }
+    }, [formData])
 
     const handleSave = async (): Promise<void> => {
         if (!validateForm()) return
@@ -103,14 +120,41 @@ export default function EditKerusakanPage() {
                 onClick: async () => {
                     setIsLoading(true)
                     try {
-                        // Simulate API call - replace with actual implementation
-                        await new Promise((resolve) => setTimeout(resolve, 1000))
+                        const updatedKerusakan: Omit<Kerusakan, 'id'> = { // Do NOT send 'id' in the body
+                            kode: formData.kode, // Keep original kode
+                            nama: formData.nama,
+                            deskripsi: formData.deskripsi,
+                            tingkat_kerusakan: formData.tingkat_kerusakan,
+                            estimasi_biaya: formData.estimasi_biaya,
+                            waktu_perbaikan: formData.waktu_perbaikan,
+                            prior_probability: formData.prior_probability,
+                            solusi: formData.solusi,
+                            gejala_terkait: formData.gejala_terkait,
+                        }
 
-                        toast.success("Kerusakan berhasil diupdate")
-                        router.push("/admin/kerusakan")
-                    } catch (error) {
-                        console.error(error)
-                        toast.error("Terjadi kesalahan saat menyimpan data")
+                        // Use formData.id (the Firestore document ID) in the URL for the PUT request
+                        const response = await fetch(`/api/damages/${formData.id}`, {
+                            method: "PUT",
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify(updatedKerusakan),
+                        })
+
+                        if (!response.ok) {
+                            const errorData: { error?: string } = await response.json()
+                            throw new Error(errorData.error || `Gagal mengupdate kerusakan: ${response.status}`)
+                        }
+
+                        toast.success("Kerusakan berhasil diupdate.")
+                        router.push("/admin/damages")
+                    } catch (caughtError: unknown) {
+                        console.error("Error saving:", caughtError)
+                        let errorMessage = "Terjadi kesalahan saat menyimpan data."
+                        if (caughtError instanceof Error) {
+                            errorMessage = caughtError.message
+                        }
+                        toast.error(errorMessage)
                     } finally {
                         setIsLoading(false)
                     }
@@ -123,8 +167,23 @@ export default function EditKerusakanPage() {
         })
     }
 
-    const handleInputChange = <K extends keyof Kerusakan>(field: K, value: Kerusakan[K]): void => {
+    const handleInputChange = useCallback(<K extends keyof Omit<Kerusakan, 'id'>>(field: K, value: Omit<Kerusakan, 'id'>[K]): void => {
         setFormData((prev) => ({ ...prev, [field]: value }))
+    }, [])
+
+    if (isLoading && formData.id === "") { // Show loading when initial data is being fetched
+        return (
+            <div className="container mx-auto px-4 py-8 max-w-4xl">
+                <div className="animate-pulse space-y-6">
+                    <div className="h-8 bg-gray-200 dark:bg-zinc-800 rounded w-1/4 mb-4"></div>
+                    <div className="h-10 bg-gray-200 dark:bg-zinc-800 rounded w-1/2"></div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="h-96 bg-gray-200 dark:bg-zinc-800 rounded"></div>
+                        <div className="h-96 bg-gray-200 dark:bg-zinc-800 rounded"></div>
+                    </div>
+                </div>
+            </div>
+        )
     }
 
     return (
@@ -153,7 +212,7 @@ export default function EditKerusakanPage() {
                                 value={formData.kode}
                                 onChange={(e) => handleInputChange("kode", e.target.value)}
                                 placeholder="KK1, KK2, dst..."
-                                disabled
+                                disabled // Kode tidak bisa diubah setelah dibuat
                             />
                         </div>
 
@@ -188,7 +247,7 @@ export default function EditKerusakanPage() {
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {tingkatKerusakan.map((tingkat) => (
+                                    {tingkatKerusakanOptions.map((tingkat) => (
                                         <SelectItem key={tingkat} value={tingkat}>
                                             {tingkat}
                                         </SelectItem>
@@ -326,8 +385,17 @@ export default function EditKerusakanPage() {
                     Batal
                 </Button>
                 <Button onClick={handleSave} disabled={isLoading}>
-                    <Save className="mr-2 h-4 w-4" />
-                    {isLoading ? "Menyimpan..." : "Update Kerusakan"}
+                    {isLoading ? (
+                        <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Menyimpan...
+                        </>
+                    ) : (
+                        <>
+                            <Save className="mr-2 h-4 w-4" />
+                            Update Kerusakan
+                        </>
+                    )}
                 </Button>
             </div>
         </div>

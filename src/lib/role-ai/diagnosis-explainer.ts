@@ -1,3 +1,5 @@
+// /lib/role-ai/diagnose-explaner.ts
+
 // Enhanced diagnosis explainer role for concise, user-friendly explanations
 export const diagnosisExplainerRole = {
   role: `Kamu adalah asisten teknisi komputer yang ahli dalam menjelaskan hasil diagnosa dengan bahasa yang sederhana dan mudah dipahami.
@@ -25,9 +27,9 @@ Gaya penjelasan:
     return `Jelaskan hasil diagnosa ini dengan SINGKAT dan MUDAH DIPAHAMI:
 
 **Gejala:** ${gejalaDetails
-      .map((g) => g.nama)
-      .slice(0, 3)
-      .join(", ")}
+        .map((g) => g.nama)
+        .slice(0, 3)
+        .join(", ")}
 **Hasil:** ${topResult?.nama} (${beliefPercentage}% kemungkinan)
 **Akurasi:** ${diagnosisData.analysis?.accuracy_percentage || 0}%
 

@@ -1,3 +1,4 @@
+// /api/ai-assistance/route.ts
 import { type NextRequest, NextResponse } from "next/server"
 import { generateStreamWithFallback, getModelStrategy, type ModelContext } from "@/lib/ai-service"
 
