@@ -6,10 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-// Removed Table, TableBody, TableCell, TableHead, TableHeader, TableRow imports to use raw HTML table elements
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-// Removed Sheet imports
 import { Download, Filter, RefreshCw, Grid3X3, List, Search, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 
@@ -328,7 +326,7 @@ export default function MassFunctionPage() {
 
             {/* Filters & Export (always visible, responsive layout) */}
             <Card className="mb-4 sm:mb-6">
-                <CardHeader className="pb-4">
+                <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg">
                         <Filter className="h-5 w-5" />
                         Filter & Export
@@ -398,203 +396,206 @@ export default function MassFunctionPage() {
             </Card>
 
             {/* View Mode Tabs */}
-            <Tabs
-                value={viewMode}
-                onValueChange={(value) => setViewMode(value as "matrix" | "list")}
-                className="mb-4 sm:mb-6"
-            >
-                <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
-                    <TabsTrigger value="matrix" className="flex items-center justify-center gap-2">
-                        <Grid3X3 className="h-4 w-4" />
-                        <span>Matrix</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="list" className="flex items-center justify-center gap-2">
-                        <List className="h-4 w-4" />
-                        <span>List</span>
-                    </TabsTrigger>
-                </TabsList>
+            <div className="w-full flex items-center justify-center">
+                <Tabs
+                    value={viewMode}
+                    onValueChange={(value) => setViewMode(value as "matrix" | "list")}
+                    className="mb-4 sm:mb-6 w-full md:max-w-4xl"
+                >
+                    <TabsList className="mx-auto">
+                        <TabsTrigger value="matrix" className="flex items-center justify-center gap-2">
+                            <Grid3X3 className="h-4 w-4" />
+                            <span>Matrix</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="list" className="flex items-center justify-center gap-2">
+                            <List className="h-4 w-4" />
+                            <span>List</span>
+                        </TabsTrigger>
+                    </TabsList>
 
-                <TabsContent value="matrix" className="mt-4">
-                    <Card>
-                        <CardHeader className="pb-4">
-                            <CardTitle className="text-lg sm:text-xl">Matrix Mass Function</CardTitle>
-                            <CardDescription className="text-sm">
-                                Tabel matrix menunjukkan nilai kepercayaan setiap gejala terhadap kerusakan. Scroll horizontal dan
-                                vertikal untuk melihat semua data.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            {/* This is the core fix for sticky header/column and hydration error */}
-                            <div className="relative overflow-auto" style={{ maxHeight: '60vh' }}>
-                                <table className="w-full caption-bottom text-sm border-collapse"> {/* Added border-collapse for sticky */}
-                                    <thead>
-                                        <tr className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-background/95 [&_th]:backdrop-blur [&_th]:supports-[backdrop-filter]:bg-background/60">
-                                            <th className="sticky left-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 w-32 sm:w-40 border-r p-2 sm:p-4 text-left align-bottom"> {/* Added align-bottom */}
-                                                <div className="font-semibold whitespace-nowrap">Gejala</div>
-                                            </th>
-                                            {kerusakanListFiltered.map((kerusakanKode) => {
-                                                const kerusakan = allKerusakan.find((k) => k.kode === kerusakanKode);
-                                                return (
-                                                    <th key={kerusakanKode} className="text-center min-w-[80px] sm:min-w-[100px] p-1 sm:p-2 align-bottom"> {/* Added align-bottom */}
-                                                        <div
-                                                            className="transform -rotate-45 origin-center whitespace-nowrap text-xs sm:text-sm font-medium"
-                                                            title={kerusakan?.nama || kerusakanKode}
-                                                        >
-                                                            {kerusakanKode}
-                                                        </div>
-                                                    </th>
-                                                );
-                                            })}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {gejalaList.length === 0 && (kerusakanListFiltered.length === 0 || !showZeroValues) ? (
-                                            <tr>
-                                                <td colSpan={kerusakanListFiltered.length + 1} className="text-center py-8 text-muted-foreground">
-                                                    Tidak ada data mass function yang sesuai dengan filter.
-                                                </td>
+                    <TabsContent value="matrix" className="mt-2">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-lg sm:text-xl">Matrix Mass Function</CardTitle>
+                                <CardDescription className="text-sm">
+                                    Tabel matrix menunjukkan nilai kepercayaan setiap gejala terhadap kerusakan. Gulir horizontal dan
+                                    vertikal untuk melihat semua data.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <div className="relative overflow-auto" style={{ maxHeight: '60vh' }}>
+                                    <table className="w-full caption-bottom text-sm border-collapse">
+                                        <thead>
+                                            {/* Header row with sticky top and background */}
+                                            <tr className="[&_th]:sticky [&_th]:top-0 [&_th]:z-20 [&_th]:bg-background/95 [&_th]:backdrop-blur [&_th]:supports-[backdrop-filter]:bg-background/60">
+                                                {/* Gejala header - sticky left */}
+                                                <th className="sticky left-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 w-28 sm:w-32 md:w-40 border-r p-2 sm:p-3 text-left align-bottom text-xs sm:text-sm">
+                                                    <div className="font-semibold whitespace-nowrap">Gejala</div>
+                                                </th>
+                                                {/* Kerusakan headers - rotate and adapt width */}
+                                                {kerusakanListFiltered.map((kerusakanKode) => {
+                                                    const kerusakan = allKerusakan.find((k) => k.kode === kerusakanKode);
+                                                    return (
+                                                        <th key={kerusakanKode} className="text-center min-w-[70px] sm:min-w-[80px] md:min-w-[100px] p-1 sm:p-2 align-bottom">
+                                                            <div
+                                                                className="transform -rotate-45 origin-center whitespace-nowrap text-[0.6rem] sm:text-xs font-medium"
+                                                                title={kerusakan?.nama || kerusakanKode}
+                                                            >
+                                                                {kerusakanKode}
+                                                            </div>
+                                                        </th>
+                                                    );
+                                                })}
                                             </tr>
-                                        ) : (
-                                            gejalaList.map((gejalaKode) => {
-                                                const gejalaInfo = allGejala.find((g) => g.kode === gejalaKode);
-                                                return (
-                                                    <tr key={gejalaKode} className="hover:bg-muted/50">
-                                                        <td className="sticky left-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 font-medium border-r w-32 sm:w-40 p-2 sm:p-4 align-top">
-                                                            <div className="space-y-1">
-                                                                <Badge variant="outline" className="text-xs">
-                                                                    {gejalaKode}
-                                                                </Badge>
-                                                                <div
-                                                                    className="text-xs text-muted-foreground max-w-28 sm:max-w-32 truncate"
-                                                                    title={gejalaInfo?.nama || "Unknown"}
-                                                                >
-                                                                    {gejalaInfo?.nama || "Unknown"}
+                                        </thead>
+                                        <tbody>
+                                            {gejalaList.length === 0 && (kerusakanListFiltered.length === 0 || !showZeroValues) ? (
+                                                <tr>
+                                                    <td colSpan={kerusakanListFiltered.length + 1} className="text-center py-8 text-muted-foreground text-sm">
+                                                        Tidak ada data mass function yang sesuai dengan filter.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                gejalaList.map((gejalaKode) => {
+                                                    const gejalaInfo = allGejala.find((g) => g.kode === gejalaKode);
+                                                    return (
+                                                        <tr key={gejalaKode} className="hover:bg-muted/50">
+                                                            {/* Gejala info column - sticky left */}
+                                                            <td className="sticky left-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 font-medium border-r w-28 sm:w-32 md:w-40 p-2 sm:p-3 align-top">
+                                                                <div className="space-y-1">
+                                                                    <Badge variant="outline" className="text-[0.6rem] sm:text-xs">
+                                                                        {gejalaKode}
+                                                                    </Badge>
+                                                                    <div
+                                                                        className="text-[0.6rem] sm:text-xs text-muted-foreground max-w-24 sm:max-w-28 md:max-w-32 truncate"
+                                                                        title={gejalaInfo?.nama || "Unknown"}
+                                                                    >
+                                                                        {gejalaInfo?.nama || "Unknown"}
+                                                                    </div>
+                                                                    <Badge variant="secondary" className="text-[0.6rem] sm:text-xs">
+                                                                        {gejalaInfo?.kategori || "Unknown"}
+                                                                    </Badge>
                                                                 </div>
-                                                                <Badge variant="secondary" className="text-xs">
-                                                                    {gejalaInfo?.kategori || "Unknown"}
-                                                                </Badge>
-                                                            </div>
-                                                        </td>
-                                                        {kerusakanListFiltered.map((kerusakanKodeCol) => {
-                                                            const value = matrix[gejalaKode]?.[kerusakanKodeCol] || 0;
-                                                            const shouldShow = showZeroValues || value > 0;
+                                                            </td>
+                                                            {/* Mass value cells */}
+                                                            {kerusakanListFiltered.map((kerusakanKodeCol) => {
+                                                                const value = matrix[gejalaKode]?.[kerusakanKodeCol] || 0;
+                                                                const shouldShow = showZeroValues || value > 0;
 
-                                                            return (
-                                                                <td
-                                                                    key={`${gejalaKode}-${kerusakanKodeCol}`}
-                                                                    className="text-center p-1 sm:p-2 min-w-[80px] sm:min-w-[100px] align-middle"
-                                                                >
-                                                                    {shouldShow ? (
-                                                                        <div
-                                                                            className="w-full h-8 sm:h-12 flex items-center justify-center rounded text-xs font-mono font-bold transition-all hover:scale-105 cursor-pointer"
-                                                                            style={{
-                                                                                backgroundColor: getCellBackgroundColor(value),
-                                                                                color: value > 0.5 ? "white" : "black",
-                                                                            }}
-                                                                            title={`${gejalaInfo?.nama || gejalaKode} → ${allKerusakan.find((k) => k.kode === kerusakanKodeCol)?.nama || kerusakanKodeCol}: ${value.toFixed(3)}`}
-                                                                        >
-                                                                            {value.toFixed(2)}
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div className="w-full h-8 sm:h-12 flex items-center justify-center bg-muted/30 rounded text-muted-foreground text-xs">
-                                                                            -
-                                                                        </div>
-                                                                    )}
-                                                                </td>
-                                                            );
-                                                        })}
-                                                    </tr>
-                                                );
-                                            })
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                            {/* Scrollbars are now implicitly handled by the overflow-auto on the div */}
-                            {/* If you still want explicit scrollbars, you'd need to re-evaluate Shadcn's ScrollArea usage */}
-                        </CardContent>
-                    </Card>
-                </TabsContent>
+                                                                return (
+                                                                    <td
+                                                                        key={`${gejalaKode}-${kerusakanKodeCol}`}
+                                                                        className="text-center p-1 sm:p-2 min-w-[70px] sm:min-w-[80px] md:min-w-[100px] align-middle"
+                                                                    >
+                                                                        {shouldShow ? (
+                                                                            <div
+                                                                                className="w-full h-7 sm:h-8 md:h-10 flex items-center justify-center rounded text-[0.6rem] sm:text-xs font-mono font-bold transition-all hover:scale-105 cursor-pointer"
+                                                                                style={{
+                                                                                    backgroundColor: getCellBackgroundColor(value),
+                                                                                    color: value > 0.5 ? "white" : "black",
+                                                                                }}
+                                                                                title={`${gejalaInfo?.nama || gejalaKode} → ${allKerusakan.find((k) => k.kode === kerusakanKodeCol)?.nama || kerusakanKodeCol}: ${value.toFixed(3)}`}
+                                                                            >
+                                                                                {value.toFixed(2)}
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="w-full h-7 sm:h-8 md:h-10 flex items-center justify-center bg-muted/30 rounded text-[0.6rem] sm:text-xs">
+                                                                                -
+                                                                            </div>
+                                                                        )}
+                                                                    </td>
+                                                                );
+                                                            })}
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
 
-                <TabsContent value="list" className="mt-4">
-                    <Card>
-                        <CardHeader className="pb-4">
-                            <CardTitle className="text-lg sm:text-xl">Detail Mass Function</CardTitle>
-                            <CardDescription className="text-sm">
-                                Daftar detail semua nilai mass function yang tersedia
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            <ScrollArea className="h-[60vh] sm:h-[70vh]">
-                                {/* For List View, we keep Shadcn's Table components */}
-                                <table className="w-full caption-bottom text-sm relative min-w-[700px] md:min-w-full"> {/* Use raw table here too for consistency and potential sticky */}
-                                    <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-background/95 [&_th]:backdrop-blur [&_th]:supports-[backdrop-filter]:bg-background/60">
-                                        <tr>
-                                            <th className="w-20 sm:w-24 text-left p-2 sm:p-4">Kode Gejala</th>
-                                            <th className="hidden sm:table-cell w-32 sm:w-40 text-left p-2 sm:p-4">Nama Gejala</th>
-                                            <th className="w-20 sm:w-24 text-left p-2 sm:p-4">Kategori</th>
-                                            <th className="w-20 sm:w-24 text-left p-2 sm:p-4">Kode Kerusakan</th>
-                                            <th className="hidden sm:table-cell w-32 sm:w-40 text-left p-2 sm:p-4">Nama Kerusakan</th>
-                                            <th className="w-20 sm:w-24 text-left p-2 sm:p-4">Mass Value</th>
-                                            <th className="hidden lg:table-cell w-20 text-left p-2 sm:p-4">Uncertainty</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {filteredData.length === 0 ? (
+                    <TabsContent value="list" className="mt-4">
+                        <Card>
+                            <CardHeader className="pb-4">
+                                <CardTitle className="text-lg sm:text-xl">Detail Mass Function</CardTitle>
+                                <CardDescription className="text-sm">
+                                    Daftar detail semua nilai mass function yang tersedia
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <ScrollArea className="h-[60vh] sm:h-[70vh]">
+                                    <table className="w-full caption-bottom text-sm relative min-w-[700px] md:min-w-full">
+                                        <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-background/95 [&_th]:backdrop-blur [&_th]:supports-[backdrop-filter]:bg-background/60">
                                             <tr>
-                                                <td colSpan={7} className="text-center py-8 text-muted-foreground">
-                                                    Tidak ada data yang sesuai dengan filter
-                                                </td>
+                                                <th className="w-20 sm:w-24 text-left p-2 sm:p-4">Kode Gejala</th>
+                                                <th className="hidden sm:table-cell w-32 sm:w-40 text-left p-2 sm:p-4">Nama Gejala</th>
+                                                <th className="w-20 sm:w-24 text-left p-2 sm:p-4">Kategori</th>
+                                                <th className="w-20 sm:w-24 text-left p-2 sm:p-4">Kode Kerusakan</th>
+                                                <th className="hidden sm:table-cell w-32 sm:w-40 text-left p-2 sm:p-4">Nama Kerusakan</th>
+                                                <th className="w-20 sm:w-24 text-left p-2 sm:p-4">Mass Value</th>
+                                                <th className="hidden lg:table-cell w-20 text-left p-2 sm:p-4">Uncertainty</th>
                                             </tr>
-                                        ) : (
-                                            filteredData
-                                                .sort((a, b) => b.value - a.value)
-                                                .map((item, index) => (
-                                                    <tr key={`${item.gejalaKode}-${item.kerusakanKode}-${index}`} className="hover:bg-muted/50">
-                                                        <td className="p-2 sm:p-4">
-                                                            <Badge variant="outline" className="text-xs">
-                                                                {item.gejalaKode}
-                                                            </Badge>
-                                                        </td>
-                                                        <td className="hidden sm:table-cell max-w-xs p-2 sm:p-4">
-                                                            <div className="truncate text-sm" title={item.gejalaNama}>
-                                                                {item.gejalaNama}
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-2 sm:p-4">
-                                                            <Badge variant="secondary" className="text-xs">
-                                                                {item.kategori}
-                                                            </Badge>
-                                                        </td>
-                                                        <td className="p-2 sm:p-4">
-                                                            <Badge variant="outline" className="text-xs">
-                                                                {item.kerusakanKode}
-                                                            </Badge>
-                                                        </td>
-                                                        <td className="hidden sm:table-cell max-w-xs p-2 sm:p-4">
-                                                            <div className="truncate text-sm" title={item.kerusakanNama}>
-                                                                {item.kerusakanNama}
-                                                            </div>
-                                                        </td>
-                                                        <td className="p-2 sm:p-4">
-                                                            <Badge className={getValueColor(item.value)}>{item.value.toFixed(3)}</Badge>
-                                                        </td>
-                                                        <td className="hidden lg:table-cell p-2 sm:p-4">
-                                                            <span className="font-mono text-sm text-muted-foreground">
-                                                                {item.uncertainty.toFixed(3)}
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                ))
-                                        )}
-                                    </tbody>
-                                </table>
-                                <ScrollBar orientation="vertical" />
-                            </ScrollArea>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-            </Tabs>
+                                        </thead>
+                                        <tbody>
+                                            {filteredData.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
+                                                        Tidak ada data yang sesuai dengan filter
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                filteredData
+                                                    .sort((a, b) => b.value - a.value)
+                                                    .map((item, index) => (
+                                                        <tr key={`${item.gejalaKode}-${item.kerusakanKode}-${index}`} className="hover:bg-muted/50">
+                                                            <td className="p-2 sm:p-4">
+                                                                <Badge variant="outline" className="text-xs">
+                                                                    {item.gejalaKode}
+                                                                </Badge>
+                                                            </td>
+                                                            <td className="hidden sm:table-cell max-w-xs p-2 sm:p-4">
+                                                                <div className="truncate text-sm" title={item.gejalaNama}>
+                                                                    {item.gejalaNama}
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-2 sm:p-4">
+                                                                <Badge variant="secondary" className="text-xs">
+                                                                    {item.kategori}
+                                                                </Badge>
+                                                            </td>
+                                                            <td className="p-2 sm:p-4">
+                                                                <Badge variant="outline" className="text-xs">
+                                                                    {item.kerusakanKode}
+                                                                </Badge>
+                                                            </td>
+                                                            <td className="hidden sm:table-cell max-w-xs p-2 sm:p-4">
+                                                                <div className="truncate text-sm" title={item.kerusakanNama}>
+                                                                    {item.kerusakanNama}
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-2 sm:p-4">
+                                                                <Badge className={getValueColor(item.value)}>{item.value.toFixed(3)}</Badge>
+                                                            </td>
+                                                            <td className="hidden lg:table-cell p-2 sm:p-4">
+                                                                <span className="font-mono text-sm text-muted-foreground">
+                                                                    {item.uncertainty.toFixed(3)}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                    <ScrollBar orientation="vertical" />
+                                </ScrollArea>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
+            </div>
 
             {/* Legend */}
             <Card className="mt-4 sm:mt-6">
@@ -631,7 +632,7 @@ export default function MassFunctionPage() {
                                 <li>• Nilai berkisar antara 0.00 hingga 1.00</li>
                                 <li>• Uncertainty adalah nilai ketidakpastian yang tersisa</li>
                                 <li>• Matrix memudahkan analisis pola hubungan gejala-kerusakan</li>
-                                <li>• Gunakan scroll horizontal dan vertikal untuk navigasi</li>
+                                <li>• Gunakan gulir horizontal dan vertikal untuk navigasi</li>
                             </ul>
                         </div>
                     </div>
