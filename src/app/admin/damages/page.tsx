@@ -1,98 +1,110 @@
-// /admin/kerusakan/page.tsx
-"use client"
-import { useState, useEffect, useRef } from "react"
-import type React from "react"
+// /admin/damages/page.tsx
+"use client";
+import { useState, useEffect, useRef } from "react";
+import type React from "react";
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Plus, Edit, Trash2, DollarSign, Clock, AlertTriangle, Download, Upload, Search, RefreshCw, Loader2 } from "lucide-react"
-import { toast } from "sonner"
-import { useRouter } from "next/navigation"
-import type { Kerusakan } from "@/types" // Use the updated Kerusakan type from types.ts
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Edit, Trash2, DollarSign, Clock, AlertTriangle, Download, Upload, Search, RefreshCw, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import type { Kerusakan } from "@/types";
 
-const tingkatKerusakanOptions: Array<Kerusakan["tingkat_kerusakan"]> = ["Ringan", "Sedang", "Berat"]
+const tingkatKerusakanOptions: Array<Kerusakan["tingkat_kerusakan"]> = ["Ringan", "Sedang", "Berat"];
 
 interface KerusakanStatistics {
-    total: number
-    byTingkat: Record<string, number>
-    avgProbability: number
+    total: number;
+    byTingkat: Record<string, number>;
+    avgProbability: number;
+}
+
+// Interface for the expected data structure for import (consistent with API)
+interface ImportKerusakanItemClient {
+    id?: string; // Optional ID for existing documents
+    kode: string;
+    nama: string;
+    deskripsi?: string;
+    tingkat_kerusakan?: "Ringan" | "Sedang" | "Berat";
+    estimasi_biaya?: string;
+    waktu_perbaikan?: string;
+    prior_probability?: number;
+    solusi?: string;
+    gejala_terkait?: string[];
 }
 
 export default function KerusakanPage() {
-    const [kerusakanList, setKerusakanList] = useState<Kerusakan[]>([])
-    const [filteredData, setFilteredData] = useState<Kerusakan[]>([])
-    const [searchQuery, setSearchQuery] = useState("")
-    const [filterTingkat, setFilterTingkat] = useState<string>("all")
-    const [isLoading, setIsLoading] = useState(true)
-    const [isImporting, setIsImporting] = useState(false) // For file processing
-    const [isSendingImport, setIsSendingImport] = useState(false) // For API call
-    const fileInputRef = useRef<HTMLInputElement>(null)
-    const router = useRouter()
+    const [kerusakanList, setKerusakanList] = useState<Kerusakan[]>([]);
+    const [filteredData, setFilteredData] = useState<Kerusakan[]>([]);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [filterTingkat, setFilterTingkat] = useState<string>("all");
+    const [isLoading, setIsLoading] = useState(true);
+    const [isImporting, setIsImporting] = useState(false); // For file processing
+    const [isSendingImport, setIsSendingImport] = useState(false); // For API call
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const router = useRouter();
 
     useEffect(() => {
-        loadData()
-    }, [])
+        loadData();
+    }, []);
 
     useEffect(() => {
-        filterData()
-    }, [kerusakanList, searchQuery, filterTingkat])
+        filterData();
+    }, [kerusakanList, searchQuery, filterTingkat]);
 
     const loadData = async (): Promise<void> => {
         try {
-            setIsLoading(true)
-            const response = await fetch("/api/damages") // Fetch from new API
+            setIsLoading(true);
+            const response = await fetch("/api/damages");
             if (!response.ok) {
-                const errorDetail = await response.text()
-                throw new Error(`Gagal memuat data kerusakan: ${response.status} ${errorDetail}`)
+                const errorDetail = await response.text();
+                throw new Error(`Gagal memuat data kerusakan: ${response.status} ${errorDetail}`);
             }
-            const fetchedData: Kerusakan[] = await response.json()
+            const fetchedData: Kerusakan[] = await response.json();
 
-            // Sort data by 'kode' (KK1, KK2, etc.)
             const sortedData = fetchedData.sort((a, b) => {
                 const numA = parseInt(a.kode.replace('KK', '')) || 0;
                 const numB = parseInt(b.kode.replace('KK', '')) || 0;
                 return numA - numB;
             });
 
-            setKerusakanList(sortedData)
-            toast.success("Data kerusakan berhasil dimuat.")
+            setKerusakanList(sortedData);
+            toast.success("Data kerusakan berhasil dimuat.");
         } catch (error) {
-            console.error("Error loading data:", error)
-            toast.error(error instanceof Error ? error.message : "Gagal memuat data kerusakan")
-            setKerusakanList([]) // Clear list on error
+            console.error("Error loading data:", error);
+            toast.error(error instanceof Error ? error.message : "Gagal memuat data kerusakan");
+            setKerusakanList([]);
         } finally {
-            setIsLoading(false)
+            setIsLoading(false);
         }
-    }
+    };
 
     const filterData = (): void => {
-        let filtered = kerusakanList
+        let filtered = kerusakanList;
 
         if (searchQuery.trim()) {
-            const query = searchQuery.toLowerCase()
+            const query = searchQuery.toLowerCase();
             filtered = filtered.filter(
                 (item) =>
                     item.nama.toLowerCase().includes(query) ||
                     item.kode.toLowerCase().includes(query) ||
-                    item.deskripsi.toLowerCase().includes(query),
-            )
+                    item.deskripsi.toLowerCase().includes(query)
+            );
         }
 
         if (filterTingkat !== "all") {
-            filtered = filtered.filter((item) => item.tingkat_kerusakan === filterTingkat)
+            filtered = filtered.filter((item) => item.tingkat_kerusakan === filterTingkat);
         }
 
-        setFilteredData(filtered)
-    }
+        setFilteredData(filtered);
+    };
 
     const handleEdit = (kerusakan: Kerusakan): void => {
-        // Use kerusakan.id for navigation, assuming your edit page route is /admin/damages/edit/[id]
-        router.push(`/admin/damages/edit/${kerusakan.id}`)
-    }
+        router.push(`/admin/damages/edit/${kerusakan.id}`);
+    };
 
     const handleDelete = async (id: string, namaKerusakan: string): Promise<void> => {
         toast("Konfirmasi Hapus", {
@@ -101,7 +113,7 @@ export default function KerusakanPage() {
                 label: "Hapus",
                 onClick: async () => {
                     try {
-                        const response = await fetch(`/api/kerusakan/${id}`, { // Use the ID-based API route
+                        const response = await fetch(`/api/damages/${id}`, {
                             method: "DELETE",
                         });
 
@@ -110,7 +122,7 @@ export default function KerusakanPage() {
                             throw new Error(`Gagal menghapus kerusakan: ${response.status} ${errorDetail}`);
                         }
 
-                        await loadData(); // Reload data after successful deletion
+                        await loadData();
                         toast.success("Kerusakan berhasil dihapus.");
                     } catch (caughtError: unknown) {
                         console.error("Error deleting:", caughtError);
@@ -126,111 +138,133 @@ export default function KerusakanPage() {
                 label: "Batal",
                 onClick: () => toast.dismiss(),
             },
-        })
-    }
+        });
+    };
 
     const handleExport = (): void => {
         try {
-            const dataStr = JSON.stringify(kerusakanList, null, 2)
-            const dataBlob = new Blob([dataStr], { type: "application/json" })
-            const url = URL.createObjectURL(dataBlob)
-            const link = document.createElement("a")
-            link.href = url
-            link.download = `kerusakan-data-${new Date().toISOString().split("T")[0]}.json`
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            URL.revokeObjectURL(url)
-            toast.success("Data berhasil diekspor")
+            const dataStr = JSON.stringify(kerusakanList, null, 2);
+            const dataBlob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `kerusakan-data-${new Date().toISOString().split("T")[0]}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            toast.success("Data berhasil diekspor");
         } catch (error) {
-            console.error("Export error:", error)
-            toast.error("Gagal mengekspor data")
+            console.error("Export error:", error);
+            toast.error("Gagal mengekspor data");
         }
-    }
+    };
 
     const handleImport = (): void => {
-        fileInputRef.current?.click()
-    }
+        fileInputRef.current?.click();
+    };
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
-        const file = event.target.files?.[0]
+        const file = event.target.files?.[0];
         if (!file) {
-            toast.error("Tidak ada file yang dipilih.")
-            return
+            toast.error("Tidak ada file yang dipilih.");
+            return;
         }
 
         if (file.type !== "application/json") {
-            toast.error("File harus berformat JSON.")
-            return
+            toast.error("File harus berformat JSON.");
+            return;
         }
 
         try {
-            setIsImporting(true) // Indicate file processing
-            const text = await file.text()
-            const importedData: unknown = JSON.parse(text)
+            setIsImporting(true);
+            const text = await file.text();
+            const importedData: unknown = JSON.parse(text);
 
             if (!Array.isArray(importedData)) {
-                toast.error("Format data tidak valid: Harap impor array JSON.")
-                return
+                toast.error("Format data tidak valid: Harap impor array JSON.");
+                return;
             }
 
-            // Validate data structure and cast to Kerusakan[]
-            const validatedData: Kerusakan[] = importedData.map((item: any, index: number) => {
-                // Basic type checking for required fields and default values
-                if (typeof item.id !== 'string' || !item.id.trim()) {
-                    throw new Error(`Data tidak valid pada baris ${index + 1}: 'id' tidak valid atau kosong.`);
-                }
-                if (typeof item.kode !== 'string' || !item.kode.trim()) {
-                    throw new Error(`Data tidak valid pada baris ${index + 1}: 'kode' tidak valid atau kosong.`);
-                }
-                if (typeof item.nama !== 'string' || !item.nama.trim()) {
-                    throw new Error(`Data tidak valid pada baris ${index + 1}: 'nama' tidak valid atau kosong.`);
+            // Validate data structure and prepare for import
+            const preparedData: ImportKerusakanItemClient[] = [];
+            const validationErrors: string[] = [];
+
+            importedData.forEach((item: unknown, index: number) => {
+                if (typeof item !== 'object' || item === null) {
+                    validationErrors.push(`Baris ${index + 1}: bukan objek yang valid.`);
+                    return;
                 }
 
-                // Ensure 'tingkat_kerusakan' is one of the valid options, default to "Ringan"
-                const tingkat: Kerusakan["tingkat_kerusakan"] = tingkatKerusakanOptions.includes(item.tingkat_kerusakan as any)
-                    ? item.tingkat_kerusakan
-                    : "Ringan";
+                const kerusakanItem = item as Partial<Kerusakan>; // Cast to Partial for safer access
 
-                // Ensure prior_probability is a valid number
-                const priorProb: number = typeof item.prior_probability === 'number' && item.prior_probability > 0 && item.prior_probability <= 0.5
-                    ? item.prior_probability
-                    : 0.1; // Default or fallback
+                const id = typeof kerusakanItem.id === 'string' && kerusakanItem.id.trim() !== '' ? kerusakanItem.id : undefined;
 
-                return {
-                    id: item.id,
-                    kode: item.kode,
-                    nama: item.nama,
-                    deskripsi: item.deskripsi || "",
+                if (typeof kerusakanItem.kode !== 'string' || !kerusakanItem.kode.trim()) {
+                    validationErrors.push(`Baris ${index + 1} (ID: ${id || 'N/A'}): 'kode' tidak valid atau kosong.`);
+                    return;
+                }
+                if (typeof kerusakanItem.nama !== 'string' || !kerusakanItem.nama.trim()) {
+                    validationErrors.push(`Baris ${index + 1} (Kode: ${kerusakanItem.kode}): 'nama' tidak valid atau kosong.`);
+                    return;
+                }
+
+                // Further validation for specific types and defaults
+                const tingkat: Kerusakan["tingkat_kerusakan"] =
+                    (typeof kerusakanItem.tingkat_kerusakan === 'string' &&
+                        tingkatKerusakanOptions.includes(kerusakanItem.tingkat_kerusakan as Kerusakan["tingkat_kerusakan"]))
+                        ? (kerusakanItem.tingkat_kerusakan as Kerusakan["tingkat_kerusakan"])
+                        : "Ringan"; // Default if invalid
+
+                const priorProb: number =
+                    (typeof kerusakanItem.prior_probability === 'number' &&
+                        kerusakanItem.prior_probability >= 0 && // Allow 0
+                        kerusakanItem.prior_probability <= 1) // Probability can be up to 1
+                        ? kerusakanItem.prior_probability
+                        : 0.1; // Default if invalid
+
+                preparedData.push({
+                    id: id,
+                    kode: kerusakanItem.kode,
+                    nama: kerusakanItem.nama,
+                    deskripsi: typeof kerusakanItem.deskripsi === 'string' ? kerusakanItem.deskripsi : "",
                     tingkat_kerusakan: tingkat,
-                    estimasi_biaya: item.estimasi_biaya || "",
-                    waktu_perbaikan: item.waktu_perbaikan || "",
+                    estimasi_biaya: typeof kerusakanItem.estimasi_biaya === 'string' ? kerusakanItem.estimasi_biaya : "",
+                    waktu_perbaikan: typeof kerusakanItem.waktu_perbaikan === 'string' ? kerusakanItem.waktu_perbaikan : "",
                     prior_probability: priorProb,
-                    solusi: item.solusi || "",
-                    gejala_terkait: Array.isArray(item.gejala_terkait) ? item.gejala_terkait.map(String) : [],
-                    createdAt: item.createdAt || undefined, // Keep existing timestamps if available
-                    updatedAt: item.updatedAt || undefined,
-                } as Kerusakan;
+                    solusi: typeof kerusakanItem.solusi === 'string' ? kerusakanItem.solusi : "",
+                    gejala_terkait: Array.isArray(kerusakanItem.gejala_terkait) ? kerusakanItem.gejala_terkait.filter(g => typeof g === 'string').map(String) : [],
+                });
             });
+
+            if (validationErrors.length > 0) {
+                toast.error(`Ditemukan ${validationErrors.length} kesalahan validasi dalam file JSON. Lihat konsol untuk detail.`);
+                console.error("Kesalahan validasi impor Kerusakan:", validationErrors);
+                return;
+            }
+            if (preparedData.length === 0) {
+                toast.info("Tidak ada data kerusakan yang valid untuk diimpor dari file.");
+                return;
+            }
 
             // Show toast for replacement confirmation
             toast("Konfirmasi Impor Data", {
-                description: `Ditemukan ${validatedData.length} entri kerusakan dalam file. Pilih tindakan:`,
+                description: `Ditemukan ${preparedData.length} entri kerusakan valid dalam file. Pilih tindakan:`,
                 action: {
-                    label: "Tambah Baru Saja",
+                    label: "Hanya Tambah Baru",
                     onClick: async () => {
-                        toast.dismiss(); // Dismiss the confirmation toast
-                        await sendImportData("kerusakan", validatedData, false); // No replace
+                        toast.dismiss();
+                        await sendImportData(preparedData, false); // No replace
                     },
                 },
-                cancel: {
-                    label: "Ganti yang Ada",
+                cancel: { // Renamed from 'cancel' to 'secondary action' to be more explicit
+                    label: "Ganti & Tambah",
                     onClick: async () => {
-                        toast.dismiss(); // Dismiss the confirmation toast
-                        await sendImportData("kerusakan", validatedData, true); // Replace existing
+                        toast.dismiss();
+                        await sendImportData(preparedData, true); // Replace existing
                     },
                 },
-                duration: Infinity, // Keep toast open until action is taken
+                duration: Infinity,
             });
 
         } catch (caughtError: unknown) {
@@ -241,28 +275,26 @@ export default function KerusakanPage() {
             }
             toast.error(errorMessage);
         } finally {
-            setIsImporting(false); // File processing finished
+            setIsImporting(false);
             if (fileInputRef.current) {
-                fileInputRef.current.value = ""; // Clear file input
+                fileInputRef.current.value = "";
             }
         }
     };
 
-    // Generic function to send data to the import API
+    // New function to send data to the import API
     const sendImportData = async (
-        dataType: "gejala" | "kerusakan", // Explicitly define accepted types
-        data: any[], // Use any[] as it could be Gejala[] or Kerusakan[]
+        data: ImportKerusakanItemClient[],
         replaceExisting: boolean
     ): Promise<void> => {
-        setIsSendingImport(true); // Indicate API call is in progress
+        setIsSendingImport(true);
         try {
-            const response = await fetch("/api/import-data", {
+            const response = await fetch("/api/import-data/kerusakan", { // Use the new dedicated import API
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    dataType,
                     data,
                     replaceExisting,
                 }),
@@ -271,10 +303,25 @@ export default function KerusakanPage() {
             const result = await response.json();
 
             if (!response.ok) {
-                throw new Error(result.error || `Gagal melakukan import: ${response.status}`);
+                // If backend returns status 202 (partial success/warnings), don't throw error
+                if (response.status === 202 && (result.warnings?.length > 0 || result.errors?.length > 0)) {
+                    toast.warning(result.message || "Import selesai dengan peringatan.");
+                    if (result.errors && result.errors.length > 0) {
+                        toast.error(`Terdapat ${result.errors.length} kesalahan. Lihat konsol.`);
+                        console.error("Import Errors:", result.errors);
+                    }
+                    if (result.warnings && result.warnings.length > 0) {
+                        toast.info(`Terdapat ${result.warnings.length} peringatan. Lihat konsol.`);
+                        console.warn("Import Warnings:", result.warnings);
+                    }
+                } else {
+                    throw new Error(result.error || `Gagal melakukan import: ${response.status}`);
+                }
+            } else {
+                toast.success(result.message || "Data berhasil diimpor.");
             }
 
-            toast.success(result.message || "Data berhasil diimpor.");
+            // Always show summary toast if available
             if (result.importedCount > 0) {
                 toast.info(`${result.importedCount} data baru ditambahkan.`);
             }
@@ -282,9 +329,9 @@ export default function KerusakanPage() {
                 toast.info(`${result.replacedCount} data diganti.`);
             }
             if (result.skippedCount > 0) {
-                toast.info(`${result.skippedCount} data dilewati (ID sudah ada).`);
+                toast.info(`${result.skippedCount} data dilewati.`);
             }
-            await loadData(); // Reload data after successful import
+            await loadData();
         } catch (caughtError: unknown) {
             console.error("Terjadi kesalahan saat mengirim data impor:", caughtError);
             let errorMessage = "Gagal mengimpor data ke database.";
@@ -293,42 +340,41 @@ export default function KerusakanPage() {
             }
             toast.error(errorMessage);
         } finally {
-            setIsSendingImport(false); // API call finished
+            setIsSendingImport(false);
         }
     };
-
 
     const getTingkatColor = (tingkat: string): string => {
         switch (tingkat) {
             case "Ringan":
-                return "bg-green-100 text-green-800 border-green-200"
+                return "bg-green-100 text-green-800 border-green-200";
             case "Sedang":
-                return "bg-yellow-100 text-yellow-800 border-yellow-200"
+                return "bg-yellow-100 text-yellow-800 border-yellow-200";
             case "Berat":
-                return "bg-red-100 text-red-800 border-red-200"
+                return "bg-red-100 text-red-800 border-red-200";
             default:
-                return "bg-gray-100 text-gray-800 border-gray-200"
+                return "bg-gray-100 text-gray-800 border-gray-200";
         }
-    }
+    };
 
     const getStatistics = (): KerusakanStatistics => {
-        const total = kerusakanList.length
+        const total = kerusakanList.length;
         const byTingkat = kerusakanList.reduce(
             (acc, item) => {
-                acc[item.tingkat_kerusakan] = (acc[item.tingkat_kerusakan] || 0) + 1
-                return acc
+                acc[item.tingkat_kerusakan] = (acc[item.tingkat_kerusakan] || 0) + 1;
+                return acc;
             },
-            {} as Record<string, number>,
-        )
+            {} as Record<string, number>
+        );
 
-        const avgProbability = total > 0 ? kerusakanList.reduce((sum, item) => sum + item.prior_probability, 0) / total : 0
+        const avgProbability = total > 0 ? kerusakanList.reduce((sum, item) => sum + item.prior_probability, 0) / total : 0;
 
-        return { total, byTingkat, avgProbability }
-    }
+        return { total, byTingkat, avgProbability };
+    };
 
-    const stats = getStatistics()
+    const stats = getStatistics();
 
-    if (isLoading || isSendingImport) { // Show loading for initial fetch or import operation
+    if (isLoading || isSendingImport) {
         return (
             <div className="container mx-auto px-4 py-8 ">
                 <div className="animate-pulse space-y-6">
@@ -341,7 +387,7 @@ export default function KerusakanPage() {
                     <div className="h-96 bg-gray-200 dark:bg-zinc-800 rounded"></div>
                 </div>
             </div>
-        )
+        );
     }
 
     return (
@@ -493,7 +539,6 @@ export default function KerusakanPage() {
                                         </TableRow>
                                     ) : (
                                         filteredData.map((item) => (
-                                            // Ensure no whitespace immediately after <TableRow key={item.id} ...>
                                             <TableRow key={item.id} className="hover:bg-muted/50">
                                                 <TableCell>
                                                     <Badge variant="outline" className="font-mono">
@@ -568,7 +613,6 @@ export default function KerusakanPage() {
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
-                                            // Ensure no whitespace immediately before </TableRow>
                                         ))
                                     )}
                                 </TableBody>
@@ -581,5 +625,5 @@ export default function KerusakanPage() {
             {/* Hidden file input */}
             <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} className="hidden" />
         </div>
-    )
+    );
 }

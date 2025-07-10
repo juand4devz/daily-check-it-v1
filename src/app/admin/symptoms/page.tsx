@@ -46,6 +46,18 @@ interface GejalaStatistics {
   totalMassFunctions: number;
 }
 
+// Interface for the expected data structure for import (consistent with API)
+interface ImportGejalaItemClient {
+  id?: string; // Optional ID for existing documents
+  kode: string;
+  nama: string;
+  deskripsi?: string;
+  kategori?: string;
+  perangkat?: string[];
+  mass_function?: Record<string, number>;
+  gambar?: string;
+}
+
 // --- Main Component ---
 export default function GejalaPage() {
   const [gejalaList, setGejalaList] = useState<Gejala[]>([]);
@@ -54,7 +66,8 @@ export default function GejalaPage() {
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterDevice, setFilterDevice] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
-  const [isImporting, setIsImporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false); // For file processing
+  const [isSendingImport, setIsSendingImport] = useState(false); // For API call
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const [errorFetching, setErrorFetching] = useState<string | null>(null);
@@ -208,7 +221,7 @@ export default function GejalaPage() {
     }
 
     try {
-      setIsImporting(true);
+      setIsImporting(true); // Indicate file processing
       const text = await file.text();
       const importedData: unknown = JSON.parse(text);
 
@@ -217,48 +230,79 @@ export default function GejalaPage() {
         return;
       }
 
-      // Pre-validation of imported data structure (optional but good practice)
-      const validatedData: Gejala[] = importedData.map((item: any, index: number) => {
-        // Basic type checking for required fields
-        if (typeof item.id !== 'string' || !item.id.trim()) {
-          throw new Error(`Data tidak valid pada baris ${index + 1}: 'id' tidak valid atau kosong.`);
+      // Validate data structure and prepare for import
+      const preparedData: ImportGejalaItemClient[] = [];
+      const validationErrors: string[] = [];
+
+      importedData.forEach((item: unknown, index: number) => {
+        if (typeof item !== 'object' || item === null) {
+          validationErrors.push(`Baris ${index + 1}: bukan objek yang valid.`);
+          return;
         }
-        if (typeof item.kode !== 'string' || !item.kode.trim()) {
-          throw new Error(`Data tidak valid pada baris ${index + 1}: 'kode' tidak valid atau kosong.`);
+
+        const gejalaItem = item as Partial<Gejala>; // Cast to Partial for safer access
+
+        const id = typeof gejalaItem.id === 'string' && gejalaItem.id.trim() !== '' ? gejalaItem.id : undefined;
+
+        if (typeof gejalaItem.kode !== 'string' || !gejalaItem.kode.trim()) {
+          validationErrors.push(`Baris ${index + 1} (ID: ${id || 'N/A'}): 'kode' tidak valid atau kosong.`);
+          return;
         }
-        if (typeof item.nama !== 'string' || !item.nama.trim()) {
-          throw new Error(`Data tidak valid pada baris ${index + 1}: 'nama' tidak valid atau kosong.`);
+        if (typeof gejalaItem.nama !== 'string' || !gejalaItem.nama.trim()) {
+          validationErrors.push(`Baris ${index + 1} (Kode: ${gejalaItem.kode}): 'nama' tidak valid atau kosong.`);
+          return;
         }
-        // Add more specific validations as needed
-        return {
-          id: item.id, // Ensure ID is present if expecting updates
-          kode: item.kode,
-          nama: item.nama,
-          deskripsi: item.deskripsi || "",
-          kategori: item.kategori || "System",
-          perangkat: Array.isArray(item.perangkat) ? item.perangkat.map(String) : [],
-          mass_function: typeof item.mass_function === 'object' && item.mass_function !== null
-            ? (item.mass_function as Record<string, number>)
-            : { uncertainty: 0.1 },
-          gambar: item.gambar || "",
-          createdAt: item.createdAt || undefined,
-          updatedAt: item.updatedAt || undefined,
-        } as Gejala; // Explicit cast after validation
+
+        // Further validation for expected types and defaults
+        const massFunction: Record<string, number> = {};
+        if (typeof gejalaItem.mass_function === 'object' && gejalaItem.mass_function !== null) {
+          Object.entries(gejalaItem.mass_function).forEach(([key, value]) => {
+            if (typeof value === 'number' && !isNaN(value)) {
+              massFunction[key] = value;
+            }
+          });
+        }
+        if (Object.keys(massFunction).length === 0) {
+          massFunction.uncertainty = 0.1; // Default if empty or invalid
+        }
+
+        preparedData.push({
+          id: id,
+          kode: gejalaItem.kode,
+          nama: gejalaItem.nama,
+          deskripsi: typeof gejalaItem.deskripsi === 'string' ? gejalaItem.deskripsi : "",
+          kategori: typeof gejalaItem.kategori === 'string' && categories.includes(gejalaItem.kategori) ? gejalaItem.kategori : "System",
+          perangkat: Array.isArray(gejalaItem.perangkat) ? gejalaItem.perangkat.filter(p => typeof p === 'string').map(String) : [],
+          mass_function: massFunction,
+          gambar: typeof gejalaItem.gambar === 'string' ? gejalaItem.gambar : "",
+        });
       });
+
+      if (validationErrors.length > 0) {
+        toast.error(`Ditemukan ${validationErrors.length} kesalahan validasi dalam file JSON. Lihat konsol untuk detail.`);
+        console.error("Kesalahan validasi impor Gejala:", validationErrors);
+        return;
+      }
+      if (preparedData.length === 0) {
+        toast.info("Tidak ada data gejala yang valid untuk diimpor dari file.");
+        return;
+      }
 
       // Show toast for replacement confirmation
       toast("Konfirmasi Impor Data", {
-        description: `Ditemukan ${validatedData.length} entri gejala dalam file. Pilih tindakan:`,
+        description: `Ditemukan ${preparedData.length} entri gejala valid dalam file. Pilih tindakan:`,
         action: {
-          label: "Tambah Baru Saja",
+          label: "Hanya Tambah Baru",
           onClick: async () => {
-            await sendImportData(validatedData, false); // No replace
+            toast.dismiss(); // Dismiss the confirmation toast
+            await sendImportData(preparedData, false); // No replace
           },
         },
-        cancel: {
-          label: "Ganti yang Ada", // If user clicks 'Ganti yang Ada', send with replace=true
+        cancel: { // Renamed from 'cancel' to 'secondary action' to be more explicit
+          label: "Ganti & Tambah",
           onClick: async () => {
-            await sendImportData(validatedData, true); // Replace existing
+            toast.dismiss(); // Dismiss the confirmation toast
+            await sendImportData(preparedData, true); // Replace existing
           },
         },
         duration: Infinity, // Keep toast open until action is taken
@@ -272,7 +316,7 @@ export default function GejalaPage() {
       }
       toast.error(errorMessage);
     } finally {
-      setIsImporting(false);
+      setIsImporting(false); // File processing finished
       if (fileInputRef.current) {
         fileInputRef.current.value = ""; // Clear file input
       }
@@ -280,8 +324,11 @@ export default function GejalaPage() {
   };
 
   // New function to send data to the import API
-  const sendImportData = async (data: Gejala[], replaceExisting: boolean): Promise<void> => {
-    setIsLoading(true); // Use a loading state for the actual API call
+  const sendImportData = async (
+    data: ImportGejalaItemClient[],
+    replaceExisting: boolean
+  ): Promise<void> => {
+    setIsSendingImport(true); // Use a loading state for the actual API call
     try {
       const response = await fetch("/api/import-data/gejala", { // Use the new dedicated import API
         method: "POST",
@@ -289,7 +336,6 @@ export default function GejalaPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          dataType: "gejala", // Specify data type for the generic import API
           data,
           replaceExisting,
         }),
@@ -298,10 +344,25 @@ export default function GejalaPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || `Gagal melakukan import: ${response.status}`);
+        // If backend returns status 202 (partial success/warnings), don't throw error
+        if (response.status === 202 && (result.warnings?.length > 0 || result.errors?.length > 0)) {
+          toast.warning(result.message || "Import selesai dengan peringatan.");
+          if (result.errors && result.errors.length > 0) {
+            toast.error(`Terdapat ${result.errors.length} kesalahan. Lihat konsol.`);
+            console.error("Import Errors:", result.errors);
+          }
+          if (result.warnings && result.warnings.length > 0) {
+            toast.info(`Terdapat ${result.warnings.length} peringatan. Lihat konsol.`);
+            console.warn("Import Warnings:", result.warnings);
+          }
+        } else {
+          throw new Error(result.error || `Gagal melakukan import: ${response.status}`);
+        }
+      } else {
+        toast.success(result.message || "Data berhasil diimpor.");
       }
 
-      toast.success(result.message || "Data berhasil diimpor.");
+      // Always show summary toast if available
       if (result.importedCount > 0) {
         toast.info(`${result.importedCount} data baru ditambahkan.`);
       }
@@ -309,9 +370,9 @@ export default function GejalaPage() {
         toast.info(`${result.replacedCount} data diganti.`);
       }
       if (result.skippedCount > 0) {
-        toast.info(`${result.skippedCount} data dilewati (ID sudah ada).`);
+        toast.info(`${result.skippedCount} data dilewati.`);
       }
-      await loadData(); // Reload data after successful import
+      await loadData(); // Reload data after successful import (or partial success with warnings)
     } catch (caughtError: unknown) {
       console.error("Terjadi kesalahan saat mengirim data impor:", caughtError);
       let errorMessage = "Gagal mengimpor data ke database.";
@@ -320,7 +381,7 @@ export default function GejalaPage() {
       }
       toast.error(errorMessage);
     } finally {
-      setIsLoading(false);
+      setIsSendingImport(false);
     }
   };
 
@@ -366,8 +427,8 @@ export default function GejalaPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleImport} disabled={isImporting || isLoading}>
-            {isImporting || isLoading ? ( // Use isLoading here too
+          <Button variant="outline" onClick={handleImport} disabled={isImporting || isSendingImport}>
+            {isImporting || isSendingImport ? (
               <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Upload className="mr-2 h-4 w-4" />
@@ -489,11 +550,12 @@ export default function GejalaPage() {
         <CardHeader>
           <CardTitle>Daftar Gejala ({filteredData.length})</CardTitle>
           <CardDescription>
-            Kelola data gejala dan nilai kepercayaan untuk sistem diagnosa.
+            Kelola data gejala dan nilai kepercayaan (mass function) untuk
+            sistem diagnosa.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
+          {isLoading || isSendingImport ? ( // Include isSendingImport in loading state
             <div className="flex justify-center items-center h-48">
               <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
             </div>

@@ -5,36 +5,36 @@ export interface Gejala {
     nama: string;
     deskripsi: string;
     kategori: string;
-    perangkat: string[];
-    mass_function: Record<string, number>;
-    gambar: string;
+    perangkat: string[]; // e.g., ["computer", "laptop"]
+    mass_function: Record<string, number>; // e.g., { "KK1": 0.5, "KK2": 0.3, "uncertainty": 0.2 }
+    gambar: string; // URL gambar
     createdAt?: string;
     updatedAt?: string;
 }
 
 export interface MassFunctionEntry {
-    kerusakan: string;
+    kerusakan: string; // Kode kerusakan (e.g., "KK1")
     value: number;
 }
 
-// Ensure 'id' is present and matches Firestore document ID
 export interface Kerusakan {
-    id: string; // This is the Firestore document ID
-    kode: string;
-    nama: string;
+    id: string; // Firestore document ID
+    kode: string; // e.g., "KK1"
+    nama: string; // e.g., "Layar Tidak Menyala"
     deskripsi: string;
     tingkat_kerusakan: "Ringan" | "Sedang" | "Berat";
     estimasi_biaya: string;
     waktu_perbaikan: string;
-    prior_probability: number;
-    solusi: string;
-    gejala_terkait: string[];
-    createdAt?: string; // Optional, will be filled in backend
-    updatedAt?: string; // Optional, will be filled in backend
+    prior_probability: number; // float between 0.01 and 0.50
+    solusi: string; // Markdown formatted text
+    gejala_terkait: string[]; // Array of Gejala codes (e.g., ["G1", "G5"])
+    createdAt?: string;
+    updatedAt?: string;
 }
 
+// Tipe untuk data yang digabungkan di halaman massscope
 export interface CombinedMassFunctionData {
-    gejalaId: string; // The Firestore ID of the Gejala document
+    gejalaId: string;
     gejalaKode: string;
     gejalaNama: string;
     kategori: string;

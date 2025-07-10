@@ -85,8 +85,12 @@ export default function MassFunctionPage() {
             const fetchedGejala: Gejala[] = await gejalaRes.json();
             const fetchedKerusakan: Kerusakan[] = await kerusakanRes.json();
 
-            setAllGejala(fetchedGejala);
-            setAllKerusakan(fetchedKerusakan);
+            // Ensure fetched data is unique by kode before setting state
+            const uniqueFetchedGejala = Array.from(new Map(fetchedGejala.map(g => [g.kode, g])).values());
+            const uniqueFetchedKerusakan = Array.from(new Map(fetchedKerusakan.map(k => [k.kode, k])).values());
+
+            setAllGejala(uniqueFetchedGejala);
+            setAllKerusakan(uniqueFetchedKerusakan);
             toast.success("Data gejala dan kerusakan berhasil dimuat.");
         } catch (error) {
             console.error("Error fetching all data:", error);
@@ -211,6 +215,7 @@ export default function MassFunctionPage() {
 
     // --- Create Matrix Data ---
     const createMatrixData = useCallback((): MatrixData => {
+        // Ensure unique codes are sorted consistently
         const uniqueGejalaCodes = Array.from(new Set(filteredData.map((item) => item.gejalaKode))).sort((a, b) => {
             const numA = parseInt(a.replace("G", "")) || 0;
             const numB = parseInt(b.replace("G", "")) || 0;
@@ -400,9 +405,9 @@ export default function MassFunctionPage() {
                 <Tabs
                     value={viewMode}
                     onValueChange={(value) => setViewMode(value as "matrix" | "list")}
-                    className="mb-4 sm:mb-6 w-full md:max-w-4xl"
+                    className="mb-4 sm:mb-6 w-full md:max-w-4xl relative"
                 >
-                    <TabsList className="mx-auto">
+                    <TabsList className="mx-auto absolute top-2 right-0">
                         <TabsTrigger value="matrix" className="flex items-center justify-center gap-2">
                             <Grid3X3 className="h-4 w-4" />
                             <span>Matrix</span>
@@ -435,6 +440,7 @@ export default function MassFunctionPage() {
                                                 {/* Kerusakan headers - rotate and adapt width */}
                                                 {kerusakanListFiltered.map((kerusakanKode) => {
                                                     const kerusakan = allKerusakan.find((k) => k.kode === kerusakanKode);
+                                                    // Use kerusakanKode as key here, it should be unique by design
                                                     return (
                                                         <th key={kerusakanKode} className="text-center min-w-[70px] sm:min-w-[80px] md:min-w-[100px] p-1 sm:p-2 align-bottom">
                                                             <div
@@ -482,6 +488,8 @@ export default function MassFunctionPage() {
                                                                 const value = matrix[gejalaKode]?.[kerusakanKodeCol] || 0;
                                                                 const shouldShow = showZeroValues || value > 0;
 
+                                                                // The key for this cell should be unique within its parent <tr>.
+                                                                // A combination of gejalaKode and kerusakanKodeCol is robust.
                                                                 return (
                                                                     <td
                                                                         key={`${gejalaKode}-${kerusakanKodeCol}`}
@@ -517,9 +525,9 @@ export default function MassFunctionPage() {
                         </Card>
                     </TabsContent>
 
-                    <TabsContent value="list" className="mt-4">
+                    <TabsContent value="list" className="mt-2">
                         <Card>
-                            <CardHeader className="pb-4">
+                            <CardHeader>
                                 <CardTitle className="text-lg sm:text-xl">Detail Mass Function</CardTitle>
                                 <CardDescription className="text-sm">
                                     Daftar detail semua nilai mass function yang tersedia
@@ -549,6 +557,7 @@ export default function MassFunctionPage() {
                                             ) : (
                                                 filteredData
                                                     .sort((a, b) => b.value - a.value)
+                                                    // Ensure a unique key for each row in the List View
                                                     .map((item, index) => (
                                                         <tr key={`${item.gejalaKode}-${item.kerusakanKode}-${index}`} className="hover:bg-muted/50">
                                                             <td className="p-2 sm:p-4">

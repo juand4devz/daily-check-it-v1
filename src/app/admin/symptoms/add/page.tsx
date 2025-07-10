@@ -13,7 +13,7 @@ import { Slider } from "@/components/ui/slider";
 import { ArrowLeft, Save, Plus, X, RefreshCw, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Gejala, MassFunctionEntry, Kerusakan } from "@/types";
-import { Combobox } from "@/components/ui/combobox"; // Import the new Combobox component
+import { Combobox } from "@/components/ui/combobox";
 
 // --- Constants ---
 const categories = [
@@ -40,7 +40,6 @@ const categories = [
 
 const devices = ["computer", "laptop"];
 
-// --- Main Component ---
 export default function AddGejalaPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -55,13 +54,12 @@ export default function AddGejalaPage() {
     gambar: "",
   });
   const [massFunctions, setMassFunctions] = useState<MassFunctionEntry[]>([
-    { kerusakan: "", value: 0.1 }, // Initialize with empty string for no default selection
+    { kerusakan: "", value: 0.1 },
   ]);
   const [existingGejalaCodes, setExistingGejalaCodes] = useState<string[]>([]);
-  const [kerusakanData, setKerusakanData] = useState<Kerusakan[]>([]); // Renamed from kerusakanOptions to avoid conflict with Combobox options
+  const [kerusakanData, setKerusakanData] = useState<Kerusakan[]>([]);
   const [isKerusakanLoading, setIsKerusakanLoading] = useState(true);
 
-  // --- Fetch Existing Gejala Codes for Code Generation & Validation ---
   useEffect(() => {
     const fetchExistingGejalaCodes = async () => {
       try {
@@ -85,7 +83,6 @@ export default function AddGejalaPage() {
     fetchExistingGejalaCodes();
   }, []);
 
-  // --- Fetch Kerusakan Data for Mass Function Options (Dynamic & Sorted) ---
   useEffect(() => {
     const fetchKerusakanData = async () => {
       setIsKerusakanLoading(true);
@@ -96,13 +93,30 @@ export default function AddGejalaPage() {
           throw new Error(`Gagal memuat data kerusakan: ${response.status} ${errorText}`);
         }
         const fetchedData: Kerusakan[] = await response.json();
-        // Sort fetchedData by 'kode' (KK1, KK2, etc.)
-        const sortedData = fetchedData.sort((a, b) => {
+
+        // --- NEW: Filter for unique codes before sorting ---
+        const uniqueKerusakanMap = new Map<string, Kerusakan>();
+        fetchedData.forEach(k => {
+          if (!uniqueKerusakanMap.has(k.kode)) {
+            uniqueKerusakanMap.set(k.kode, k);
+          }
+        });
+        const uniqueKerusakan = Array.from(uniqueKerusakanMap.values());
+        // --- END NEW ---
+
+        const sortedData = uniqueKerusakan.sort((a, b) => { // Use uniqueKerusakan here
           const numA = parseInt(a.kode.replace('KK', '')) || 0;
           const numB = parseInt(b.kode.replace('KK', '')) || 0;
           return numA - numB;
         });
         setKerusakanData(sortedData);
+
+        // If there are no mass functions, and kerusakan data is available,
+        // initialize the first mass function with the first available kerusakan code.
+        if (massFunctions.length === 1 && massFunctions[0].kerusakan === "" && sortedData.length > 0) {
+          setMassFunctions([{ kerusakan: sortedData[0].kode, value: 0.1 }]);
+        }
+
       } catch (caughtError: unknown) {
         console.error("Terjadi kesalahan saat memuat data kerusakan:", caughtError);
         let errorMessage = "Gagal memuat daftar kerusakan untuk mass function.";
@@ -117,9 +131,8 @@ export default function AddGejalaPage() {
     };
 
     fetchKerusakanData();
-  }, []);
+  }, []); // massFunctions added to dep array to conditionally set initial massFunction
 
-  // --- Code Generation ---
   const generateNextCode = useCallback(async (): Promise<void> => {
     setIsGeneratingCode(true);
     try {
@@ -151,7 +164,6 @@ export default function AddGejalaPage() {
     }
   }, [existingGejalaCodes, formData.kode, generateNextCode, isGeneratingCode]);
 
-  // --- Mass Function Management ---
   const addMassFunction = useCallback((): void => {
     if (kerusakanData.length === 0) {
       toast.error("Data kerusakan belum dimuat atau tidak tersedia.");
@@ -193,7 +205,6 @@ export default function AddGejalaPage() {
     []
   );
 
-  // Helper to get Combobox options from fetched kerusakan data
   const getKerusakanComboboxOptions = useCallback(() => {
     return kerusakanData.map(k => ({
       value: k.kode,
@@ -201,7 +212,6 @@ export default function AddGejalaPage() {
     }));
   }, [kerusakanData]);
 
-  // --- Form Validation ---
   const validateForm = useCallback((): boolean => {
     if (!formData.kode.trim()) {
       toast.error("Kode gejala harus diisi.");
@@ -230,13 +240,11 @@ export default function AddGejalaPage() {
       return false;
     }
 
-    // Check if any selected kerusakan in mass function is actually valid (exists in fetched options)
     if (massFunctions.some(mf => !kerusakanData.some(ko => ko.kode === mf.kerusakan))) {
       toast.error("Terdapat kerusakan yang tidak valid dalam mass function.");
       return false;
     }
 
-    // Ensure all mass function entries have a selected kerusakan
     if (massFunctions.some(mf => !mf.kerusakan)) {
       toast.error("Semua entri mass function harus memiliki kerusakan yang dipilih.");
       return false;
@@ -245,7 +253,6 @@ export default function AddGejalaPage() {
     return true;
   }, [formData, massFunctions, existingGejalaCodes, isGeneratingCode, kerusakanData]);
 
-  // --- Save Handler ---
   const handleSave = async (): Promise<void> => {
     if (!validateForm()) return;
 
@@ -302,7 +309,6 @@ export default function AddGejalaPage() {
     });
   };
 
-  // --- Input Change Handlers ---
   const handleInputChange = useCallback(
     <K extends keyof Omit<Gejala, 'id'>>(field: K, value: Omit<Gejala, 'id'>[K]): void => {
       setFormData((prev) => ({ ...prev, [field]: value }));
@@ -322,7 +328,6 @@ export default function AddGejalaPage() {
     []
   );
 
-  // Calculate current total for display
   const currentTotalMass = massFunctions.reduce((sum, mf) => sum + mf.value, 0);
   const currentUncertainty = Math.max(0.05, 1 - currentTotalMass);
 
@@ -511,11 +516,10 @@ export default function AddGejalaPage() {
                       )}
                     </div>
 
-                    {/* NEW: Use Combobox for Kerusakan selection */}
                     <Combobox
                       options={getKerusakanComboboxOptions().filter(option =>
-                        option.value === entry.kerusakan || // Always show current selection
-                        !massFunctions.some(mf => mf.kerusakan === option.value) // Filter out other already selected options
+                        option.value === entry.kerusakan ||
+                        !massFunctions.some(mf => mf.kerusakan === option.value)
                       )}
                       value={entry.kerusakan}
                       onValueChange={(value) => updateMassFunction(index, "kerusakan", value)}

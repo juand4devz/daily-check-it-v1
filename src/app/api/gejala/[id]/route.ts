@@ -23,7 +23,7 @@ export async function GET(
     { params }: { params: { id: string } }
 ) {
     try {
-        const { id } = params;
+        const { id } = await params;
         if (!id) {
             return NextResponse.json({ error: "ID gejala diperlukan." }, { status: 400 });
         }
@@ -70,7 +70,7 @@ export async function PUT(
     { params }: { params: { id: string } }
 ) {
     try {
-        const { id } = params;
+        const { id } = await params;
         if (!id) {
             return NextResponse.json({ error: "ID gejala diperlukan untuk pembaruan." }, { status: 400 });
         }
@@ -135,7 +135,7 @@ export async function DELETE(
     { params }: { params: { id: string } }
 ) {
     try {
-        const { id } = params;
+        const { id } = await params;
         if (!id) {
             return NextResponse.json({ error: "ID gejala diperlukan untuk penghapusan." }, { status: 400 });
         }

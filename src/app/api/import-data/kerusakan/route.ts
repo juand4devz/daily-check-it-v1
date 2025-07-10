@@ -1,47 +1,51 @@
-// app/api/import-data/gejala/route.ts
+// app/api/import-data/kerusakan/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/firebase-admin";
 
 // --- Interfaces (ensure these are consistent with your /types.ts) ---
-interface Gejala {
-    id: string; // Firestore document ID
+interface Kerusakan {
+    id: string;
     kode: string;
     nama: string;
     deskripsi: string;
-    kategori: string;
-    perangkat: string[];
-    mass_function: Record<string, number>;
-    gambar: string;
+    tingkat_kerusakan: "Ringan" | "Sedang" | "Berat";
+    estimasi_biaya: string;
+    waktu_perbaikan: string;
+    prior_probability: number;
+    solusi: string;
+    gejala_terkait: string[];
     createdAt?: string;
     updatedAt?: string;
 }
 
-// Define the expected structure for incoming Gejala data from JSON import
-interface ImportGejalaItem {
+// Define the expected structure for incoming Kerusakan data from JSON import
+interface ImportKerusakanItem {
     id?: string; // Optional ID for existing documents
     kode: string;
     nama: string;
     deskripsi?: string;
-    kategori?: string;
-    perangkat?: string[];
-    mass_function?: Record<string, number>;
-    gambar?: string;
+    tingkat_kerusakan?: "Ringan" | "Sedang" | "Berat";
+    estimasi_biaya?: string;
+    waktu_perbaikan?: string;
+    prior_probability?: number;
+    solusi?: string;
+    gejala_terkait?: string[];
 }
 
 // Interface for the incoming request body
-interface ImportGejalaRequestBody {
-    data: ImportGejalaItem[];
+interface ImportKerusakanRequestBody {
+    data: ImportKerusakanItem[];
     replaceExisting: boolean;
 }
 
 export async function POST(request: NextRequest) {
     try {
-        const { data, replaceExisting }: ImportGejalaRequestBody = await request.json();
+        const { data, replaceExisting }: ImportKerusakanRequestBody = await request.json();
         const now = new Date().toISOString();
-        const collectionRef = adminDb.collection("gejala");
+        const collectionRef = adminDb.collection("kerusakan");
 
         if (!data || !Array.isArray(data)) {
-            return NextResponse.json({ error: "Permintaan tidak valid: data (array Gejala) wajib diisi." }, { status: 400 });
+            return NextResponse.json({ error: "Permintaan tidak valid: data (array Kerusakan) wajib diisi." }, { status: 400 });
         }
 
         let importedCount = 0;
@@ -53,9 +57,9 @@ export async function POST(request: NextRequest) {
 
         // Fetch all existing 'kode' to check for uniqueness efficiently
         const existingDocsByKode: Map<string, string> = new Map(); // Map<kode, id>
-        const existingGejalaSnapshot = await collectionRef.get();
-        existingGejalaSnapshot.docs.forEach(doc => {
-            const docData = doc.data() as Gejala;
+        const existingKerusakanSnapshot = await collectionRef.get();
+        existingKerusakanSnapshot.docs.forEach(doc => {
+            const docData = doc.data() as Kerusakan;
             if (docData.kode) {
                 existingDocsByKode.set(docData.kode, doc.id);
             }
@@ -76,7 +80,7 @@ export async function POST(request: NextRequest) {
 
             const cleanKode = item.kode.trim();
             const hasProvidedId = typeof item.id === 'string' && item.id.trim() !== '';
-            const docRef = hasProvidedId ? collectionRef.doc(item.id as string) : collectionRef.doc(); // Use provided ID or generate new
+            const docRef = hasProvidedId ? collectionRef.doc(item.id as string) : collectionRef.doc();
 
             const existingIdForKode = existingDocsByKode.get(cleanKode);
 
@@ -90,31 +94,18 @@ export async function POST(request: NextRequest) {
                     // Document with this ID exists
                     if (existingIdForKode && existingIdForKode !== existingDocSnapshot.id) {
                         // This means the provided ID points to one doc, but the code points to a DIFFERENT doc.
-                        // This is an ambiguous state, so we warn and skip to prevent data corruption.
                         warnings.push(`Peringatan: Kode '${cleanKode}' sudah ada pada ID '${existingIdForKode}', tetapi item impor ini memiliki ID '${item.id}' yang berbeda. Item ini dilewati untuk menghindari konflik.`);
                         skippedCount++;
                         actionTaken = true;
                     } else if (replaceExisting) {
                         // Update existing document with provided ID, ensuring unique 'kode' is handled
-                        const dataToUpdate: Partial<Gejala> = {
+                        const dataToUpdate: Partial<Kerusakan> = {
                             ...item,
                             updatedAt: now,
-                            // Ensure mass_function logic
-                            mass_function: item.mass_function ? item.mass_function : { uncertainty: 0.1 },
-                            // Add or update createdAt if it's missing in the existing doc, but don't overwrite if present
+                            tingkat_kerusakan: item.tingkat_kerusakan || "Ringan",
+                            prior_probability: item.prior_probability !== undefined ? item.prior_probability : 0.1,
                             createdAt: existingDocSnapshot.data()?.createdAt || now,
                         };
-                        // Apply specific mass_function cleaning for gejala
-                        if (dataToUpdate.mass_function) {
-                            const massFunction = Object.fromEntries(
-                                Object.entries(dataToUpdate.mass_function).filter(
-                                    ([, value]) => typeof value === 'number' && value >= 0
-                                ) // Allow 0 values, just filter out non-numbers
-                            );
-                            const currentTotal = Object.values(massFunction).reduce((sum, val) => sum + val, 0);
-                            massFunction["uncertainty"] = parseFloat(Math.max(0, 1 - currentTotal).toFixed(3)); // Ensure uncertainty is not negative and fixed to 3 decimal places
-                            dataToUpdate.mass_function = massFunction;
-                        }
 
                         batch.set(docRef, dataToUpdate, { merge: true });
                         replacedCount++;
@@ -132,30 +123,20 @@ export async function POST(request: NextRequest) {
                         actionTaken = true;
                     } else {
                         // No doc with this ID, and no other doc with this code, so create new with provided ID
-                        const dataToCreate: Gejala = {
-                            id: docRef.id,
+                        const dataToCreate: Kerusakan = {
+                            id: docRef.id, // Assign the newly generated ID
                             kode: cleanKode,
                             nama: item.nama,
                             deskripsi: item.deskripsi || "",
-                            kategori: item.kategori || "System", // Default category
-                            perangkat: item.perangkat || [],
-                            mass_function: item.mass_function || { uncertainty: 0.1 },
-                            gambar: item.gambar || "",
+                            tingkat_kerusakan: item.tingkat_kerusakan || "Ringan",
+                            estimasi_biaya: item.estimasi_biaya || "",
+                            waktu_perbaikan: item.waktu_perbaikan || "",
+                            prior_probability: item.prior_probability !== undefined ? item.prior_probability : 0.1,
+                            solusi: item.solusi || "",
+                            gejala_terkait: item.gejala_terkait || [],
                             createdAt: now,
                             updatedAt: now,
                         };
-                        // Apply mass_function cleaning
-                        if (dataToCreate.mass_function) {
-                            const massFunction = Object.fromEntries(
-                                Object.entries(dataToCreate.mass_function).filter(
-                                    ([, value]) => typeof value === 'number' && value >= 0
-                                )
-                            );
-                            const currentTotal = Object.values(massFunction).reduce((sum, val) => sum + val, 0);
-                            massFunction["uncertainty"] = parseFloat(Math.max(0, 1 - currentTotal).toFixed(3));
-                            dataToCreate.mass_function = massFunction;
-                        }
-
                         batch.set(docRef, dataToCreate);
                         importedCount++;
                         actionTaken = true;
@@ -169,26 +150,15 @@ export async function POST(request: NextRequest) {
                     if (replaceExisting) {
                         // Kode exists, replace the document associated with that code
                         const existingDocRef = collectionRef.doc(existingIdForKode);
-                        const existingDocSnapshot = await existingDocRef.get(); // Get the doc by its actual ID
+                        const existingDocSnapshot = await existingDocRef.get();
 
-                        const dataToUpdate: Partial<Gejala> = {
+                        const dataToUpdate: Partial<Kerusakan> = {
                             ...item,
                             updatedAt: now,
-                            // Ensure mass_function logic
-                            mass_function: item.mass_function ? item.mass_function : { uncertainty: 0.1 },
+                            tingkat_kerusakan: item.tingkat_kerusakan || "Ringan",
+                            prior_probability: item.prior_probability !== undefined ? item.prior_probability : 0.1,
                             createdAt: existingDocSnapshot.data()?.createdAt || now,
                         };
-                        // Apply specific mass_function cleaning for gejala
-                        if (dataToUpdate.mass_function) {
-                            const massFunction = Object.fromEntries(
-                                Object.entries(dataToUpdate.mass_function).filter(
-                                    ([, value]) => typeof value === 'number' && value >= 0
-                                )
-                            );
-                            const currentTotal = Object.values(massFunction).reduce((sum, val) => sum + val, 0);
-                            massFunction["uncertainty"] = parseFloat(Math.max(0, 1 - currentTotal).toFixed(3));
-                            dataToUpdate.mass_function = massFunction;
-                        }
 
                         batch.set(existingDocRef, dataToUpdate, { merge: true });
                         replacedCount++;
@@ -200,30 +170,20 @@ export async function POST(request: NextRequest) {
                     }
                 } else {
                     // Kode does not exist, create a new document with auto-generated ID
-                    const dataToCreate: Gejala = {
+                    const dataToCreate: Kerusakan = {
                         id: docRef.id, // Assign the newly generated ID
                         kode: cleanKode,
                         nama: item.nama,
                         deskripsi: item.deskripsi || "",
-                        kategori: item.kategori || "System", // Default category
-                        perangkat: item.perangkat || [],
-                        mass_function: item.mass_function || { uncertainty: 0.1 },
-                        gambar: item.gambar || "",
+                        tingkat_kerusakan: item.tingkat_kerusakan || "Ringan",
+                        estimasi_biaya: item.estimasi_biaya || "",
+                        waktu_perbaikan: item.waktu_perbaikan || "",
+                        prior_probability: item.prior_probability !== undefined ? item.prior_probability : 0.1,
+                        solusi: item.solusi || "",
+                        gejala_terkait: item.gejala_terkait || [],
                         createdAt: now,
                         updatedAt: now,
                     };
-                    // Apply mass_function cleaning
-                    if (dataToCreate.mass_function) {
-                        const massFunction = Object.fromEntries(
-                            Object.entries(dataToCreate.mass_function).filter(
-                                ([, value]) => typeof value === 'number' && value >= 0
-                            )
-                        );
-                        const currentTotal = Object.values(massFunction).reduce((sum, val) => sum + val, 0);
-                        massFunction["uncertainty"] = parseFloat(Math.max(0, 1 - currentTotal).toFixed(3));
-                        dataToCreate.mass_function = massFunction;
-                    }
-
                     batch.set(docRef, dataToCreate);
                     importedCount++;
                     actionTaken = true;
@@ -233,11 +193,12 @@ export async function POST(request: NextRequest) {
 
         await batch.commit();
 
-        let message = `Import data gejala selesai.`;
+        let message = `Import data kerusakan selesai.`;
         if (importedCount > 0) message += ` ${importedCount} data baru ditambahkan.`;
         if (replacedCount > 0) message += ` ${replacedCount} data diganti.`;
         if (skippedCount > 0) message += ` ${skippedCount} data dilewati.`;
         if (errors.length > 0 || warnings.length > 0) message += ` Beberapa masalah terjadi.`;
+
 
         return NextResponse.json({
             message,
@@ -249,8 +210,8 @@ export async function POST(request: NextRequest) {
         }, { status: (errors.length > 0 || warnings.length > 0) ? 202 : 200 });
 
     } catch (caughtError: unknown) {
-        console.error("Terjadi kesalahan saat proses import data gejala:", caughtError);
-        let errorMessage = "Terjadi kesalahan server saat mengimpor data gejala.";
+        console.error("Terjadi kesalahan saat proses import data kerusakan:", caughtError);
+        let errorMessage = "Terjadi kesalahan server saat mengimpor data kerusakan.";
         if (caughtError instanceof Error) {
             errorMessage = caughtError.message;
         }

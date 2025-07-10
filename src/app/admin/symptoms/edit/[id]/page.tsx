@@ -13,7 +13,7 @@ import { Slider } from "@/components/ui/slider";
 import { ArrowLeft, Save, Plus, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Gejala, MassFunctionEntry, Kerusakan } from "@/types";
-import { Combobox } from "@/components/ui/combobox"; // Import the new Combobox component
+import { Combobox } from "@/components/ui/combobox";
 
 // --- Constants ---
 const categories = [
@@ -40,11 +40,10 @@ const categories = [
 
 const devices = ["computer", "laptop"];
 
-// --- Main Component ---
 export default function EditGejalaPage() {
   const router = useRouter();
   const params = useParams();
-  const [isLoading, setIsLoading] = useState(true); // Loading state for initial fetch and save
+  const [isLoading, setIsLoading] = useState(true);
   const [formData, setFormData] = useState<Gejala>({
     id: "",
     kode: "",
@@ -56,9 +55,9 @@ export default function EditGejalaPage() {
     gambar: "",
   });
   const [massFunctions, setMassFunctions] = useState<MassFunctionEntry[]>([
-    { kerusakan: "", value: 0.1 }, // Initialize empty
+    { kerusakan: "", value: 0.1 },
   ]);
-  const [kerusakanData, setKerusakanData] = useState<Kerusakan[]>([]); // Renamed from kerusakanOptions
+  const [kerusakanData, setKerusakanData] = useState<Kerusakan[]>([]);
   const [isKerusakanLoading, setIsKerusakanLoading] = useState(true);
 
   // --- Fetch Gejala Data for Editing & Kerusakan Options ---
@@ -89,15 +88,22 @@ export default function EditGejalaPage() {
           const errorText = await kerusakanResponse.text();
           throw new Error(`Gagal memuat data kerusakan: ${kerusakanResponse.status} ${errorText}`);
         }
-        const fetchedKerusakan: Kerusakan[] = await kerusakanResponse.json();
-        // Sort fetchedKerusakan by 'kode' (KK1, KK2, etc.)
-        const sortedKerusakan = fetchedKerusakan.sort((a, b) => {
+        const fetchedData: Kerusakan[] = await kerusakanResponse.json();
+
+        // --- NEW: Filter for unique codes before sorting ---
+        const uniqueKerusakanMap = new Map<string, Kerusakan>();
+        fetchedData.forEach(k => {
+          if (!uniqueKerusakanMap.has(k.kode)) {
+            uniqueKerusakanMap.set(k.kode, k);
+          }
+        });
+        const sortedKerusakan = Array.from(uniqueKerusakanMap.values()).sort((a, b) => {
           const numA = parseInt(a.kode.replace('KK', '')) || 0;
           const numB = parseInt(b.kode.replace('KK', '')) || 0;
           return numA - numB;
         });
         setKerusakanData(sortedKerusakan);
-
+        // --- END NEW ---
 
         setFormData({
           id: fetchedGejala.id,
@@ -110,7 +116,6 @@ export default function EditGejalaPage() {
           gambar: fetchedGejala.gambar || "",
         });
 
-        // Convert mass_function object to MassFunctionEntry array for UI
         const entries = Object.entries(fetchedGejala.mass_function || {})
           .filter(([key]) => key !== "uncertainty")
           .map(([kerusakan, value]) => ({
@@ -123,11 +128,10 @@ export default function EditGejalaPage() {
         if (entries.length === 0 && sortedKerusakan.length > 0) {
           setMassFunctions([{ kerusakan: sortedKerusakan[0].kode, value: 0.1 }]);
         } else if (entries.length === 0) {
-          setMassFunctions([{ kerusakan: "", value: 0.1 }]); // No default if no kerusakan available
+          setMassFunctions([{ kerusakan: "", value: 0.1 }]);
         } else {
           setMassFunctions(entries);
         }
-
 
         toast.success(`Data gejala '${fetchedGejala.kode}' berhasil dimuat.`);
       } catch (caughtError: unknown) {
@@ -189,7 +193,6 @@ export default function EditGejalaPage() {
     []
   );
 
-  // Helper to get Combobox options from fetched kerusakan data
   const getKerusakanComboboxOptions = useCallback(() => {
     return kerusakanData.map(k => ({
       value: k.kode,
@@ -216,7 +219,6 @@ export default function EditGejalaPage() {
       return false;
     }
 
-    // Ensure all mass function entries have a selected kerusakan
     if (massFunctions.some(mf => !mf.kerusakan)) {
       toast.error("Semua entri mass function harus memiliki kerusakan yang dipilih.");
       return false;
@@ -307,30 +309,13 @@ export default function EditGejalaPage() {
     []
   );
 
-  // Calculate current total for display
   const currentTotalMass = massFunctions.reduce((sum, mf) => sum + mf.value, 0);
   const currentUncertainty = Math.max(0.05, 1 - currentTotalMass);
 
-
-  if (isLoading || isKerusakanLoading) {
-    return (
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 dark:bg-zinc-800 rounded w-1/4 mb-4"></div>
-          <div className="h-10 bg-gray-200 dark:bg-zinc-800 rounded w-1/2"></div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="h-96 bg-gray-200 dark:bg-zinc-800 rounded"></div>
-            <div className="h-96 bg-gray-200 dark:bg-zinc-800 rounded"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto px-4 py-8 max-w-6xl">
       {/* Header */}
-      <div className="mb-6">
+      <div className="mb-8">
         <Button variant="outline" onClick={() => router.back()} className="mb-4">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Kembali
@@ -482,11 +467,10 @@ export default function EditGejalaPage() {
                       )}
                     </div>
 
-                    {/* NEW: Use Combobox for Kerusakan selection */}
                     <Combobox
                       options={getKerusakanComboboxOptions().filter(option =>
-                        option.value === entry.kerusakan || // Always show current selection
-                        !massFunctions.some(mf => mf.kerusakan === option.value) // Filter out other already selected options
+                        option.value === entry.kerusakan ||
+                        !massFunctions.some(mf => mf.kerusakan === option.value)
                       )}
                       value={entry.kerusakan}
                       onValueChange={(value) => updateMassFunction(index, "kerusakan", value)}
