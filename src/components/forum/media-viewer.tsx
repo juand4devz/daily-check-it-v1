@@ -1,6 +1,6 @@
 "use client"
 import { useState } from "react"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Expand, Play, X } from "lucide-react"
 import Image from "next/image"
@@ -134,6 +134,8 @@ export function MediaViewer({ media, className = "" }: MediaViewerProps) {
 
       {/* Full Screen Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogTitle className="hidden">
+        </DialogTitle>
         <DialogContent className="max-w-none max-h-none w-screen h-screen p-0 border-0 bg-black">
           <FullScreenMedia />
         </DialogContent>

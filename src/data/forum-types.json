@@ -1,0 +1,48 @@
+[
+    {
+      "id": "pertanyaan",
+      "name": "Pertanyaan",
+      "description": "Ajukan pertanyaan dan dapatkan solusi",
+      "icon": "help-circle",
+      "color": "bg-blue-500",
+      "allowSolution": true,
+      "allowTags": true
+    },
+    {
+      "id": "pengetahuan",
+      "name": "Pengetahuan",
+      "description": "Bagikan informasi atau fakta menarik",
+      "icon": "book-open",
+      "color": "bg-green-500",
+      "allowSolution": false,
+      "allowTags": true
+    },
+    {
+      "id": "pengalaman",
+      "name": "Pengalaman",
+      "description": "Ceritakan pengalaman pribadi Anda",
+      "icon": "user-check",
+      "color": "bg-purple-500",
+      "allowSolution": false,
+      "allowTags": true
+    },
+    {
+      "id": "tutorial",
+      "name": "Tutorial",
+      "description": "Berikan panduan langkah demi langkah",
+      "icon": "graduation-cap",
+      "color": "bg-orange-500",
+      "allowSolution": false,
+      "allowTags": true
+    },
+    {
+      "id": "berita",
+      "name": "Berita",
+      "description": "Informasi terbaru seputar teknologi",
+      "icon": "newspaper",
+      "color": "bg-red-500",
+      "allowSolution": false,
+      "allowTags": false
+    }
+  ]
+  

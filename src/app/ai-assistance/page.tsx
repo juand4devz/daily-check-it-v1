@@ -42,8 +42,8 @@ interface UserTokenData {
 const STATIC_USER: UserTokenData = {
     userId: "user_001",
     username: "Pengguna Demo",
-    dailyTokens: 50,
-    maxDailyTokens: 50,
+    dailyTokens: 2,
+    maxDailyTokens: 2,
     lastResetDate: new Date().toISOString().split("T")[0],
     totalUsage: 0,
 }
@@ -529,7 +529,7 @@ export default function AIChatPage() {
                 </Alert>
             )}
 
-            {/* Token Display */}
+            {/* Token Display
             <Card className="mb-6">
                 <Button
                     variant="outline"
@@ -601,7 +601,7 @@ export default function AIChatPage() {
                         </div>
                     )}
                 </CardContent>
-            </Card>
+            </Card> */}
 
             {/* Main Chat Area */}
             <div className="shadow-sm min-h-[600px] flex flex-col">
@@ -825,6 +825,12 @@ export default function AIChatPage() {
                                     <FormItem>
                                         <FormControl>
                                             <div className="relative">
+                                                <div className="flex items-center justify-between text-xs bg-blue-50 dark:bg-zinc-700 p-2 rounded mb-2">
+                                                    <span>
+                                                        Token tersisa: <strong>{userTokenData.dailyTokens}</strong>/{userTokenData.maxDailyTokens}
+                                                    </span>
+                                                    <span className="text-gray-500 dark:text-gray-300">Reset jam 7 pagi WIB</span>
+                                                </div>
                                                 <Textarea
                                                     {...field}
                                                     ref={textareaRef}
@@ -840,7 +846,7 @@ export default function AIChatPage() {
                                                 />
 
                                                 {/* Character Counter */}
-                                                <div className="absolute top-2 right-2 text-xs text-muted-foreground">
+                                                <div className="absolute -bottom-5 right-0 text-xs text-muted-foreground">
                                                     {field.value?.length || 0}/300
                                                 </div>
 
@@ -910,7 +916,6 @@ export default function AIChatPage() {
                             />
                         </form>
                     </Form>
-
                     {/* Hidden File Inputs */}
                     <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                     <input

@@ -18,6 +18,9 @@ interface MediaUploadProps {
   disabled?: boolean
   maxFiles?: number
   maxSize?: number // in MB
+  files?: File[]
+  onFilesChange?: (files: File[]) => void
+  acceptVideo?: boolean
 }
 
 export function MediaUpload({ onUpload, disabled = false, maxFiles = 5, maxSize = 10 }: MediaUploadProps) {
@@ -123,11 +126,10 @@ export function MediaUpload({ onUpload, disabled = false, maxFiles = 5, maxSize 
     <div className="space-y-4">
       {/* Drag & Drop Area */}
       <div
-        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-          disabled || isProcessing
-            ? "border-gray-200 bg-gray-50 cursor-not-allowed"
-            : "border-gray-300 hover:border-gray-400 cursor-pointer"
-        }`}
+        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${disabled || isProcessing
+          ? "border-gray-200 bg-gray-50 cursor-not-allowed"
+          : "border-gray-300 hover:border-gray-400 cursor-pointer"
+          }`}
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onClick={() => !disabled && !isProcessing && fileInputRef.current?.click()}

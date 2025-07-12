@@ -1,0 +1,131 @@
+[
+    {
+      "id": "reply-1",
+      "postId": "1",
+      "content": "Error Kernel-Power ID 41 itu biasanya indikasi masalah power supply (PSU) atau overclocks yang tidak stabil. Coba cek kabel power ke motherboard dan GPU, pastikan terpasang dengan baik. Kalau ada PSU lain, bisa dicoba ganti untuk tes.",
+      "author": "TechSavvy",
+      "avatar": "/placeholder.svg?height=40&width=40",
+      "createdAt": "2024-07-10T10:15:00Z",
+      "upvotes": 5,
+      "downvotes": 0,
+      "reactions": {
+        "like": ["user1", "user2"],
+        "love": ["user3"]
+      }
+    },
+    {
+      "id": "reply-1-1",
+      "content": "Coba cek PSU atau kabel power 24-pin. Sering longgar.",
+      "author": "TechSavvy",
+      "avatar": "/placeholder.svg?height=40&width=40",
+      "createdAt": "2024-07-10T10:20:00Z",
+      "upvotes": 5,
+      "downvotes": 0,
+      "isSolution": false,
+      "reactions": {
+        "like": ["user1", "user2"]
+      }
+    },
+    {
+      "id": "reply-2",
+      "postId": "1",
+      "content": "Setuju dengan @TechSavvy. Selain PSU, bisa juga karena driver chipset motherboard yang belum update atau ada konflik. Coba update driver chipset dari website resmi ASUS.",
+      "author": "DriverMaster",
+      "avatar": "/placeholder.svg?height=40&width=40",
+      "createdAt": "2024-07-10T10:30:00Z",
+      "upvotes": 3,
+      "downvotes": 0,
+      "parentId": "reply-1",
+      "mentions": ["TechSavvy"],
+      "reactions": {
+        "like": ["user4"]
+      }
+    },
+    {
+      "id": "reply-3",
+      "postId": "1",
+      "content": "Saya pernah mengalami hal serupa, ternyata masalahnya ada di **RAM yang tidak terpasang sempurna** atau slot RAM yang kotor. Coba cabut semua RAM, bersihkan slotnya dengan kuas kecil, lalu pasang kembali dengan benar. Pastikan bunyi 'klik' saat terpasang. Ini seringkali jadi solusi untuk masalah restart acak. Semoga membantu!",
+      "author": "HardwareFixer",
+      "avatar": "/placeholder.svg?height=40&width=40",
+      "createdAt": "2024-07-10T11:00:00Z",
+      "upvotes": 10,
+      "downvotes": 1,
+      "isSolution": false,
+      "reactions": {
+        "like": ["user5", "user6", "user7"],
+        "wow": ["user8"]
+      }
+    },
+    {
+      "id": "reply-1-3",
+      "content": "Slot RAM kotor! Setelah dibersihkan restart hilang total.",
+      "author": "HardwareFixer",
+      "avatar": "/placeholder.svg?height=40&width=40",
+      "createdAt": "2024-07-10T11:00:00Z",
+      "upvotes": 10,
+      "downvotes": 0,
+      "isSolution": true,
+      "reactions": {}
+    },
+    {
+      "id": "reply-4",
+      "postId": "1",
+      "content": "Terima kasih banyak @HardwareFixer! Saya coba cara cabut pasang RAM dan sepertinya berhasil! Sudah 2 jam main game tidak restart lagi. Ini solusi terbaik!",
+      "author": "GamerPro",
+      "avatar": "/placeholder.svg?height=40&width=40",
+      "createdAt": "2024-07-10T13:00:00Z",
+      "upvotes": 7,
+      "downvotes": 0,
+      "parentId": "reply-3",
+      "mentions": ["HardwareFixer"],
+      "reactions": {
+        "love": ["user9"],
+        "like": ["user10"]
+      }
+    },
+    {
+      "id": "reply-5",
+      "postId": "1",
+      "content": "Kalau masih sering restart setelah coba semua itu, bisa jadi motherboardnya yang bermasalah. Tapi coba dulu yang paling mudah seperti RAM dan PSU.",
+      "author": "PCDoctor",
+      "avatar": "/placeholder.svg?height=40&width=40",
+      "createdAt": "2024-07-10T11:30:00Z",
+      "upvotes": 2,
+      "downvotes": 0,
+      "reactions": {}
+    },
+    {
+      "id": "reply-6",
+      "postId": "1",
+      "content": "Pernah juga kasus seperti ini karena kabel power CPU (EPS 8-pin) tidak terpasang kencang. Coba cek itu juga.",
+      "author": "CableGuy",
+      "avatar": "/placeholder.svg?height=40&width=40",
+      "createdAt": "2024-07-10T12:00:00Z",
+      "upvotes": 1,
+      "downvotes": 0,
+      "reactions": {}
+    },
+    {
+      "id": "reply-7",
+      "postId": "1",
+      "content": "Pastikan juga BIOS/UEFI firmware motherboard Anda sudah yang terbaru. Kadang ada perbaikan stabilitas di sana.",
+      "author": "FirmwareUpdater",
+      "avatar": "/placeholder.svg?height=40&width=40",
+      "createdAt": "2024-07-10T12:45:00Z",
+      "upvotes": 0,
+      "downvotes": 0,
+      "reactions": {}
+    },
+    {
+      "id": "reply-8",
+      "postId": "1",
+      "content": "Saya juga pernah mengalami Kernel-Power 41, dan solusinya adalah mengganti kabel power dari PSU ke stop kontak. Kabelnya sudah tua dan longgar.",
+      "author": "Electrician",
+      "avatar": "/placeholder.svg?height=40&width=40",
+      "createdAt": "2024-07-10T14:00:00Z",
+      "upvotes": 1,
+      "downvotes": 0,
+      "reactions": {}
+    }
+  ]
+  

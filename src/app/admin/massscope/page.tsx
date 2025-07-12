@@ -330,7 +330,7 @@ export default function MassFunctionPage() {
 
 
             {/* Filters & Export (always visible, responsive layout) */}
-            <Card className="mb-4 sm:mb-6">
+            <Card className="mb-2 sm:mb-4">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg">
                         <Filter className="h-5 w-5" />

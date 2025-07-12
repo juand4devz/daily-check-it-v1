@@ -23,7 +23,7 @@ export default function GeneralLayout({ children }: MainLayoutProps) {
     }
 
     return (
-        <SessionProvider>
+        <SessionProvider >
             <ThemeProvider
                 attribute="class"
                 defaultTheme="system"
