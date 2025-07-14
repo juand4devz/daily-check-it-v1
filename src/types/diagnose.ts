@@ -1,4 +1,4 @@
-// types/definitions.ts
+// /types/diagnose.ts
 
 /**
  * Merepresentasikan 'Mass Function' dalam teori Dempster-Shafer.

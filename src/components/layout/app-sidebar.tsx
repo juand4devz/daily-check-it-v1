@@ -7,7 +7,6 @@ import {
     Brain,
     Computer,
     Home,
-    MessageSquare,
     Settings,
     Users,
     Wrench,
@@ -18,7 +17,8 @@ import {
     Drone,
     User2,
     Bell,
-    TagIcon, // Import LucideIcon type for icon components
+    TagIcon,
+    Waypoints, // Import LucideIcon type for icon components
 } from "lucide-react"
 
 import {
@@ -45,7 +45,9 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
-import Image from "next/image"
+import { useSession } from "next-auth/react"
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
+import { Skeleton } from "../ui/skeleton"
 
 // --- Tipe untuk Struktur Navigasi ---
 interface NavItem {
@@ -86,7 +88,7 @@ const knowledgeBaseNavigation: NavItem[] = [
     {
         title: "Forum Diskusi",
         href: "/forum",
-        icon: MessageSquare,
+        icon: Waypoints,
         exactMatch: false, // Matches /forum/ or /discussion-forum
     },
 ]
@@ -167,6 +169,7 @@ interface SidebarNavProps extends React.HTMLAttributes<HTMLDivElement> {
     customClassName?: string // Contoh properti
 }
 
+
 export function SidebarNav({ className, ...props }: SidebarNavProps) {
     const pathname = usePathname()
 
@@ -199,6 +202,8 @@ export function SidebarNav({ className, ...props }: SidebarNavProps) {
             )}
         </SidebarMenuItem>
     )
+
+    const { data: session } = useSession();
 
     return (
         <Sidebar collapsible="icon" className={className} {...props}>
@@ -236,24 +241,54 @@ export function SidebarNav({ className, ...props }: SidebarNavProps) {
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" className="justify-between">
                             <div className="flex items-center gap-2">
-                                <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-zinc-100">
-                                    <Image height="40" width="40"
-                                        src="/placeholder.svg?height=32&width=32"
-                                        alt="User avatar"
-                                        className="h-full w-full object-cover"
-                                    />
+                                <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl bg-zinc-100">
+                                    {
+                                        session ? (
+                                            <Avatar className="rounded-xl">
+                                                {session?.user?.avatar ? (
+                                                    <AvatarImage src={session?.user?.avatar} alt={session?.user.username} height={50} width={50} />
+                                                ) : (
+                                                    <AvatarFallback className="rounded-none">
+                                                        {(() => {
+                                                            const username = session?.user?.username || '';
+                                                            const words = username.trim().split(' ');
+                                                            if (words.length >= 2) {
+                                                                return (words[0][0] + words[1][0]).toUpperCase();
+                                                            }
+                                                            return username.slice(0, 2).toUpperCase();
+                                                        })()}
+                                                    </AvatarFallback>
+                                                )}
+                                            </Avatar>
+                                        ) : <Skeleton className="h-12 w-12 rounded-full" />
+                                    }
+
                                 </div>
-                                <div className="flex flex-col items-start">
-                                    <span className="text-sm font-medium">John Doe</span>
-                                    <span className="text-xs text-muted-foreground">john@example.com</span>
+                                <div className="flex flex-col items-start gap-y-1">
+                                    <span className="text-sm font-medium">{
+                                        session ? (
+                                            session?.user?.username
+                                        ) : <Skeleton className="bg-neutral-700 rounded-xs h-4 w-[100px]" />
+                                    }</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {
+                                            session ? (
+                                                session?.user?.email
+                                            ) : <Skeleton className="bg-neutral-800 rounded-xs h-4 w-[150px]" />
+                                        }
+                                    </span>
                                 </div>
                             </div>
                             <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                                        <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
+                                {
+                                    session ? (
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                                                <MoreVertical className="h-4 w-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                    ) : <Skeleton className="h-4 w-2" />
+                                }
                                 <DropdownMenuContent align="start">
                                     <DropdownMenuItem>
                                         <User className="mr-2 h-4 w-4" />

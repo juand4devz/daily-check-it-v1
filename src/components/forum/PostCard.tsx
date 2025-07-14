@@ -19,7 +19,7 @@ import {
     MessageSquare,
     Heart,
     CheckCircle,
-    ImageIcon,
+    // ImageIcon,
     MoreHorizontal,
     Pin,
     Archive,
@@ -84,8 +84,8 @@ export function PostCard({ post, currentUser, isAdmin, onPostAction, onTagClick 
         }
     }
 
-    const hasMedia = post.media && post.media.length > 0
-    const thumbnail = post.thumbnail || (post.media && post.media.length > 0 ? post.media[0].url : null)
+    // const hasMedia = post.media && post.media.length > 0
+    const thumbnail = post.thumbnail || (post.media && post.media.length > 0 ? post.media[0].data : null)
     const TypeIcon = getTypeIcon(post.type)
     const CategoryIcon = getCategoryIcon(post.category)
     const forumType = FORUM_TYPES.find((t) => t.id === post.type)
@@ -142,14 +142,14 @@ export function PostCard({ post, currentUser, isAdmin, onPostAction, onTagClick 
                     )}
 
                     {/* Media indicator */}
-                    {hasMedia && (
+                    {/* {hasMedia && (
                         <div className="absolute top-3 right-3">
                             <Badge variant="secondary" className="bg-black/50 text-white border-0">
                                 <ImageIcon className="h-3 w-3 mr-1" />
                                 {post.media!.length}
                             </Badge>
                         </div>
-                    )}
+                    )} */}
 
                     {/* Actions dropdown */}
                     <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">

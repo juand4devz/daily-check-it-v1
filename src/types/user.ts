@@ -1,22 +1,31 @@
+// user.ts
+// user.ts
 export interface User {
-    id: string
-    username: string
-    email: string
-    role: "admin" | "user"
-    loginType: "email" | "github" | "google"
-    avatar: string
-    bio: string
-    banner: string
-    location: string
-    phone: string
-    website: string
-    github: string
-    twitter: string
-    linkedin: string
-    instagram: string
-    createdAt: string
-    updatedAt: string
-    lastLogin: string
+    id: string;
+    username: string;
+    email: string;
+    role: "admin" | "user";
+    loginType: "email" | "github" | "google";
+    avatar: string; // URL to avatar image
+    bio: string;
+    banner: string; // URL to banner image
+    location: string;
+    phone: string;
+    website: string;
+    github: string;
+    twitter: string;
+    linkedin: string;
+    instagram: string;
+    createdAt: string; // ISO string
+    updatedAt: string; // ISO string
+    lastLogin: string; // ISO string
+
+    // --- UserTokenData fields integrated ---
+    dailyTokens: number;
+    maxDailyTokens: number;
+    lastResetDate: string; // ISO string of the date tokens were last reset
+    totalUsage: number; // Total tokens used since account creation
+    // --- End UserTokenData fields ---
 }
 
 export interface ForumPost {

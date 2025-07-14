@@ -2,9 +2,6 @@
 
 import { usePathname } from "next/navigation"
 import React from "react"
-
-import { Separator } from "@/components/ui/separator"
-import { SidebarTrigger } from "@/components/ui/sidebar"
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -13,93 +10,112 @@ import {
     BreadcrumbPage,
     BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
+import { SidebarTrigger } from "@/components/ui/sidebar"
+import { Separator } from "@/components/ui/separator"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "../ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "../ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
 import { signIn, useSession } from "next-auth/react"
-import AuthButton, { SignOut } from "../auth/auth-button"
-import Link from "next/link"
+import { SignOut } from "../auth/auth-button"
 
 export function Header() {
     const pathname = usePathname()
+    const { data: session } = useSession()
 
-    // Generate breadcrumbs based on pathname
     const generateBreadcrumbs = () => {
-        const paths = pathname.split("/").filter(Boolean)
+        const segments = pathname.split("/").filter(Boolean)
+        const mainSegment = segments[0] || "home"
+        const mainLabel = mainSegment.charAt(0).toUpperCase() + mainSegment.slice(1)
+        const restSegments = segments.slice(1)
 
-        if (paths.length === 0) {
-            return (
+        return (
+            <BreadcrumbList>
                 <BreadcrumbItem>
-                    <BreadcrumbPage>Home</BreadcrumbPage>
+                    <BreadcrumbLink href={`/${mainSegment}`}>{mainLabel}</BreadcrumbLink>
                 </BreadcrumbItem>
-            )
-        }
 
-        return paths.map((path, index) => {
-            const href = `/${paths.slice(0, index + 1).join("/")}`
-            const isLast = index === paths.length - 1
-            const label = path.charAt(0).toUpperCase() + path.slice(1)
+                {restSegments.length > 0 && (
+                    <span className="hidden md:flex">
+                        {restSegments.map((segment, index) => {
+                            const href = `/${[mainSegment, ...restSegments.slice(0, index + 1)].join("/")}`
+                            const label = segment.charAt(0).toUpperCase() + segment.slice(1)
+                            const isLast = index === restSegments.length - 1
 
-            return (
-                <React.Fragment key={href}>
-                    <BreadcrumbItem>
-                        {isLast ? <BreadcrumbPage>{label}</BreadcrumbPage> : <BreadcrumbLink href={href}>{label}</BreadcrumbLink>}
-                    </BreadcrumbItem>
-                    {!isLast && <BreadcrumbSeparator />}
-                </React.Fragment>
-            )
-        })
+                            return (
+                                <React.Fragment key={href}>
+                                    <BreadcrumbSeparator className="flex self-center-safe mr-2" />
+                                    <BreadcrumbItem>
+                                        {isLast ? (
+                                            <BreadcrumbPage>{label}</BreadcrumbPage>
+                                        ) : (
+                                            <BreadcrumbLink href={href}>{label}</BreadcrumbLink>
+                                        )}
+                                    </BreadcrumbItem>
+                                </React.Fragment>
+                            )
+                        })}
+                    </span>
+                )}
+            </BreadcrumbList>
+        )
     }
 
-    const { data: session } = useSession()
     console.log(session)
 
     return (
-        <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="flex items-center gap-2 px-4 w-full">
+        <header className="sticky top-0 z-10 flex h-16 items-center gap-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="flex items-center w-full px-4 gap-2">
                 <SidebarTrigger className="-ml-1" />
                 <Separator orientation="vertical" className="mr-2 h-4" />
-                <Breadcrumb>
-                    <BreadcrumbList>{generateBreadcrumbs()}</BreadcrumbList>
-                </Breadcrumb>
+                <Breadcrumb>{generateBreadcrumbs()}</Breadcrumb>
 
                 <div className="ml-auto flex items-center gap-2">
                     <ThemeToggle />
-                    <AuthButton provider='github' name='Github' />
-                    <AuthButton provider='google' name='Google' />
-                    <Button onClick={() => signIn()} variant="secondary">Login</Button>
-                    <Button variant="secondary"><Link href="/register">register</Link></Button>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger>
-                            <Avatar className='h-10 w-10 border-4'>
-                                {session?.user?.image ? (
-                                    <AvatarImage src={session?.user?.image} alt='Profile Picture' height={50} width={50} />
-                                ) : (
-                                    <AvatarFallback>
-                                        {(() => {
-                                            const name = session?.user?.name || '';
-                                            const words = name.trim().split(' ');
-                                            if (words.length >= 2) {
-                                                return (words[0][0] + words[1][0]).toUpperCase();
-                                            }
-                                            return name.slice(0, 2).toUpperCase();
-                                        })()}
-                                    </AvatarFallback>
-                                )}
-                            </Avatar>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className='mr-14 mt-2 min-w-40'>
-                            <DropdownMenuLabel>Account</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem>{session?.user?.name}</DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem>{session?.user?.email}</DropdownMenuItem>
-                            <DropdownMenuItem>
-                                <SignOut />
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                    {session ? (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger>
+                                <Avatar className="h-10 w-10 border-4 rounded-xl">
+                                    {session.user?.avatar ? (
+                                        <AvatarImage src={session.user.avatar} alt="Profile" />
+                                    ) : (
+                                        <AvatarFallback className="rounded-none">
+                                            {(() => {
+                                                const username = session.user?.username || ""
+                                                const initials = username
+                                                    .split(" ")
+                                                    .slice(0, 2)
+                                                    .map((word) => word[0])
+                                                    .join("")
+                                                return initials.toUpperCase()
+                                            })()}
+                                        </AvatarFallback>
+                                    )}
+                                </Avatar>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="mr-14 mt-2 min-w-40">
+                                <DropdownMenuLabel>Account</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem>{session.user?.username}</DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem>{session.user?.email}</DropdownMenuItem>
+                                <DropdownMenuItem>
+                                    <SignOut />
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    ) : (
+                        <Button onClick={() => signIn()} variant="secondary">
+                            Login
+                        </Button>
+                    )}
                 </div>
             </div>
         </header>

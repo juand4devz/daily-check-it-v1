@@ -1,4 +1,4 @@
-// src/types.ts
+// /types/index.ts
 export interface Gejala {
     id: string; // Firestore document ID
     kode: string;

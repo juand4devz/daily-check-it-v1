@@ -1,4 +1,4 @@
-// interfaces.ts
+// /types/forum.ts
 import { LucideIcon } from "lucide-react";
 import {
     Monitor,
