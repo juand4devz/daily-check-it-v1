@@ -2,12 +2,12 @@
 "use client";
 
 import * as React from "react";
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback, useEffect } from "react"; // Tambahkan useEffect
 import { Camera, Save, X, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils"; // Pastikan Anda memiliki utility cn
+import { cn } from "@/lib/utils"; // Pastikan Anda memiliki utility cn (dari shadcn-ui install)
 import {
     ImageKitAbortError,
     ImageKitInvalidRequestError,
@@ -41,8 +41,6 @@ export function ImageUploader({
     imageAlt,
     disabled = false,
     type,
-    // width,
-    // height,
 }: ImageUploaderProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null); // URL preview lokal (blob URL atau URL dari IK)
@@ -79,20 +77,15 @@ export function ImageUploader({
     const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
-            // Validasi tipe file
+            // Validasi tipe dan ukuran file
             if (!file.type.startsWith("image/")) {
                 toast.error("File tidak valid", { description: "Hanya gambar yang diperbolehkan." });
-                event.target.value = ''; // Clear the input so same file can be selected again
                 return;
             }
-            // Validasi ukuran file (maksimal 5MB)
-            const MAX_FILE_SIZE_MB = 5;
-            if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-                toast.error("Ukuran file terlalu besar", { description: `Maksimal ukuran file adalah ${MAX_FILE_SIZE_MB}MB.` });
-                event.target.value = ''; // Clear the input so same file can be selected again
+            if (file.size > 5 * 1024 * 1024) { // Maksimal 5MB
+                toast.error("Ukuran file terlalu besar", { description: "Maksimal ukuran file adalah 5MB." });
                 return;
             }
-
             setFileToUpload(file);
             setPreviewUrl(URL.createObjectURL(file)); // Buat URL lokal untuk preview langsung
             setProgress(0); // Reset progress
@@ -127,8 +120,7 @@ export function ImageUploader({
             // const originalFileNameWithoutExt = fileToUpload.name.split('.').slice(0, -1).join('.');
             const fileExtension = fileToUpload.name.split('.').pop();
 
-            // Format nama file: {prefix}-{userId}-{tahun}{bulan}{hari}-{jam}{menit}{detik}-{random}.{ext}
-            const uniqueFileName = `${fileNamePrefix}-${userId}-${year}${month}${day}-${hours}${minutes}${seconds}-${randomString}.${fileExtension}`;
+            const uniqueFileName = `${fileNamePrefix}${userId}-${year}${month}${day}-${hours}${minutes}${seconds}-${randomString}.${fileExtension}`;
 
 
             const uploadResponse = await upload({
@@ -142,12 +134,14 @@ export function ImageUploader({
                 onProgress: (event) => {
                     setProgress((event.loaded / event.total) * 100);
                 },
+                // Opsi tambahan untuk menimpa file dengan nama yang sama jika ada
                 useUniqueFileName: false, // Kita buat nama file unik sendiri
                 overwriteFile: true, // Timpa jika ada file dengan nama yang sama di folder
             });
 
             if (uploadResponse.url) {
-                await onImageUrlChange(uploadResponse.url); // Kirim URL baru ke parent component
+                // Panggil callback ke parent dengan URL baru yang diunggah
+                await onImageUrlChange(uploadResponse.url);
 
                 setFileToUpload(null); // Bersihkan file yang menunggu upload
                 // setPreviewUrl(uploadResponse.url); // Preview akan disinkronkan oleh useEffect dari currentImageUrl
@@ -239,7 +233,6 @@ export function ImageUploader({
     const showUploadButton = !showSaveCancelButtons;
     const showDeleteButton = (currentImageUrl || previewUrl) && !isUploading; // Tampilkan tombol hapus jika ada gambar
 
-
     return (
         <div className="relative group w-full">
             {/* Input file tersembunyi */}
@@ -257,12 +250,9 @@ export function ImageUploader({
 
             {/* Overlay untuk tombol Simpan/Batal/Hapus */}
             <div className={cn(
-                "absolute flex gap-2 z-10 transition-opacity",
-                // Posisi default untuk banner dan general
-                type === "banner" || type === "general" ? "top-4 right-4 opacity-0 group-hover:opacity-100" : "",
-                // Posisi spesifik untuk avatar (bottom-right dari avatar itu sendiri)
-                type === "avatar" ? "bottom-0 right-0 top-auto left-auto translate-x-1/4 translate-y-1/4 opacity-0 group-hover:opacity-100" : "",
-                { "opacity-100": showSaveCancelButtons } // Selalu tampilkan jika ada file untuk disimpan
+                "absolute top-4 right-4 flex gap-2 z-10",
+                type === "avatar" ? "bottom-6 -right-36 top-auto translate-y-1/4 translate-x-1/4 opacity-90 group-hover:opacity-100" : "opacity-90 group-hover:opacity-100", // Posisi overlay berbeda untuk avatar
+                "transition-opacity"
             )}>
                 {showSaveCancelButtons ? (
                     <>
@@ -272,7 +262,7 @@ export function ImageUploader({
                             size="sm"
                             onClick={handleSave}
                             disabled={isUploading || disabled}
-                            className="flex items-center gap-1"
+                            className="flex items-center gap-1 cursor-pointer"
                         >
                             {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                             {isUploading ? `${Math.round(progress)}%` : "Simpan"}
@@ -281,6 +271,7 @@ export function ImageUploader({
                             type="button"
                             variant="outline"
                             size="sm"
+                            className="cursor-pointer"
                             onClick={handleCancel}
                             disabled={isUploading || disabled}
                         >
@@ -295,11 +286,11 @@ export function ImageUploader({
                         onClick={handleDelete}
                         disabled={disabled}
                         className={cn(
-                            "flex items-center gap-1",
-                            type === "avatar" ? "rounded-full h-8 w-8 p-0" : "" // Bentuk bulat untuk avatar
+                            "flex items-center gap-1 rounded-full cursor-pointer",
+                            type === "avatar" ? "absolute -bottom-7 right-44 translate-y-1/4 -translate-x-1/4" : "absolute top-0 right-36 rounded-md" // Posisi hapus avatar
                         )}
                     >
-                        <Trash2 className={cn("h-4 w-4", type === "avatar" ? "" : "mr-2")} /> {type === "avatar" ? "" : "Hapus"}
+                        <Trash2 className="h-2 w-2" /> {type === "avatar" ? "" : "Hapus"}
                     </Button>
                 ) : null}
             </div>
@@ -313,9 +304,10 @@ export function ImageUploader({
                     onClick={handleUploadButtonClick}
                     disabled={disabled || isUploading}
                     className={cn(
-                        "absolute flex items-center justify-center gap-1 z-10 transition-opacity",
-                        type === "banner" || type === "general" ? "top-4 right-4 opacity-0 group-hover:opacity-100" : "", // Posisi default untuk banner dan general
-                        type === "avatar" ? "bottom-0 right-0 top-auto left-auto rounded-full h-8 w-8 p-0 opacity-0 group-hover:opacity-100" : "", // Posisi spesifik untuk avatar
+                        "absolute top-4 right-4 z-10 cursor-pointer", // Default position for banner and general
+                        type === "avatar" ? "bottom-2 right-1 top-auto rounded-full h-8 w-8 p-0" : "", // Specific position for avatar
+                        type === "banner" ? "top-4 right-4" : "", // Specific position for banner
+                        "opacity-90 group-hover:opacity-100 transition-opacity" // Hidden by default, show on group hover
                     )}
                 >
                     <Camera className={cn("h-4 w-4", type === "avatar" ? "" : "mr-2")} />

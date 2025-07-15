@@ -7,6 +7,7 @@ import type { User } from "@/types/types"; // Sesuaikan path jika berbeda
 // Constants for default user data
 const DEFAULT_MAX_DAILY_TOKENS = 10; // Contoh nilai default
 const DEFAULT_BIO = "Halo! Saya pengguna baru DailyCheckIt.";
+const DEFAULT_AVATAR_URL = ""; // Atau "/placeholder.svg" jika Anda menggunakannya sebagai default di DB
 
 // Helper function to get today's date in YYYY-MM-DD format
 function getTodayDateString(): string {
@@ -58,7 +59,7 @@ export async function register(
         email: data.email,
         role: "user",
         loginType: "email",
-        avatar: "", // Default avatar kosong untuk registrasi email
+        avatar: DEFAULT_AVATAR_URL, // Default avatar kosong untuk registrasi email
         bio: DEFAULT_BIO,
         banner: "",
         location: "",
@@ -110,12 +111,12 @@ async function handleOAuthLogin(email: string, name: string, loginType: User['lo
     const now = new Date().toISOString();
     const todayDate = getTodayDateString();
 
-    let user: User; // Deklarasikan variabel user dengan tipe User
+    let user: User;
 
     if (!snapshot.empty) {
         // Pengguna sudah ada, perbarui datanya
         const userDoc = snapshot.docs[0];
-        const existingData = userDoc.data() as User; // Pastikan casting ke User
+        const existingData = userDoc.data() as User;
 
         const updateData: Partial<User> = {
             username: name || existingData.username, // Gunakan nama baru jika tersedia
@@ -124,16 +125,21 @@ async function handleOAuthLogin(email: string, name: string, loginType: User['lo
             loginType: loginType, // Perbarui tipe login jika mungkin berbeda
         };
 
-        // --- Perbaikan di sini untuk avatar ---
-        // Hanya update avatar jika avatarUrl disediakan oleh penyedia OAuth
-        // atau jika avatarUrl secara eksplisit string kosong atau null
-        if (avatarUrl !== undefined) { // Cek apakah properti 'image' ada di objek profile NextAuth
-            updateData.avatar = avatarUrl || ""; // Jika ada, gunakan nilai tersebut (string kosong jika null)
+        // --- PERBAIKAN LOGIKA AVATAR DI SINI ---
+        // Hanya perbarui avatar jika:
+        // 1. Avatar yang ada di DB adalah URL default kita (misalnya, string kosong).
+        // 2. Atau, jika avatar yang ada di DB sama persis dengan avatar dari penyedia OAuth.
+        //    Ini mencegah penimpaan avatar kustom yang diunggah pengguna.
+        const isExistingAvatarDefault = existingData.avatar === DEFAULT_AVATAR_URL;
+        const isExistingAvatarFromProvider = existingData.avatar === avatarUrl; // Cek jika avatar yang ada sama dengan yang dari provider
+
+        if (avatarUrl !== undefined && (isExistingAvatarDefault || isExistingAvatarFromProvider)) {
+            // Jika avatarUrl disediakan Oauth DAN (avatar di DB default ATAU sama dengan yang dari provider)
+            updateData.avatar = avatarUrl || DEFAULT_AVATAR_URL; // Timpa dengan yang dari provider (atau default kosong jika null)
         }
-        // Jika avatarUrl adalah undefined (properti tidak ada sama sekali), maka tidak sentuh avatar di DB.
-        // Jika avatarUrl adalah string atau null, maka akan menimpa avatar yang ada.
-        // Anda bisa menyesuaikan ini: Jika Anda ingin agar avatar hanya diperbarui jika avatarUrl ada dan tidak kosong
-        // if (avatarUrl) { updateData.avatar = avatarUrl; } else if (avatarUrl === null) { updateData.avatar = ""; }
+        // Jika avatarUrl adalah undefined, atau jika avatar yang ada di DB BUKAN default DAN BUKAN dari provider yang sama,
+        // maka kita tidak akan menimpa avatar di DB.
+        // --- AKHIR PERBAIKAN LOGIKA AVATAR ---
 
 
         // Tangani reset token harian jika hari sudah berganti
@@ -143,7 +149,6 @@ async function handleOAuthLogin(email: string, name: string, loginType: User['lo
         }
 
         await updateDoc(doc(clientDb, "users", userDoc.id), updateData);
-        // Gabungkan data lama dengan data yang diperbarui
         user = { ...existingData, ...updateData };
     } else {
         // Pengguna baru, buat profil baru
@@ -152,7 +157,7 @@ async function handleOAuthLogin(email: string, name: string, loginType: User['lo
             email: email,
             role: "user",
             loginType: loginType,
-            avatar: avatarUrl || "", // Gunakan avatar dari penyedia atau string kosong
+            avatar: avatarUrl || DEFAULT_AVATAR_URL, // Gunakan avatar dari penyedia atau default kosong
             bio: DEFAULT_BIO,
             banner: "",
             location: "",
@@ -177,14 +182,11 @@ async function handleOAuthLogin(email: string, name: string, loginType: User['lo
 }
 
 export async function loginWithGoogle(data: { email: string; name?: string | null; image?: string | null }): Promise<User> {
-    // Pastikan avatar (image) ditransfer ke handleOAuthLogin sebagai string | null | undefined
     return handleOAuthLogin(data.email, data.name || data.email.split('@')[0], "google", data.image);
 }
 
 export async function loginWithGithub(data: { email: string; name?: string | null; image?: string | null }): Promise<User> {
-    // GitHub profile.email bisa null jika private. Gunakan fallback email
     const userEmail = data.email || `${data.name?.replace(/\s/g, '').toLowerCase() || Math.random().toString(36).substring(7)}@github.com`;
-    // Pastikan avatar (image) ditransfer ke handleOAuthLogin sebagai string | null | undefined
     return handleOAuthLogin(userEmail, data.name || userEmail.split('@')[0], "github", data.image);
 }
 
@@ -203,9 +205,8 @@ export async function updateUserTokens(userId: string, tokensUsed: number): Prom
     let currentTotalUsage = userData.totalUsage;
     let lastResetDate = userData.lastResetDate;
 
-    // Reset daily tokens if it's a new day
     if (lastResetDate !== todayDate) {
-        currentDailyTokens = userData.maxDailyTokens || DEFAULT_MAX_DAILY_TOKENS; // Gunakan default jika maxDailyTokens tidak ada
+        currentDailyTokens = userData.maxDailyTokens || DEFAULT_MAX_DAILY_TOKENS;
         lastResetDate = todayDate;
     }
 
@@ -227,5 +228,21 @@ export async function updateUserTokens(userId: string, tokensUsed: number): Prom
     } catch (error) {
         console.error("Error updating user tokens:", error);
         return { status: false, message: "Gagal memperbarui token." };
+    }
+}
+
+export async function updateUserProfile(userId: string, updatedFields: Partial<User>): Promise<{ status: boolean; message?: string }> {
+    const userDocRef = doc(clientDb, "users", userId);
+    try {
+        const { ...fieldsToUpdate } = updatedFields;
+
+        await updateDoc(userDocRef, {
+            ...fieldsToUpdate,
+            updatedAt: new Date().toISOString(),
+        });
+        return { status: true, message: "Profil berhasil diperbarui." };
+    } catch (error) {
+        console.error("Error updating user profile:", error);
+        return { status: false, message: "Gagal memperbarui profil." };
     }
 }

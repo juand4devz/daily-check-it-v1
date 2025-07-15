@@ -28,7 +28,7 @@ import { SignOut } from "../auth/auth-button"
 
 export function Header() {
     const pathname = usePathname()
-    const { data: session } = useSession()
+    const { data: session, status } = useSession()
 
     const generateBreadcrumbs = () => {
         const segments = pathname.split("/").filter(Boolean)
@@ -68,10 +68,8 @@ export function Header() {
         )
     }
 
-    console.log(session)
-
     return (
-        <header className="sticky top-0 z-10 flex h-16 items-center gap-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <header className="sticky top-0 z-50 flex h-16 items-center gap-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex items-center w-full px-4 gap-2">
                 <SidebarTrigger className="-ml-1" />
                 <Separator orientation="vertical" className="mr-2 h-4" />
@@ -79,7 +77,7 @@ export function Header() {
 
                 <div className="ml-auto flex items-center gap-2">
                     <ThemeToggle />
-                    {session ? (
+                    {status === "loading" ? null : session ? (
                         <DropdownMenu>
                             <DropdownMenuTrigger>
                                 <Avatar className="h-10 w-10 border-4 rounded-xl">

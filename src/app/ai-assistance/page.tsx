@@ -5,13 +5,13 @@ import type React from "react"
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { Bot, Send, Camera, Upload, RotateCcw, Info, Loader2, X, AlertTriangle, Sparkles, Copy, Check } from "lucide-react"
+import { Bot, Send, Camera, Upload, Info, Loader2, X, AlertTriangle, Sparkles, Copy, Check, Shuffle, BrushCleaning } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { toast } from "sonner"
@@ -687,7 +687,7 @@ export default function AIChatPage() {
                                 onClick={() => setExampleQuestions(getRandomQuestions())}
                                 className="text-xs"
                             >
-                                <RotateCcw className="h-3 w-3 mr-1" />
+                                <Shuffle className="h-3 w-3 mr-1" />
                                 Acak Lagi
                             </Button>
                         </div>
@@ -862,7 +862,7 @@ export default function AIChatPage() {
                                                             className="h-8 w-8 p-0"
                                                             title="Clear chat history"
                                                         >
-                                                            <RotateCcw className="h-4 w-4" />
+                                                            <BrushCleaning className="h-4 w-4" />
                                                         </Button>
                                                     </div>
 

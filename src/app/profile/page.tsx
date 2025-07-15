@@ -1,12 +1,15 @@
-"use client"
+// /app/profile/page.tsx
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect, useCallback } from "react";
+import { useSession } from "next-auth/react"; // Menggunakan useSession untuk mendapatkan ID pengguna yang login
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Dialog,
     DialogContent,
@@ -14,70 +17,193 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-} from "@/components/ui/dialog"
-import { toast } from "sonner"
-import { Edit, Camera, MapPin, Phone, Globe, Github, Twitter, Linkedin, Instagram, Calendar, Mail } from "lucide-react"
-import type { User } from "@/types/user"
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { Edit, Camera, MapPin, Phone, Globe, Github, Twitter, Linkedin, Instagram, Calendar, Mail, Loader2, Link } from "lucide-react";
+import type { User } from "@/types/types"; // Pastikan path ini benar
+import { ImageUploader } from "@/components/imagekit/ImageUploader";
+import { Skeleton } from "@/components/ui/skeleton"; // Untuk efek loading
 
-const mockUser: User = {
-    id: "2",
-    username: "johndoe",
-    email: "john.doe@example.com",
-    role: "user",
-    loginType: "github",
-    avatar: "/placeholder.svg?height=120&width=120",
-    bio: "Teknisi komputer yang suka belajar hal baru dan berbagi pengalaman dengan komunitas",
-    banner: "/placeholder.svg?height=200&width=800",
-    location: "Bandung, Indonesia",
-    phone: "+62 813-9876-5432",
-    website: "https://johndoe.dev",
-    github: "johndoe",
-    twitter: "johndoe",
-    linkedin: "johndoe",
-    instagram: "johndoe",
-    createdAt: "2024-01-20T10:30:00Z",
-    updatedAt: "2024-01-20T10:30:00Z",
-    lastLogin: "2024-01-22T14:15:00Z",
-}
 
 export default function ProfilePage() {
-    const [user, setUser] = useState<User>(mockUser)
-    const [isEditing, setIsEditing] = useState(false)
-    const [editForm, setEditForm] = useState<User>(mockUser)
+    const { data: session, status } = useSession(); // Ambil sesi pengguna
+    const router = useRouter();
 
-    const handleSave = () => {
-        toast("Simpan Perubahan", {
-            description: "Apakah Anda yakin ingin menyimpan perubahan profil?",
-            action: {
-                label: "Simpan",
-                onClick: () => {
-                    setUser(editForm)
-                    setIsEditing(false)
-                    toast.success("Profil berhasil diperbarui")
-                },
-            },
-            cancel: {
-                label: "Batal",
-                onClick: () => toast.dismiss(),
-            },
-        })
-    }
+    const [user, setUser] = useState<User | null>(null); // State untuk data user yang ditampilkan
+    const [isEditing, setIsEditing] = useState(false); // State untuk mode edit dialog
+    const [editForm, setEditForm] = useState<Partial<User>>({}); // State untuk form edit
+    const [isSaving, setIsSaving] = useState(false); // State saat proses simpan data
+    const [initialLoading, setInitialLoading] = useState(true); // State untuk loading awal page
 
-    const handleCancel = () => {
-        setEditForm(user)
-        setIsEditing(false)
-    }
+    // --- Fetch User Data (based on session ID) ---
+    const fetchUserData = useCallback(async (userId: string) => {
+        try {
+            // Fetch data user dari API Route yang sudah ada: /api/users/[id]
+            const response = await fetch(`/api/users/${userId}`);
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || "Gagal memuat data pengguna.");
+            }
+            const fetchedUser: User = await response.json();
+            setUser(fetchedUser);
+            setEditForm(fetchedUser); // Inisialisasi form edit dengan data yang diambil
+            toast.success("Data profil berhasil dimuat.");
+        } catch (error) {
+            console.error("Error fetching user data:", error);
+            toast.error(error instanceof Error ? error.message : "Gagal memuat profil.");
+            setUser(null); // Bersihkan data user jika gagal
+        } finally {
+            setInitialLoading(false); // Selesai loading awal
+        }
+    }, []);
 
+    useEffect(() => {
+        if (status === "loading") return; // Tunggu sesi dimuat
+
+        if (status === "unauthenticated") {
+            router.push('/login'); // Redirect ke login jika belum terautentikasi
+            return;
+        }
+
+        // Jika ada ID pengguna di sesi dan ini adalah loading awal, fetch data
+        if (session?.user?.id && initialLoading) {
+            fetchUserData(session.user.id);
+        }
+    }, [status, session, router, fetchUserData, initialLoading]);
+
+    // Fungsi untuk memformat tanggal
     const formatDate = (dateString: string): string => {
+        if (!dateString) return "N/A"; // Handle string tanggal kosong
         return new Date(dateString).toLocaleDateString("id-ID", {
             year: "numeric",
             month: "long",
             day: "numeric",
-        })
-    }
+        });
+    };
 
-    const updateFormField = <K extends keyof User>(field: K, value: User[K]) => {
-        setEditForm((prev) => ({ ...prev, [field]: value }))
+    // --- Save Profile Changes for Text Fields ---
+    const handleSaveProfile = async () => {
+        if (!user) return; // Tidak ada user untuk disimpan
+
+        setIsSaving(true);
+        try {
+            // Kirim hanya field yang diubah atau yang relevan untuk update dari client
+            const dataToUpdate: Partial<User> = {
+                username: editForm.username,
+                bio: editForm.bio,
+                location: editForm.location,
+                phone: editForm.phone,
+                website: editForm.website,
+                github: editForm.github,
+                twitter: editForm.twitter,
+                linkedin: editForm.linkedin,
+                instagram: editForm.instagram,
+                // avatar dan banner diupdate oleh ImageUploader secara terpisah
+            };
+
+            const response = await fetch(`/api/users/${user.id}`, { // Memanggil API update user
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(dataToUpdate),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || "Gagal memperbarui profil.");
+            }
+
+            // Perbarui state user lokal dengan data yang sudah diupdate dari form edit
+            // Avatar dan banner akan disinkronkan secara terpisah oleh ImageUploader jika mereka diubah
+            setUser(prevUser => ({ ...prevUser!, ...editForm })); // Update state lokal segera
+            setIsEditing(false); // Tutup dialog
+            toast.success("Profil berhasil diperbarui!");
+
+        } catch (error) {
+            console.error("Error saving profile:", error);
+            toast.error(error instanceof Error ? error.message : "Gagal menyimpan perubahan profil.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    // --- Cancel Edit Dialog ---
+    const handleCancelEdit = () => {
+        setEditForm(user || {}); // Kembalikan form edit ke data user saat ini
+        setIsEditing(false);
+    };
+
+    // --- Update Form Field for Dialog ---
+    const updateFormField = useCallback(<K extends keyof Partial<User>>(field: K, value: Partial<User>[K]) => {
+        setEditForm((prev) => ({ ...prev, [field]: value }));
+    }, []);
+
+    // --- Handle Image URL Changes from ImageUploader (untuk Avatar) ---
+    const handleAvatarUrlChange = useCallback(async (newUrl: string | null) => {
+        if (!user) return;
+        try {
+            // Kirim perubahan avatar ke API update user
+            const response = await fetch(`/api/users/${user.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ avatar: newUrl || "" }), // Kirim string kosong jika null untuk hapus
+            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || "Gagal memperbarui avatar.");
+            }
+            setUser(prevUser => ({ ...prevUser!, avatar: newUrl || "" })); // Update state lokal
+            toast.success("Avatar berhasil diperbarui!");
+        } catch (error) {
+            console.error("Error updating avatar:", error);
+            toast.error(error instanceof Error ? error.message : "Gagal memperbarui avatar.");
+        }
+    }, [user]);
+
+    // --- Handle Image URL Changes from ImageUploader (untuk Banner) ---
+    const handleBannerUrlChange = useCallback(async (newUrl: string | null) => {
+        if (!user) return;
+        try {
+            // Kirim perubahan banner ke API update user
+            const response = await fetch(`/api/users/${user.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ banner: newUrl || "" }), // Kirim string kosong jika null untuk hapus
+            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || "Gagal memperbarui banner.");
+            }
+            setUser(prevUser => ({ ...prevUser!, banner: newUrl || "" })); // Update state lokal
+            toast.success("Banner berhasil diperbarui!");
+        } catch (error) {
+            console.error("Error updating banner:", error);
+            toast.error(error instanceof Error ? error.message : "Gagal memperbarui banner.");
+        }
+    }, [user]);
+
+
+    // Tampilkan skeleton saat loading
+    if (initialLoading || status === "loading" || !user) {
+        return (
+            <div className="mx-2 md:mx-4 py-6 space-y-6">
+                <Skeleton className="h-8 w-1/3" />
+                <div className="h-48 bg-gray-200 rounded-t-lg"></div>
+                <div className="relative -mt-16 ml-6">
+                    <Skeleton className="h-32 w-32 rounded-full border-4 border-background"></Skeleton>
+                </div>
+                <div className="pt-20 pb-6 px-6 space-y-2">
+                    <Skeleton className="h-8 w-48"></Skeleton>
+                    <Skeleton className="h-4 w-64"></Skeleton>
+                    <Skeleton className="h-16 w-full"></Skeleton>
+                </div>
+                <div className="grid gap-6 md:grid-cols-2">
+                    <Card><CardHeader><Skeleton className="h-6 w-40"></Skeleton></CardHeader><CardContent className="space-y-4"><Skeleton className="h-4 w-full"></Skeleton><Skeleton className="h-4 w-full"></Skeleton></CardContent></Card>
+                    <Card><CardHeader><Skeleton className="h-6 w-40"></Skeleton></CardHeader><CardContent className="space-y-4"><Skeleton className="h-4 w-full"></Skeleton><Skeleton className="h-4 w-full"></Skeleton></CardContent></Card>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -87,41 +213,40 @@ export default function ProfilePage() {
                     <h1 className="text-3xl font-bold">Profil Saya</h1>
                     <p className="text-muted-foreground">Kelola informasi profil dan pengaturan akun Anda</p>
                 </div>
-                <Button onClick={() => setIsEditing(true)}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Profil
-                </Button>
+                {session?.user?.id === user.id && ( // Hanya tampilkan tombol edit jika ini profil pengguna yang login
+                    <Button onClick={() => setIsEditing(true)}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit Profil
+                    </Button>
+                )}
             </div>
 
             <Card className="py-0">
                 <CardContent className="p-0">
                     <div className="relative">
-                        <div
-                            className="h-48 bg-gradient-to-r from-blue-500 to-purple-600 rounded-t-lg"
-                            style={{
-                                backgroundImage: `url(${user.banner})`,
-                                backgroundSize: "cover",
-                                backgroundPosition: "center",
-                            }}
-                        >
-                            <div className="absolute top-4 right-4">
-                                <Button variant="secondary" size="sm">
-                                    <Camera className="h-4 w-4 mr-2" />
-                                    Ubah Banner
-                                </Button>
-                            </div>
-                        </div>
-
+                        {/* ImageUploader for Banner */}
+                        <ImageUploader
+                            userId={user.id} // Kirim ID pengguna untuk penamaan file
+                            currentImageUrl={user.banner}
+                            onImageUrlChange={handleBannerUrlChange}
+                            folderPath="user-banners" // Folder di ImageKit
+                            fileNamePrefix="banner" // Prefix nama file
+                            imageAlt={`${user.username}'s banner`}
+                            disabled={!session?.user?.id || session.user.id !== user.id} // Disable jika bukan user yang login
+                            type="banner"
+                        />
                         <div className="absolute -bottom-16 left-6">
-                            <div className="relative">
-                                <Avatar className="h-32 w-32 border-4 border-background">
-                                    <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.username} />
-                                    <AvatarFallback className="text-2xl">{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                                </Avatar>
-                                <Button variant="secondary" size="sm" className="absolute bottom-0 right-0 rounded-full h-8 w-8 p-0">
-                                    <Camera className="h-4 w-4" />
-                                </Button>
-                            </div>
+                            {/* ImageUploader for Avatar */}
+                            <ImageUploader
+                                userId={user.id} // Kirim ID pengguna untuk penamaan file
+                                currentImageUrl={user.avatar}
+                                onImageUrlChange={handleAvatarUrlChange}
+                                folderPath="user-avatars" // Folder di ImageKit
+                                fileNamePrefix="avatar" // Prefix nama file
+                                imageAlt={`${user.username}'s avatar`}
+                                disabled={!session?.user?.id || session.user.id !== user.id} // Disable jika bukan user yang login
+                                type="avatar"
+                            />
                         </div>
                     </div>
 
@@ -133,7 +258,7 @@ export default function ProfilePage() {
                                     <Mail className="h-4 w-4" />
                                     {user.email}
                                 </p>
-                                {user.bio && <p className="mt-2 text-sm">{user.bio}</p>}
+                                {user.bio && user.bio.trim() !== "" && <p className="mt-2 text-sm text-gray-700">{user.bio}</p>}
                             </div>
                         </div>
                     </div>
@@ -155,7 +280,7 @@ export default function ProfilePage() {
                             </div>
                         </div>
 
-                        {user.location && (
+                        {user.location && user.location.trim() !== "" && (
                             <div className="flex items-center gap-3">
                                 <MapPin className="h-4 w-4 text-muted-foreground" />
                                 <div>
@@ -165,7 +290,7 @@ export default function ProfilePage() {
                             </div>
                         )}
 
-                        {user.phone && (
+                        {user.phone && user.phone.trim() !== "" && (
                             <div className="flex items-center gap-3">
                                 <Phone className="h-4 w-4 text-muted-foreground" />
                                 <div>
@@ -175,13 +300,13 @@ export default function ProfilePage() {
                             </div>
                         )}
 
-                        {user.website && (
+                        {user.website && user.website.trim() !== "" && (
                             <div className="flex items-center gap-3">
-                                <Globe className="h-4 w-4 text-muted-foreground" />
+                                <Link className="h-4 w-4 text-muted-foreground" />
                                 <div>
                                     <p className="text-sm font-medium">Website</p>
                                     <a
-                                        href={user.website}
+                                        href={user.website.startsWith('http') ? user.website : `https://${user.website}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="text-sm text-blue-600 hover:underline"
@@ -200,7 +325,7 @@ export default function ProfilePage() {
                         <CardDescription>Tautan ke profil media sosial Anda</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {user.github && (
+                        {user.github && user.github.trim() !== "" && (
                             <div className="flex items-center gap-3">
                                 <Github className="h-4 w-4 text-muted-foreground" />
                                 <div>
@@ -217,7 +342,7 @@ export default function ProfilePage() {
                             </div>
                         )}
 
-                        {user.twitter && (
+                        {user.twitter && user.twitter.trim() !== "" && (
                             <div className="flex items-center gap-3">
                                 <Twitter className="h-4 w-4 text-muted-foreground" />
                                 <div>
@@ -234,7 +359,7 @@ export default function ProfilePage() {
                             </div>
                         )}
 
-                        {user.linkedin && (
+                        {user.linkedin && user.linkedin.trim() !== "" && (
                             <div className="flex items-center gap-3">
                                 <Linkedin className="h-4 w-4 text-muted-foreground" />
                                 <div>
@@ -251,7 +376,7 @@ export default function ProfilePage() {
                             </div>
                         )}
 
-                        {user.instagram && (
+                        {user.instagram && user.instagram.trim() !== "" && (
                             <div className="flex items-center gap-3">
                                 <Instagram className="h-4 w-4 text-muted-foreground" />
                                 <div>
@@ -275,123 +400,146 @@ export default function ProfilePage() {
                 </Card>
             </div>
 
-            <Dialog open={isEditing} onOpenChange={setIsEditing}>
-                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Edit Profil</DialogTitle>
-                        <DialogDescription>Perbarui informasi profil Anda di sini</DialogDescription>
-                    </DialogHeader>
+            {/* Edit Profile Dialog */}
+            {session?.user?.id === user.id && (
+                <Dialog open={isEditing} onOpenChange={setIsEditing}>
+                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>Edit Profil</DialogTitle>
+                            <DialogDescription>Perbarui informasi profil Anda di sini</DialogDescription>
+                        </DialogHeader>
 
-                    <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="username">Username</Label>
+                                    <Input
+                                        id="username"
+                                        value={editForm.username || ''}
+                                        onChange={(e) => updateFormField("username", e.target.value)}
+                                        disabled={isSaving}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="email">Email</Label>
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        value={editForm.email || ''}
+                                        disabled={true}
+                                    />
+                                    <p className="text-xs text-muted-foreground">Email tidak dapat diubah.</p>
+                                </div>
+                            </div>
+
                             <div className="space-y-2">
-                                <Label htmlFor="username">Username</Label>
-                                <Input
-                                    id="username"
-                                    value={editForm.username}
-                                    onChange={(e) => updateFormField("username", e.target.value)}
+                                <Label htmlFor="bio">Bio</Label>
+                                <Textarea
+                                    id="bio"
+                                    placeholder="Ceritakan tentang diri Anda..."
+                                    value={editForm.bio || ''}
+                                    onChange={(e) => updateFormField("bio", e.target.value)}
+                                    rows={3}
+                                    disabled={isSaving}
                                 />
                             </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="location">Lokasi</Label>
+                                    <Input
+                                        id="location"
+                                        placeholder="Kota, Negara"
+                                        value={editForm.location || ''}
+                                        onChange={(e) => updateFormField("location", e.target.value)}
+                                        disabled={isSaving}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="phone">Telepon</Label>
+                                    <Input
+                                        id="phone"
+                                        placeholder="+62 xxx-xxxx-xxxx"
+                                        value={editForm.phone || ''}
+                                        onChange={(e) => updateFormField("phone", e.target.value)}
+                                        disabled={isSaving}
+                                    />
+                                </div>
+                            </div>
+
                             <div className="space-y-2">
-                                <Label htmlFor="email">Email</Label>
+                                <Label htmlFor="website">Website</Label>
                                 <Input
-                                    id="email"
-                                    type="email"
-                                    value={editForm.email}
-                                    onChange={(e) => updateFormField("email", e.target.value)}
+                                    id="website"
+                                    placeholder="https://example.com"
+                                    value={editForm.website || ''}
+                                    onChange={(e) => updateFormField("website", e.target.value)}
+                                    disabled={isSaving}
                                 />
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="github">GitHub</Label>
+                                    <Input
+                                        id="github"
+                                        placeholder="username"
+                                        value={editForm.github || ''}
+                                        onChange={(e) => updateFormField("github", e.target.value)}
+                                        disabled={isSaving}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="twitter">Twitter</Label>
+                                    <Input
+                                        id="twitter"
+                                        placeholder="username"
+                                        value={editForm.twitter || ''}
+                                        onChange={(e) => updateFormField("twitter", e.target.value)}
+                                        disabled={isSaving}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="linkedin">LinkedIn</Label>
+                                    <Input
+                                        id="linkedin"
+                                        placeholder="username"
+                                        value={editForm.linkedin || ''}
+                                        onChange={(e) => updateFormField("linkedin", e.target.value)}
+                                        disabled={isSaving}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="instagram">Instagram</Label>
+                                    <Input
+                                        id="instagram"
+                                        placeholder="username"
+                                        value={editForm.instagram || ''}
+                                        onChange={(e) => updateFormField("instagram", e.target.value)}
+                                        disabled={isSaving}
+                                    />
+                                </div>
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="bio">Bio</Label>
-                            <Textarea
-                                id="bio"
-                                placeholder="Ceritakan tentang diri Anda..."
-                                value={editForm.bio}
-                                onChange={(e) => updateFormField("bio", e.target.value)}
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="location">Lokasi</Label>
-                                <Input
-                                    id="location"
-                                    placeholder="Kota, Negara"
-                                    value={editForm.location}
-                                    onChange={(e) => updateFormField("location", e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="phone">Telepon</Label>
-                                <Input
-                                    id="phone"
-                                    placeholder="+62 xxx-xxxx-xxxx"
-                                    value={editForm.phone}
-                                    onChange={(e) => updateFormField("phone", e.target.value)}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="website">Website</Label>
-                            <Input
-                                id="website"
-                                placeholder="https://example.com"
-                                value={editForm.website}
-                                onChange={(e) => updateFormField("website", e.target.value)}
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-4 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="github">GitHub</Label>
-                                <Input
-                                    id="github"
-                                    placeholder="username"
-                                    value={editForm.github}
-                                    onChange={(e) => updateFormField("github", e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="twitter">Twitter</Label>
-                                <Input
-                                    id="twitter"
-                                    placeholder="username"
-                                    value={editForm.twitter}
-                                    onChange={(e) => updateFormField("twitter", e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="linkedin">LinkedIn</Label>
-                                <Input
-                                    id="linkedin"
-                                    placeholder="username"
-                                    value={editForm.linkedin}
-                                    onChange={(e) => updateFormField("linkedin", e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="instagram">Instagram</Label>
-                                <Input
-                                    id="instagram"
-                                    placeholder="username"
-                                    value={editForm.instagram}
-                                    onChange={(e) => updateFormField("instagram", e.target.value)}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button variant="outline" onClick={handleCancel}>
-                            Batal
-                        </Button>
-                        <Button onClick={handleSave}>Simpan Perubahan</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={handleCancelEdit} disabled={isSaving}>
+                                Batal
+                            </Button>
+                            <Button onClick={handleSaveProfile} disabled={isSaving}>
+                                {isSaving ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Menyimpan...
+                                    </>
+                                ) : (
+                                    "Simpan Perubahan"
+                                )}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            )}
         </div>
-    )
+    );
 }
