@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
@@ -11,7 +11,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { Bot, Send, Camera, Upload, Info, Loader2, X, AlertTriangle, Sparkles, Copy, Check, Shuffle, BrushCleaning } from "lucide-react"
+import { Bot, Send, Camera, Upload, Info, Loader2, X, AlertTriangle, Sparkles, Copy, Check, Shuffle, BrushCleaning, Crown } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { toast } from "sonner"
@@ -19,6 +19,8 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import Image from "next/image"
+import { useSession } from "next-auth/react"
+import type { UserTokenData } from "@/types/types"
 
 interface Message {
     id: string
@@ -29,43 +31,10 @@ interface Message {
     model?: string
 }
 
-interface UserTokenData {
-    userId: string
-    username: string
-    dailyTokens: number
-    maxDailyTokens: number
-    lastResetDate: string
-    totalUsage: number
-}
-
-// Static user data sementara
-const STATIC_USER: UserTokenData = {
-    userId: "user_001",
-    username: "Pengguna Demo",
-    dailyTokens: 2,
-    maxDailyTokens: 2,
-    lastResetDate: new Date().toISOString().split("T")[0],
-    totalUsage: 0,
-}
-
-// Fungsi untuk mengecek apakah perlu reset token (jam 7 pagi WIB)
-const shouldResetTokens = (lastResetDate: string): boolean => {
-    const now = new Date()
-    const wibOffset = 7 * 60 // WIB = UTC+7
-    const nowWIB = new Date(now.getTime() + wibOffset * 60 * 1000)
-
-    const today = nowWIB.toISOString().split("T")[0]
-    const currentHour = nowWIB.getUTCHours()
-
-    // Reset jika hari berbeda atau sudah lewat jam 7 dan belum reset hari ini
-    return lastResetDate !== today && currentHour >= 7
-}
-
 const formSchema = z.object({
     message: z.string().max(300, "Pesan maksimal 300 karakter").optional(),
 })
 
-// 23 example questions with random selection of 3
 const ALL_EXAMPLE_QUESTIONS = [
     "Apa kemungkinan penyebab laptop tidak bisa menyala sama sekali?",
     "Apa penyebab utama baterai laptop cepat habis?",
@@ -95,20 +64,17 @@ const ALL_EXAMPLE_QUESTIONS = [
 const DEFAULT_IMAGE_PROMPT =
     "Analisa gambar ini dan berikan penjelasan detail tentang apa yang terlihat, terutama jika berkaitan dengan teknologi komputer atau perangkat elektronik. Identifikasi komponen, masalah, atau hal menarik yang dapat dilihat dari gambar."
 
-// Function to get 3 random questions
 const getRandomQuestions = (): string[] => {
     const shuffled = [...ALL_EXAMPLE_QUESTIONS].sort(() => 0.5 - Math.random())
     return shuffled.slice(0, 3)
 }
 
-// Copy to clipboard function
 const copyToClipboard = async (text: string): Promise<boolean> => {
     try {
         if (navigator.clipboard && window.isSecureContext) {
             await navigator.clipboard.writeText(text)
             return true
         } else {
-            // Fallback for older browsers or non-secure contexts
             const textArea = document.createElement("textarea")
             textArea.value = text
             textArea.style.position = "fixed"
@@ -127,7 +93,6 @@ const copyToClipboard = async (text: string): Promise<boolean> => {
     }
 }
 
-// Copy Button Component
 const CopyButton: React.FC<{ content: string; className?: string }> = ({ content, className = "" }) => {
     const [copied, setCopied] = useState(false)
 
@@ -169,6 +134,7 @@ const CopyButton: React.FC<{ content: string; className?: string }> = ({ content
 }
 
 export default function AIChatPage() {
+    const { data: session, status } = useSession()
     const [messages, setMessages] = useState<Message[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [selectedImage, setSelectedImage] = useState<string | null>(null)
@@ -181,8 +147,8 @@ export default function AIChatPage() {
     const fileInputRef = useRef<HTMLInputElement>(null)
     const cameraInputRef = useRef<HTMLInputElement>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
-    const [userTokenData, setUserTokenData] = useState<UserTokenData>(STATIC_USER)
-    const [showTokenWarning, setShowTokenWarning] = useState(false)
+    const [userTokenData, setUserTokenData] = useState<UserTokenData | null>(null)
+    const [isFetchingTokens, setIsFetchingTokens] = useState(true) // State untuk menandakan sedang fetch token
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -191,12 +157,10 @@ export default function AIChatPage() {
         },
     })
 
-    // Initialize random questions on component mount
     useEffect(() => {
         setExampleQuestions(getRandomQuestions())
     }, [])
 
-    // Check if device is mobile
     useEffect(() => {
         const checkMobile = () => {
             setIsMobile(
@@ -204,7 +168,6 @@ export default function AIChatPage() {
                 /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
             )
         }
-
         checkMobile()
         window.addEventListener("resize", checkMobile)
         return () => window.removeEventListener("resize", checkMobile)
@@ -234,39 +197,47 @@ export default function AIChatPage() {
         }
     }, [messages])
 
-    // Load dan manage token data
-    useEffect(() => {
-        const savedTokenData = localStorage.getItem("user-token-data")
-        if (savedTokenData) {
-            try {
-                const parsedData: UserTokenData = JSON.parse(savedTokenData)
-
-                // Cek apakah perlu reset token
-                if (shouldResetTokens(parsedData.lastResetDate)) {
-                    const resetData = {
-                        ...parsedData,
-                        dailyTokens: parsedData.maxDailyTokens,
-                        lastResetDate: new Date().toISOString().split("T")[0],
-                    }
-                    setUserTokenData(resetData)
-                    localStorage.setItem("user-token-data", JSON.stringify(resetData))
-                    toast.success("Token harian telah direset! Anda mendapat 50 token baru.")
-                } else {
-                    setUserTokenData(parsedData)
-                }
-            } catch (error) {
-                console.error("Error loading token data:", error)
-                setUserTokenData(STATIC_USER)
-            }
-        } else {
-            localStorage.setItem("user-token-data", JSON.stringify(STATIC_USER))
+    // --- Load dan manage token data dari API ---
+    // Dipanggil hanya saat pertama kali komponen dimuat atau saat sesi berubah
+    const fetchUserTokens = useCallback(async () => {
+        if (status === "loading") {
+            setIsFetchingTokens(true); // Masih loading sesi, set fetching token true
+            return;
         }
-    }, [])
 
-    // Save token data whenever it changes
+        // Jika tidak terautentikasi, set data token null dan tampilkan warning
+        if (!session || !session.user || !session.user.id) {
+            setUserTokenData(null);
+            setIsFetchingTokens(false);
+            setShowOfflineWarning(true);
+            toast.warning("Anda harus login untuk menggunakan fitur AI ini.");
+            return;
+        }
+
+        setIsFetchingTokens(true);
+        try {
+            const response = await fetch("/api/user-tokens");
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || "Gagal memuat data token.");
+            }
+            const fetchedTokenData: UserTokenData = await response.json();
+            setUserTokenData(fetchedTokenData);
+            setShowOfflineWarning(false); // Clear warning if tokens loaded successfully
+        } catch (err) {
+            console.error("Error fetching user tokens:", err);
+            setShowOfflineWarning(true); // Fallback to "offline" if fetching fails
+            setUserTokenData(null);
+            toast.error("Gagal memuat data token. Fitur AI mungkin terbatas.");
+        } finally {
+            setIsFetchingTokens(false);
+        }
+    }, [session, status]); // Dependencies untuk useCallback: session dan status
+
+    // Effect untuk memanggil fetchUserTokens saat komponen mount atau sesi/status berubah
     useEffect(() => {
-        localStorage.setItem("user-token-data", JSON.stringify(userTokenData))
-    }, [userTokenData])
+        fetchUserTokens();
+    }, [fetchUserTokens]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -282,20 +253,20 @@ export default function AIChatPage() {
 
         if (!finalMessage && !selectedImage) return
 
-        // Cek token availability
-        if (userTokenData.dailyTokens <= 0) {
-            setShowTokenWarning(true)
-            toast.error("Token harian Anda sudah habis! Token akan direset jam 7 pagi WIB.")
-            return
+        // Check if user is authenticated
+        if (!session?.user?.id) {
+            toast.error("Anda harus login untuk menggunakan fitur AI ini.");
+            return;
         }
 
-        // Kurangi token sebelum mengirim pesan
-        const updatedTokenData = {
-            ...userTokenData,
-            dailyTokens: userTokenData.dailyTokens - 1,
-            totalUsage: userTokenData.totalUsage + 1,
+        // Check token availability BEFORE sending request
+        if (!userTokenData || userTokenData.dailyTokens <= 0) {
+            toast.error("Token harian Anda sudah habis! Token akan direset jam 7 pagi WIB.");
+            return;
         }
-        setUserTokenData(updatedTokenData)
+
+        setIsLoading(true)
+        setShowOfflineWarning(false)
 
         const userMessage: Message = {
             id: Date.now().toString(),
@@ -308,10 +279,39 @@ export default function AIChatPage() {
         setMessages((prev) => [...prev, userMessage])
         form.reset()
         setSelectedImage(null)
-        setIsLoading(true)
-        setShowOfflineWarning(false)
 
         try {
+            // --- Decrement token via API ---
+            const decrementResponse = await fetch("/api/user-tokens", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "decrement", tokensUsed: 1 }),
+            });
+
+            if (!decrementResponse.ok) {
+                const errorData = await decrementResponse.json();
+                // If token decrement fails, revert user message and show error
+                setMessages((prev) => prev.filter((msg) => msg.id !== userMessage.id));
+                toast.error(errorData.message || "Gagal mengurangi token. Pesan tidak terkirim.");
+                // Revert token state immediately (client-side) to reflect the failed decrement
+                setUserTokenData(prev => prev ? {
+                    ...prev,
+                    dailyTokens: prev.dailyTokens + 1,
+                    totalUsage: Math.max(0, prev.totalUsage - 1),
+                } : null);
+                setIsLoading(false);
+                return; // Stop execution if token decrement failed
+            }
+            const updatedTokenResult: UserTokenData = await decrementResponse.json();
+            // Update token state with response from API
+            setUserTokenData(prev => prev ? {
+                ...prev,
+                dailyTokens: updatedTokenResult.dailyTokens,
+                totalUsage: updatedTokenResult.totalUsage,
+                lastResetDate: updatedTokenResult.lastResetDate,
+            } : null);
+
+
             // Prepare conversation history for API - include all previous messages
             const conversationHistory = messages.map((msg) => ({
                 role: msg.role,
@@ -327,19 +327,14 @@ export default function AIChatPage() {
                 body: JSON.stringify({
                     message: finalMessage,
                     image: selectedImage,
-                    history: conversationHistory, // Send complete conversation history
+                    history: conversationHistory,
                     context: "chat",
                 }),
             })
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}))
-
-                // Show offline warning for API issues
-                if (response.status === 401 || response.status === 403) {
-                    setShowOfflineWarning(true)
-                }
-
+                setShowOfflineWarning(true)
                 throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
             }
 
@@ -357,6 +352,7 @@ export default function AIChatPage() {
 
             const decoder = new TextDecoder()
             let done = false
+            let currentModel = "";
 
             while (!done) {
                 const { value, done: readerDone } = await reader.read()
@@ -383,7 +379,8 @@ export default function AIChatPage() {
                                         ),
                                     )
                                 }
-                                if (parsed.model && parsed.model !== "offline") {
+                                if (parsed.model) {
+                                    currentModel = parsed.model;
                                     setMessages((prev) =>
                                         prev.map((msg) => (msg.id === assistantMessage.id ? { ...msg, model: parsed.model } : msg)),
                                     )
@@ -392,15 +389,25 @@ export default function AIChatPage() {
                                     throw new Error(parsed.error)
                                 }
                             } catch (e) {
-                                // Ignore parsing errors for partial chunks
                                 console.warn("Chunk parsing warning:", e)
                             }
                         }
                     }
                 }
             }
+            if (currentModel && currentModel !== "offline") {
+                const isGeminiPro = currentModel.includes("gemini-2.5-pro");
+                if (isGeminiPro) {
+                    toast.success(`✨ Respon AI berhasil dimuat menggunakan Gemini Pro 2.5 (Model Utama)`);
+                } else {
+                    toast.success(`Respon AI berhasil dimuat menggunakan ${currentModel} (Fallback)`);
+                }
+            } else if (currentModel === "offline") {
+                toast.success("Respon berhasil dimuat (Mode Offline)");
+            } else {
+                toast.success("Respon AI berhasil dimuat");
+            }
 
-            // Tambahkan pengecekan jika response kosong atau terpotong
             setMessages((prev) =>
                 prev.map((msg) => {
                     if (msg.id === assistantMessage.id && msg.content.trim() === "") {
@@ -408,6 +415,7 @@ export default function AIChatPage() {
                             ...msg,
                             content:
                                 "Maaf, terjadi kesalahan dalam memproses response. Silakan coba lagi dengan pertanyaan yang lebih spesifik.",
+                            model: "offline"
                         }
                     }
                     return msg
@@ -417,23 +425,35 @@ export default function AIChatPage() {
             console.error("Error sending message:", error)
             const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan yang tidak diketahui"
 
-            // Don't show toast for API key issues, show warning instead
-            if (!errorMessage.includes("API key") && !errorMessage.includes("authentication")) {
-                toast.error(errorMessage)
-            } else {
-                setShowOfflineWarning(true)
-            }
+            setShowOfflineWarning(true)
+            toast.error(errorMessage)
 
-            // Remove the user message if there was an error and restore token
-            setMessages((prev) => prev.filter((msg) => msg.id !== userMessage.id))
+            // Revert token if AI generation failed (but token decrement already successful)
+            setUserTokenData(prev => prev ? {
+                ...prev,
+                dailyTokens: prev.dailyTokens + 1,
+                totalUsage: Math.max(0, prev.totalUsage - 1),
+            } : null);
 
-            // Kembalikan token jika error
-            const revertTokenData = {
-                ...userTokenData,
-                dailyTokens: userTokenData.dailyTokens + 1,
-                totalUsage: Math.max(0, userTokenData.totalUsage - 1),
-            }
-            setUserTokenData(revertTokenData)
+            // Add a fallback assistant message if there's an error
+            setMessages((prev) => {
+                const lastMessage = prev[prev.length - 1];
+                if (lastMessage?.role === "assistant" && lastMessage.id === (Date.now() + 1).toString()) {
+                    return prev.map(msg => msg.id === lastMessage.id ? {
+                        ...msg,
+                        content: `Maaf, ada masalah saat mendapatkan respons dari AI. Coba lagi atau pastikan Anda online. Detail: ${errorMessage}.`,
+                        model: "offline"
+                    } : msg);
+                } else {
+                    return [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: "assistant",
+                        content: `Maaf, ada masalah saat mendapatkan respons dari AI. Coba lagi atau pastikan Anda online. Detail: ${errorMessage}.`,
+                        timestamp: new Date(),
+                        model: "offline"
+                    }];
+                }
+            });
         } finally {
             setIsLoading(false)
         }
@@ -443,7 +463,6 @@ export default function AIChatPage() {
         const file = event.target.files?.[0]
         if (!file) return
 
-        // Reset the input value so the same file can be selected again
         event.target.value = ""
 
         if (file.size > 5 * 1024 * 1024) {
@@ -459,13 +478,14 @@ export default function AIChatPage() {
         setIsProcessingImage(true)
 
         try {
-            // Simple client-side processing - convert to base64
             const reader = new FileReader()
             reader.onload = (e) => {
                 const result = e.target?.result as string
                 setSelectedImage(result)
                 toast.success("Gambar berhasil diupload")
                 setIsProcessingImage(false)
+                form.setValue("message", "");
+                textareaRef.current?.focus();
             }
             reader.onerror = () => {
                 toast.error("Gagal membaca file gambar")
@@ -490,7 +510,6 @@ export default function AIChatPage() {
                     setSelectedImage(null)
                     setShowOfflineWarning(false)
                     localStorage.removeItem("ai-chat-history")
-                    // Generate new random questions when clearing chat
                     setExampleQuestions(getRandomQuestions())
                     toast.success("Chat berhasil dibersihkan")
                 },
@@ -498,7 +517,6 @@ export default function AIChatPage() {
             cancel: {
                 label: "Batal",
                 onClick: () => {
-                    // Do nothing, just close the toast
                 },
             },
         })
@@ -516,6 +534,21 @@ export default function AIChatPage() {
         }
     }
 
+    const getModelBadgeInfo = (model: string) => {
+        if (model.includes("gemini-2.5-pro")) {
+            return { variant: "default" as const, icon: Crown, color: "text-yellow-600" };
+        } else if (model.includes("gemini")) {
+            return { variant: "secondary" as const, icon: Sparkles, color: "text-blue-600" };
+        } else if (model.includes("offline")) {
+            return { variant: "outline" as const, icon: AlertTriangle, color: "text-gray-600" };
+        } else {
+            return { variant: "outline" as const, icon: Sparkles, color: "text-green-600" };
+        }
+    };
+
+    // Kondisi untuk menonaktifkan input dan tombol
+    const isDisabled = isLoading || isProcessingImage || !session?.user?.id || (userTokenData?.dailyTokens ?? 0) <= 0 || isFetchingTokens;
+
     return (
         <Card className="m-0 md:m-4 px-0 md:px-40 py-8 max-w-full">
             {/* Offline Warning */}
@@ -523,85 +556,11 @@ export default function AIChatPage() {
                 <Alert className="mb-6 border-orange-200 bg-orange-50">
                     <AlertTriangle className="h-4 w-4 text-orange-600" />
                     <AlertDescription className="text-orange-800">
-                        <strong>Mode Offline</strong> Layanan AI sedang tidak tersedia, namun sistem tetap dapat memberikan bantuan
+                        <strong>Mode Offline:</strong> Layanan AI sedang tidak tersedia atau Anda belum login. Namun, sistem tetap dapat memberikan bantuan
                         troubleshooting dasar berdasarkan pengetahuan yang tersimpan. Fitur analisis gambar mungkin terbatas.
                     </AlertDescription>
                 </Alert>
             )}
-
-            {/* Token Display
-            <Card className="mb-6">
-                <Button
-                    variant="outline"
-                    onClick={() =>
-                        toast("Event has been created", {
-                            description: "Sunday, December 03, 2023 at 9:00 AM",
-                            action: {
-                                label: "Undo",
-                                onClick: () => console.log("Undo"),
-                            },
-                        })
-                    }
-                >
-                    Show Toast
-                </Button>
-                <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
-                                <span className="text-blue-600 font-semibold text-sm">
-                                    {userTokenData.username
-                                        .split(" ")
-                                        .map((n) => n[0])
-                                        .join("")}
-                                </span>
-                            </div>
-                            <div>
-                                <p className="font-medium text-gray-900 dark:text-gray-300">{userTokenData.username}</p>
-                                <p className="text-sm text-gray-600 dark:text-gray-400">ID: {userTokenData.userId}</p>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <div className="flex items-center gap-2 mb-1">
-                                <span className="text-2xl font-bold text-blue-600">{userTokenData.dailyTokens}</span>
-                                <span className="text-sm text-gray-500 dark:text-gray-300">/ {userTokenData.maxDailyTokens}</span>
-                            </div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Token tersisa hari ini</p>
-                            <p className="text-xs text-gray-400 dark:text-gray-300">Reset jam 7 pagi WIB</p>
-                        </div>
-                    </div>
-                    <div className="mt-3">
-                        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
-                            <span>Penggunaan Token</span>
-                            <span>
-                                {(
-                                    ((userTokenData.maxDailyTokens - userTokenData.dailyTokens) / userTokenData.maxDailyTokens) *
-                                    100
-                                ).toFixed(0)}
-                                %
-                            </span>
-                        </div>
-                        <div className="w-full bg-gray-200 dark:bg-gray-400 rounded-full h-2">
-                            <div
-                                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                                style={{
-                                    width: `${((userTokenData.maxDailyTokens - userTokenData.dailyTokens) / userTokenData.maxDailyTokens) * 100}%`,
-                                }}
-                            ></div>
-                        </div>
-                    </div>
-                    {userTokenData.dailyTokens <= 5 && userTokenData.dailyTokens > 0 && (
-                        <div className="mt-2 text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                            ⚠️ Token Anda hampir habis! Sisa {userTokenData.dailyTokens} token.
-                        </div>
-                    )}
-                    {userTokenData.dailyTokens === 0 && (
-                        <div className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded">
-                            🚫 Token harian habis! Reset otomatis jam 7 pagi WIB.
-                        </div>
-                    )}
-                </CardContent>
-            </Card> */}
 
             {/* Main Chat Area */}
             <div className="shadow-sm min-h-[600px] flex flex-col">
@@ -647,7 +606,7 @@ export default function AIChatPage() {
                                     <div>
                                         <h4 className="font-semibold mb-2">Mode Offline</h4>
                                         <p>
-                                            Jika layanan AI tidak tersedia, sistem akan memberikan bantuan dasar berdasarkan pengetahuan
+                                            Jika layanan AI tidak tersedia atau Anda belum login, sistem akan memberikan bantuan dasar berdasarkan pengetahuan
                                             troubleshooting yang tersimpan.
                                         </p>
                                     </div>
@@ -666,15 +625,15 @@ export default function AIChatPage() {
                                             Selalu backup data penting sebelum melakukan perbaikan. Konsultasi dengan teknisi profesional
                                             untuk masalah yang kompleks.
                                         </p>
-                                    </div>
-                                </div>
+                                    </div >
+                                </div >
                                 <div className="flex justify-end">
                                     <Button onClick={() => setIsDialogOpen(false)}>Mengerti</Button>
                                 </div>
                             </DialogContent>
                         </Dialog>
-                    </div>
-                </div>
+                    </div >
+                </div >
 
                 {/* Example Questions (only show when no messages) */}
                 {messages.length === 0 && (
@@ -686,6 +645,7 @@ export default function AIChatPage() {
                                 size="sm"
                                 onClick={() => setExampleQuestions(getRandomQuestions())}
                                 className="text-xs"
+                                disabled={isDisabled} // Disable example questions if input disabled
                             >
                                 <Shuffle className="h-3 w-3 mr-1" />
                                 Acak Lagi
@@ -697,6 +657,8 @@ export default function AIChatPage() {
                                     key={index}
                                     className="p-4 cursor-pointer hover:bg-muted/50 transition-colors w-fit h-10 flex items-center justify-center rounded-bl-none rounded-tl-2xl"
                                     onClick={() => handleExampleClick(question)}
+                                    tabIndex={isDisabled ? -1 : 0} // Disable focus if input disabled
+                                    aria-disabled={isDisabled}
                                 >
                                     <p className="text-sm">{question}</p>
                                 </Card>
@@ -708,83 +670,80 @@ export default function AIChatPage() {
                 {/* Chat Messages */}
                 <ScrollArea className="flex-1 p-6">
                     <div className="space-y-6">
-                        {messages.map((message) => (
-                            <div key={message.id} className="space-y-2">
-                                {message.role === "assistant" ? (
-                                    <div className="flex gap-3 group">
-                                        <div className="flex-1 min-w-0 relative">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <Bot className="h-4 w-4 text-blue-600" />
-                                                <span className="text-sm font-medium">Asisten Teknisi</span>
-                                                {message.model && message.model !== "offline" && (
-                                                    <Badge variant="outline" className="text-xs">
-                                                        <Sparkles className="h-3 w-3 mr-1" />
-                                                        {message.model}
-                                                    </Badge>
-                                                )}
-                                                {message.model === "offline" && (
-                                                    <Badge variant="secondary" className="text-xs">
-                                                        Mode Offline
-                                                    </Badge>
-                                                )}
-
-                                                {isLoading && (
-                                                    <div className="flex gap-3">
-                                                        <div className="flex-1">
-                                                            <div className="flex items-center gap-2">
-                                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                                                <span className="text-sm text-muted-foreground">
-                                                                    {showOfflineWarning ? "Memproses dengan bantuan offline..." : "Sedang menganalisis..."}
-                                                                </span>
+                        {messages.map((message) => {
+                            const modelInfo = message.model ? getModelBadgeInfo(message.model) : null;
+                            return (
+                                <div key={message.id} className="space-y-2">
+                                    {message.role === "assistant" ? (
+                                        <div className="flex gap-3 group">
+                                            <div className="flex-1 min-w-0 relative">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <Bot className="h-4 w-4 text-blue-600" />
+                                                    <span className="text-sm font-medium">Asisten Teknisi</span>
+                                                    {modelInfo && (
+                                                        <Badge variant={modelInfo.variant} className={`text-xs gap-1 ${modelInfo.color}`}>
+                                                            {modelInfo.icon && <modelInfo.icon className="h-3 w-3" />}
+                                                            {message.model}
+                                                        </Badge>
+                                                    )}
+                                                    {isLoading && (
+                                                        <div className="flex gap-3">
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                                    <span className="text-sm text-muted-foreground">
+                                                                        {showOfflineWarning ? "Memproses dengan bantuan offline..." : "Sedang menganalisis..."}
+                                                                    </span>
+                                                                </div>
                                                             </div>
                                                         </div>
+                                                    )}
+                                                    <span className="text-xs text-muted-foreground">{message.timestamp.toLocaleTimeString()}</span>
+                                                </div>
+                                                <div className="relative">
+                                                    <div className="prose prose-sm max-w-none dark:prose-invert">
+                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                                                    </div>
+                                                    <div className="absolute -top-6 right-0">
+                                                        <CopyButton content={message.content} />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex justify-end">
+                                            <div className="max-w-[80%] space-y-2 group">
+                                                {message.image && (
+                                                    <div className="flex justify-end">
+                                                        <Image
+                                                            height={500}
+                                                            width={500}
+                                                            src={message.image || "/placeholder.svg"}
+                                                            alt="Uploaded"
+                                                            className="max-w-xs rounded-lg border"
+                                                        />
                                                     </div>
                                                 )}
-                                                <span className="text-xs text-muted-foreground">{message.timestamp.toLocaleTimeString()}</span>
-                                            </div>
-                                            <div className="relative">
-                                                <div className="prose prose-sm max-w-none dark:prose-invert">
-                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                                                <div className="relative">
+                                                    <div className="bg-primary rounded-tr-none rounded-tb-2xl text-primary-foreground rounded-lg px-4 py-2">
+                                                        <p className="text-sm">{message.content}</p>
+                                                    </div>
+                                                    <div className="absolute -top-6 right-1">
+                                                        <CopyButton
+                                                            content={message.content}
+                                                            className="hover:bg-white/20 text-white/70 hover:text-white"
+                                                        />
+                                                    </div>
                                                 </div>
-                                                <div className="absolute -top-6 right-0">
-                                                    <CopyButton content={message.content} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex justify-end">
-                                        <div className="max-w-[80%] space-y-2 group">
-                                            {message.image && (
                                                 <div className="flex justify-end">
-                                                    <Image
-                                                        height={500}
-                                                        width={500}
-                                                        src={message.image || "/placeholder.svg"}
-                                                        alt="Uploaded"
-                                                        className="max-w-xs rounded-lg border"
-                                                    />
+                                                    <span className="text-xs text-muted-foreground">{message.timestamp.toLocaleTimeString()}</span>
                                                 </div>
-                                            )}
-                                            <div className="relative">
-                                                <div className="bg-primary rounded-tr-none rounded-tb-2xl text-primary-foreground rounded-lg px-4 py-2">
-                                                    <p className="text-sm">{message.content}</p>
-                                                </div>
-                                                <div className="absolute -top-6 right-1">
-                                                    <CopyButton
-                                                        content={message.content}
-                                                        className="hover:bg-white/20 text-white/70 hover:text-white"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="flex justify-end">
-                                                <span className="text-xs text-muted-foreground">{message.timestamp.toLocaleTimeString()}</span>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                                    )}
+                                </div>
+                            )
+                        })}
                     </div>
                     <div ref={messagesEndRef} />
                 </ScrollArea>
@@ -801,6 +760,7 @@ export default function AIChatPage() {
                                     size="sm"
                                     className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
                                     onClick={() => setSelectedImage(null)}
+                                    disabled={isDisabled} // Disable remove image button if input disabled
                                 >
                                     <X className="h-3 w-3" />
                                 </Button>
@@ -825,12 +785,20 @@ export default function AIChatPage() {
                                     <FormItem>
                                         <FormControl>
                                             <div className="relative">
-                                                <div className="flex items-center justify-between text-xs bg-blue-50 dark:bg-zinc-700 p-2 rounded mb-2">
-                                                    <span>
-                                                        Token tersisa: <strong>{userTokenData.dailyTokens}</strong>/{userTokenData.maxDailyTokens}
-                                                    </span>
-                                                    <span className="text-gray-500 dark:text-gray-300">Reset jam 7 pagi WIB</span>
-                                                </div>
+                                                {/* Token Display - Conditional Rendering for loading/unauthenticated */}
+                                                {isFetchingTokens ? (
+                                                    <div className="flex items-center justify-between text-xs bg-blue-50 dark:bg-gray-700 p-2 rounded mb-2 animate-pulse">
+                                                        <Loader2 className="h-4 w-4 animate-spin mr-2" /> <span>Memuat token...</span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center justify-between text-xs bg-blue-50 dark:bg-zinc-700 p-2 rounded mb-2">
+                                                        <span>
+                                                            Token tersisa: <strong>{userTokenData?.dailyTokens ?? 'N/A'}</strong>/{userTokenData?.maxDailyTokens ?? 'N/A'}
+                                                        </span>
+                                                        <span className="text-gray-500 dark:text-gray-300">Reset jam 7 pagi WIB</span>
+                                                    </div>
+                                                )}
+
                                                 <Textarea
                                                     {...field}
                                                     ref={textareaRef}
@@ -840,7 +808,7 @@ export default function AIChatPage() {
                                                             : "Tanyakan sesuatu tentang teknologi komputer..."
                                                     }
                                                     className="min-h-[80px] pr-32 resize-none"
-                                                    disabled={isLoading || isProcessingImage}
+                                                    disabled={isDisabled} // Menggunakan kondisi isDisabled gabungan
                                                     onKeyPress={handleKeyPress}
                                                     maxLength={300}
                                                 />
@@ -858,7 +826,7 @@ export default function AIChatPage() {
                                                             variant="ghost"
                                                             size="sm"
                                                             onClick={handleClearChat}
-                                                            disabled={isLoading || messages.length === 0}
+                                                            disabled={isDisabled || messages.length === 0} // Disable clear chat if input disabled or no messages
                                                             className="h-8 w-8 p-0"
                                                             title="Clear chat history"
                                                         >
@@ -873,7 +841,7 @@ export default function AIChatPage() {
                                                                 variant="ghost"
                                                                 size="sm"
                                                                 onClick={() => cameraInputRef.current?.click()}
-                                                                disabled={isLoading || isProcessingImage}
+                                                                disabled={isDisabled} // Menggunakan kondisi isDisabled gabungan
                                                                 className="h-8 w-8 p-0"
                                                                 title="Take photo"
                                                             >
@@ -886,7 +854,7 @@ export default function AIChatPage() {
                                                             variant="ghost"
                                                             size="sm"
                                                             onClick={() => fileInputRef.current?.click()}
-                                                            disabled={isLoading || isProcessingImage}
+                                                            disabled={isDisabled} // Menggunakan kondisi isDisabled gabungan
                                                             className="h-8 w-8 p-0"
                                                             title="Upload image"
                                                         >
@@ -896,10 +864,8 @@ export default function AIChatPage() {
                                                         <Button
                                                             type="submit"
                                                             disabled={
-                                                                isLoading ||
-                                                                isProcessingImage ||
-                                                                (!field.value?.trim() && !selectedImage) ||
-                                                                userTokenData.dailyTokens <= 0
+                                                                isDisabled ||
+                                                                (!field.value?.trim() && !selectedImage) // Additional condition: must have text or image
                                                             }
                                                             className="h-8 w-8 p-0"
                                                             title="Send message"

@@ -29,6 +29,7 @@ import { SignOut } from "../auth/auth-button"
 export function Header() {
     const pathname = usePathname()
     const { data: session, status } = useSession()
+    console.log(session)
 
     const generateBreadcrumbs = () => {
         const segments = pathname.split("/").filter(Boolean)

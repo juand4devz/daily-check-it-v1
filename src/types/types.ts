@@ -1,3 +1,4 @@
+// /types/types
 export interface User {
     id: string; // Firestore document ID
     username: string;
@@ -26,3 +27,5 @@ export interface User {
     isBanned?: boolean; // Opsional: true jika pengguna diblokir
     password?: string;
 }
+
+export type UserTokenData = Pick<User, 'id' | 'dailyTokens' | 'maxDailyTokens' | 'lastResetDate' | 'totalUsage'>;
