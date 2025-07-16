@@ -2,8 +2,7 @@ export interface User {
     id: string; // Firestore document ID
     username: string;
     email: string;
-    password?: string;
-    role: "admin" | "user";
+    role: "admin" | "user" | "banned"; // Tambahkan 'banned' role
     loginType: "email" | "github" | "google";
     avatar: string;
     bio: string;
@@ -19,9 +18,11 @@ export interface User {
     updatedAt: string; // ISO string
     lastLogin: string; // ISO string
 
-    // Properti token dari UserTokenData, digabung ke User
     dailyTokens: number;
-    maxDailyTokens: number; // Misalnya, 1000 token per hari
+    maxDailyTokens: number;
     lastResetDate: string; // Tanggal terakhir reset token (ISO string, hanya tanggal YYYY-MM-DD)
     totalUsage: number; // Total token yang sudah digunakan sepanjang waktu
+
+    isBanned?: boolean; // Opsional: true jika pengguna diblokir
+    password?: string;
 }

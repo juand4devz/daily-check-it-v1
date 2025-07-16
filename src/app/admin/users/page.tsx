@@ -1,19 +1,20 @@
-"use client"
+// /app/admin/users/page.tsx
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useState, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+} from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
     Pagination,
     PaginationContent,
@@ -22,26 +23,15 @@ import {
     PaginationLink,
     PaginationNext,
     PaginationPrevious,
-} from "@/components/ui/pagination"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { toast } from "sonner"
+} from "@/components/ui/pagination";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { toast } from "sonner";
 import {
     Search,
     MoreHorizontal,
     UserCheck,
     UserX,
-    Edit,
     Trash2,
     Shield,
     Eye,
@@ -55,245 +45,347 @@ import {
     Filter,
     SortAsc,
     Key,
-} from "lucide-react"
-import type { User } from "@/types/user"
+    // Loader2,
+    RotateCw,
+} from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import type { User } from "@/types/types";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
-type SortOption = "newest" | "oldest" | "name-asc" | "name-desc"
-type RoleFilter = "all" | "admin" | "user"
-type LoginTypeFilter = "all" | "email" | "github" | "google"
+type SortOption = "newest" | "oldest" | "name-asc" | "name-desc";
+type RoleFilter = "all" | "admin" | "user" | "banned";
+type LoginTypeFilter = "all" | "email" | "github" | "google";
 
-const ITEMS_PER_PAGE = 5
-
-const mockUsers: User[] = [
-    {
-        id: "1",
-        username: "admin",
-        email: "admin@example.com",
-        role: "admin",
-        loginType: "email",
-        avatar: "/placeholder.svg?height=40&width=40",
-        bio: "Administrator sistem dengan pengalaman 5+ tahun dalam troubleshooting komputer",
-        banner: "/placeholder.svg?height=200&width=800",
-        location: "Jakarta, Indonesia",
-        phone: "+62 812-3456-7890",
-        website: "https://admin.example.com",
-        github: "admin",
-        twitter: "admin",
-        linkedin: "admin",
-        instagram: "admin",
-        createdAt: "2024-01-15T08:00:00Z",
-        updatedAt: "2024-01-15T08:00:00Z",
-        lastLogin: "2024-01-20T10:30:00Z",
-    },
-    {
-        id: "2",
-        username: "johndoe",
-        email: "john.doe@example.com",
-        role: "user",
-        loginType: "github",
-        avatar: "/placeholder.svg?height=40&width=40",
-        bio: "Teknisi komputer yang suka belajar hal baru dan berbagi pengalaman dengan komunitas",
-        banner: "/placeholder.svg?height=200&width=800",
-        location: "Bandung, Indonesia",
-        phone: "+62 813-9876-5432",
-        website: "https://johndoe.dev",
-        github: "johndoe",
-        twitter: "johndoe",
-        linkedin: "johndoe",
-        instagram: "johndoe",
-        createdAt: "2024-01-20T10:30:00Z",
-        updatedAt: "2024-01-20T10:30:00Z",
-        lastLogin: "2024-01-22T14:15:00Z",
-    },
-    {
-        id: "3",
-        username: "janedoe",
-        email: "jane.doe@example.com",
-        role: "user",
-        loginType: "google",
-        avatar: "/placeholder.svg?height=40&width=40",
-        bio: "Mahasiswa IT yang tertarik dengan dunia teknologi dan troubleshooting",
-        banner: "/placeholder.svg?height=200&width=800",
-        location: "Surabaya, Indonesia",
-        phone: "+62 814-5678-9012",
-        website: "",
-        github: "janedoe",
-        twitter: "",
-        linkedin: "janedoe",
-        instagram: "janedoe",
-        createdAt: "2024-01-25T14:15:00Z",
-        updatedAt: "2024-01-25T14:15:00Z",
-        lastLogin: "2024-01-26T09:20:00Z",
-    },
-    {
-        id: "4",
-        username: "techguru",
-        email: "tech.guru@example.com",
-        role: "user",
-        loginType: "email",
-        avatar: "/placeholder.svg?height=40&width=40",
-        bio: "Expert dalam hardware dan software troubleshooting dengan 10+ tahun pengalaman",
-        banner: "/placeholder.svg?height=200&width=800",
-        location: "Yogyakarta, Indonesia",
-        phone: "+62 815-2345-6789",
-        website: "https://techguru.id",
-        github: "techguru",
-        twitter: "techguru",
-        linkedin: "techguru",
-        instagram: "techguru",
-        createdAt: "2024-02-01T09:45:00Z",
-        updatedAt: "2024-02-01T09:45:00Z",
-        lastLogin: "2024-02-02T16:30:00Z",
-    },
-    {
-        id: "5",
-        username: "newbie123",
-        email: "newbie@example.com",
-        role: "user",
-        loginType: "google",
-        avatar: "/placeholder.svg?height=40&width=40",
-        bio: "Pemula yang ingin belajar tentang troubleshooting komputer",
-        banner: "/placeholder.svg?height=200&width=800",
-        location: "Medan, Indonesia",
-        phone: "+62 816-7890-1234",
-        website: "",
-        github: "",
-        twitter: "",
-        linkedin: "",
-        instagram: "newbie123",
-        createdAt: "2024-02-10T16:20:00Z",
-        updatedAt: "2024-02-10T16:20:00Z",
-        lastLogin: "2024-02-11T08:45:00Z",
-    },
-]
+const ITEMS_PER_PAGE = 10;
 
 export default function UsersPage() {
-    const [users, setUsers] = useState<User[]>(mockUsers)
-    const [searchTerm, setSearchTerm] = useState("")
-    const [currentPage, setCurrentPage] = useState(1)
-    const [selectedUser, setSelectedUser] = useState<User | null>(null)
-    const [showUserDetail, setShowUserDetail] = useState(false)
-    const [userToDelete, setUserToDelete] = useState<User | null>(null)
-    const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-    const [sortBy, setSortBy] = useState<SortOption>("newest")
-    const [roleFilter, setRoleFilter] = useState<RoleFilter>("all")
-    const [loginTypeFilter, setLoginTypeFilter] = useState<LoginTypeFilter>("all")
+    const [users, setUsers] = useState<User[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState("");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+    const [showUserDetail, setShowUserDetail] = useState(false);
 
+    const [isUpdatingUser, setIsUpdatingUser] = useState(false);
+
+    const [sortBy, setSortBy] = useState<SortOption>("newest");
+    const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
+    const [loginTypeFilter, setLoginTypeFilter] = useState<LoginTypeFilter>("all");
+
+    // --- Fetch User Data from API ---
+    const fetchUsers = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const response = await fetch("/api/users");
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || "Gagal memuat daftar pengguna.");
+            }
+            const fetchedUsers: User[] = await response.json();
+            setUsers(fetchedUsers);
+            toast.success("Daftar pengguna berhasil dimuat.");
+        } catch (error) {
+            console.error("Error fetching users:", error);
+            toast.error(error instanceof Error ? error.message : "Gagal memuat pengguna.");
+            setUsers([]);
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchUsers();
+    }, [fetchUsers]);
+
+    // --- Filtering and Sorting Logic ---
     const filteredAndSortedUsers = users
         .filter((user) => {
             const matchesSearch =
                 user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                user.location.toLowerCase().includes(searchTerm.toLowerCase())
+                (user.location?.toLowerCase().includes(searchTerm.toLowerCase()) || false) ||
+                (user.bio?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
 
-            const matchesRole = roleFilter === "all" || user.role === roleFilter
-            const matchesLoginType = loginTypeFilter === "all" || user.loginType === loginTypeFilter
+            const matchesRole = roleFilter === "all" || user.role === roleFilter;
+            const matchesLoginType = loginTypeFilter === "all" || user.loginType === loginTypeFilter;
 
-            return matchesSearch && matchesRole && matchesLoginType
+            return matchesSearch && matchesRole && matchesLoginType;
         })
         .sort((a, b) => {
             switch (sortBy) {
                 case "newest":
-                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
                 case "oldest":
-                    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+                    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
                 case "name-asc":
-                    return a.username.localeCompare(b.username)
+                    return a.username.localeCompare(b.username);
                 case "name-desc":
-                    return b.username.localeCompare(a.username)
+                    return b.username.localeCompare(a.username);
                 default:
-                    return 0
+                    return 0;
             }
-        })
+        });
 
-    const totalPages = Math.ceil(filteredAndSortedUsers.length / ITEMS_PER_PAGE)
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
-    const endIndex = startIndex + ITEMS_PER_PAGE
-    const currentUsers = filteredAndSortedUsers.slice(startIndex, endIndex)
+    const totalPages = Math.ceil(filteredAndSortedUsers.length / ITEMS_PER_PAGE);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const currentUsers = filteredAndSortedUsers.slice(startIndex, endIndex);
 
-    const handleFilterChange = () => {
-        setCurrentPage(1)
-    }
+    const handleFilterChange = useCallback(() => {
+        setCurrentPage(1);
+    }, []);
 
-    const handleRoleChange = (userId: string, newRole: "admin" | "user") => {
-        const user = users.find((u) => u.id === userId)
-        if (!user) return
+    // --- Action Handlers (Menggunakan Sonner Toast untuk Konfirmasi) ---
+    const sendUpdateUserRequest = useCallback(async (userId: string, data: Partial<User> & { resetTokens?: boolean }) => {
+        setIsUpdatingUser(true);
+        try {
+            const response = await fetch(`/api/users/${userId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || "Gagal melakukan aksi.");
+            }
+            await fetchUsers();
+            return { success: true, message: "Aksi berhasil!" };
+        } catch (error) {
+            console.error("Error updating user:", error);
+            return { success: false, message: error instanceof Error ? error.message : "Gagal melakukan aksi." };
+        } finally {
+            setIsUpdatingUser(false);
+        }
+    }, [fetchUsers]);
 
-        setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)))
-        toast.success(`Role ${user.username} berhasil diubah menjadi ${newRole}`)
-    }
+    const handleRoleChangeClick = useCallback((user: User, newRole: "admin" | "user") => {
+        toast("Konfirmasi Perubahan Role", {
+            description: `Apakah Anda yakin ingin mengubah role ${user.username} menjadi ${newRole === "admin" ? "Admin" : "User"}?`,
+            action: {
+                label: "Ubah",
+                onClick: async () => {
+                    const result = await sendUpdateUserRequest(user.id, { role: newRole });
+                    if (result.success) {
+                        toast.success(`Role ${user.username} berhasil diubah menjadi ${newRole === "admin" ? "Admin" : "User"}.`);
+                    } else {
+                        toast.error(result.message);
+                    }
+                },
+            },
+            cancel: {
+                label: "Batal",
+                onClick: () => toast.dismiss(),
+            },
+        });
+    }, [sendUpdateUserRequest]);
 
-    const handleDeleteUser = (user: User) => {
-        setUserToDelete(user)
-        setShowDeleteDialog(true)
-    }
+    const handleBanUserClick = useCallback((user: User) => {
+        toast("Konfirmasi Blokir Pengguna", {
+            description: `Apakah Anda yakin ingin memblokir (ban) pengguna ${user.username}? Mereka tidak akan bisa lagi mengakses sistem.`,
+            action: {
+                label: "Blokir",
+                onClick: async () => {
+                    const result = await sendUpdateUserRequest(user.id, { role: "banned", isBanned: true });
+                    if (result.success) {
+                        toast.success(`Pengguna ${user.username} berhasil diblokir.`);
+                    } else {
+                        toast.error(result.message);
+                    }
+                },
+            },
+            cancel: {
+                label: "Batal",
+                onClick: () => toast.dismiss(),
+            },
+        });
+    }, [sendUpdateUserRequest]);
 
-    const confirmDeleteUser = () => {
-        if (!userToDelete) return
+    const handleUnbanUserClick = useCallback((user: User) => {
+        toast("Konfirmasi Aktifkan Pengguna", {
+            description: `Apakah Anda yakin ingin mengaktifkan kembali (unban) pengguna ${user.username}? Mereka akan bisa login kembali.`,
+            action: {
+                label: "Aktifkan",
+                onClick: async () => {
+                    const result = await sendUpdateUserRequest(user.id, { role: "user", isBanned: false });
+                    if (result.success) {
+                        toast.success(`Pengguna ${user.username} berhasil diaktifkan kembali.`);
+                    } else {
+                        toast.error(result.message);
+                    }
+                },
+            },
+            cancel: {
+                label: "Batal",
+                onClick: () => toast.dismiss(),
+            },
+        });
+    }, [sendUpdateUserRequest]);
 
-        setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id))
-        toast.success(`User ${userToDelete.username} berhasil dihapus`)
-        setShowDeleteDialog(false)
-        setUserToDelete(null)
-    }
+    const handleResetTokensClick = useCallback((user: User) => {
+        toast("Konfirmasi Reset Token", {
+            description: `Apakah Anda yakin ingin mereset token harian ${user.username} ke ${user.maxDailyTokens} dan mereset Total Penggunaan mereka ke 0?`,
+            action: {
+                label: "Reset",
+                onClick: async () => {
+                    const result = await sendUpdateUserRequest(user.id, { resetTokens: true });
+                    if (result.success) {
+                        toast.success(`Token harian ${user.username} berhasil direset.`);
+                    } else {
+                        toast.error(result.message);
+                    }
+                },
+            },
+            cancel: {
+                label: "Batal",
+                onClick: () => toast.dismiss(),
+            },
+        });
+    }, [sendUpdateUserRequest]);
 
-    const handleViewUser = (user: User) => {
-        setSelectedUser(user)
-        setShowUserDetail(true)
-    }
+    const handleDeleteUserClick = useCallback((user: User) => {
+        toast("Konfirmasi Hapus Permanen", {
+            description: `Ini akan menghapus pengguna ${user.username} secara PERMANEN. Tindakan ini tidak dapat dibatalkan. Lanjutkan?`,
+            action: {
+                label: "Hapus",
+                onClick: async () => {
+                    setIsUpdatingUser(true);
+                    try {
+                        const response = await fetch(`/api/users/${user.id}`, {
+                            method: 'DELETE',
+                        });
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.message || "Gagal menghapus pengguna secara permanen.");
+                        }
+                        await fetchUsers();
+                        toast.success(`Pengguna ${user.username} berhasil dihapus secara permanen.`);
+                    } catch (error) {
+                        console.error("Error deleting user:", error);
+                        toast.error(error instanceof Error ? error.message : "Gagal menghapus pengguna secara permanen.");
+                    } finally {
+                        setIsUpdatingUser(false);
+                    }
+                },
+            },
+            cancel: {
+                label: "Batal",
+                onClick: () => toast.dismiss(),
+            },
+        });
+    }, [fetchUsers]);
 
-    const handleEditUser = (user: User) => {
-        toast.info(`Edit user ${user.username} - Feature coming soon`)
-    }
+    const handleViewUser = useCallback((user: User) => {
+        setSelectedUser(user);
+        setShowUserDetail(true);
+    }, []);
 
-    const formatDate = (dateString: string): string => {
+    const formatDate = useCallback((dateString: string): string => {
+        if (!dateString) return "N/A";
         return new Date(dateString).toLocaleDateString("id-ID", {
             year: "numeric",
             month: "long",
             day: "numeric",
-        })
-    }
+        });
+    }, []);
 
-    const formatDateTime = (dateString: string): string => {
+    const formatDateTime = useCallback((dateString: string): string => {
+        if (!dateString) return "N/A";
         return new Date(dateString).toLocaleString("id-ID", {
             year: "numeric",
             month: "short",
             day: "numeric",
             hour: "2-digit",
             minute: "2-digit",
-        })
-    }
+        });
+    }, []);
 
-    const getSocialMediaCount = (user: User): number => {
-        const socialMedia = [user.github, user.twitter, user.linkedin, user.instagram].filter(Boolean)
-        return socialMedia.length
-    }
+    const getSocialMediaCount = useCallback((user: User): number => {
+        const socialMedia = [user.github, user.twitter, user.linkedin, user.instagram].filter(Boolean);
+        return socialMedia.filter(s => s && s.trim() !== "").length;
+    }, []);
 
-    const getLoginTypeIcon = (loginType: string) => {
+    const getLoginTypeIcon = useCallback((loginType: string) => {
         switch (loginType) {
             case "github":
-                return <Github className="h-3 w-3" />
+                return <Github className="h-3 w-3" />;
             case "google":
-                return <div className="h-3 w-3 bg-red-500 rounded-full" />
+                return <div className="h-3 w-3 bg-red-500 rounded-full" />;
             case "email":
             default:
-                return <Mail className="h-3 w-3" />
+                return <Mail className="h-3 w-3" />;
         }
-    }
+    }, []);
 
-    const getLoginTypeBadge = (loginType: string) => {
+    const getLoginTypeBadge = useCallback((loginType: string) => {
         const variants = {
             email: "default",
             github: "secondary",
             google: "outline",
-        } as const
+        } as const;
 
         return (
             <Badge variant={variants[loginType as keyof typeof variants] || "default"} className="text-xs">
                 {getLoginTypeIcon(loginType)}
                 <span className="ml-1 capitalize">{loginType}</span>
             </Badge>
-        )
+        );
+    }, [getLoginTypeIcon]);
+
+    const getRoleAndStatusBadge = useCallback((user: User) => {
+        if (user.role === "banned") {
+            return (
+                <Badge
+                    variant="destructive"
+                    className="cursor-not-allowed"
+                    onClick={() => toast.info(`Pengguna ${user.username} diblokir. Gunakan menu aksi untuk unban.`)}
+                >
+                    <UserX className="h-3 w-3 mr-1" /> Blocked
+                </Badge>
+            );
+        } else if (user.role === "admin") {
+            return (
+                <Badge
+                    variant="default"
+                    className="cursor-pointer hover:opacity-80"
+                    onClick={() => handleRoleChangeClick(user, "user")}
+                >
+                    <Shield className="h-3 w-3 mr-1" /> Admin
+                </Badge>
+            );
+        } else { // user.role === "user"
+            return (
+                <Badge
+                    variant="secondary"
+                    className="cursor-pointer hover:opacity-80"
+                    onClick={() => handleRoleChangeClick(user, "admin")}
+                >
+                    <Eye className="h-3 w-3 mr-1" /> User
+                </Badge>
+            );
+        }
+    }, [handleRoleChangeClick]);
+
+
+    if (isLoading) {
+        return (
+            <div className="mx-2 md:mx-4 py-6 space-y-6">
+                <div className="flex items-center justify-between">
+                    <Skeleton className="h-10 w-64" />
+                    <Skeleton className="h-10 w-32" />
+                </div>
+                <Card className="p-4">
+                    <Skeleton className="h-10 w-full mb-4" />
+                    <Skeleton className="h-12 w-full mb-4" />
+                    <div className="space-y-2">
+                        {Array.from({ length: ITEMS_PER_PAGE }).map((_, i) => (
+                            <Skeleton key={i} className="h-16 w-full" />
+                        ))}
+                    </div>
+                    <Skeleton className="h-8 w-full mt-4" />
+                </Card>
+            </div>
+        );
     }
 
     return (
@@ -319,22 +411,22 @@ export default function UsersPage() {
                                     placeholder="Cari pengguna..."
                                     value={searchTerm}
                                     onChange={(e) => {
-                                        setSearchTerm(e.target.value)
-                                        handleFilterChange()
+                                        setSearchTerm(e.target.value);
+                                        handleFilterChange();
                                     }}
                                     className="pl-8"
                                 />
                             </div>
 
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 flex-wrap sm:flex-nowrap">
                                 <Select
                                     value={sortBy}
                                     onValueChange={(value: SortOption) => {
-                                        setSortBy(value)
-                                        handleFilterChange()
+                                        setSortBy(value);
+                                        handleFilterChange();
                                     }}
                                 >
-                                    <SelectTrigger className="w-[180px]">
+                                    <SelectTrigger className="w-full sm:w-[180px]">
                                         <SortAsc className="h-4 w-4 mr-2" />
                                         <SelectValue placeholder="Urutkan" />
                                     </SelectTrigger>
@@ -349,11 +441,11 @@ export default function UsersPage() {
                                 <Select
                                     value={roleFilter}
                                     onValueChange={(value: RoleFilter) => {
-                                        setRoleFilter(value)
-                                        handleFilterChange()
+                                        setRoleFilter(value);
+                                        handleFilterChange();
                                     }}
                                 >
-                                    <SelectTrigger className="w-[120px]">
+                                    <SelectTrigger className="w-full sm:w-[120px]">
                                         <Filter className="h-4 w-4 mr-2" />
                                         <SelectValue placeholder="Role" />
                                     </SelectTrigger>
@@ -361,17 +453,18 @@ export default function UsersPage() {
                                         <SelectItem value="all">Semua Role</SelectItem>
                                         <SelectItem value="admin">Admin</SelectItem>
                                         <SelectItem value="user">User</SelectItem>
+                                        <SelectItem value="banned">Banned</SelectItem>
                                     </SelectContent>
                                 </Select>
 
                                 <Select
                                     value={loginTypeFilter}
                                     onValueChange={(value: LoginTypeFilter) => {
-                                        setLoginTypeFilter(value)
-                                        handleFilterChange()
+                                        setLoginTypeFilter(value);
+                                        handleFilterChange();
                                     }}
                                 >
-                                    <SelectTrigger className="w-[140px]">
+                                    <SelectTrigger className="w-full sm:w-[140px]">
                                         <Key className="h-4 w-4 mr-2" />
                                         <SelectValue placeholder="Login Type" />
                                     </SelectTrigger>
@@ -386,86 +479,116 @@ export default function UsersPage() {
                         </div>
                     </div>
 
-                    <div className="rounded-md border">
-                        <Table>
+                    <ScrollArea className="rounded-md border h-[calc(100vh-250px)]">
+                        <Table className="min-w-full table-fixed">
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Pengguna</TableHead>
-                                    <TableHead>Lokasi</TableHead>
-                                    <TableHead>Role</TableHead>
-                                    <TableHead>Login Type</TableHead>
-                                    <TableHead>Media Sosial</TableHead>
-                                    <TableHead>Bergabung</TableHead>
+                                    <TableHead className="min-w-[180px]">Pengguna</TableHead>
+                                    <TableHead className="min-w-[120px]">Lokasi</TableHead>
+                                    <TableHead className="min-w-[100px]">Role</TableHead>
+                                    <TableHead className="min-w-[120px]">Login Type</TableHead>
+                                    <TableHead className="min-w-[180px]">Token Penggunaan</TableHead>
+                                    <TableHead className="min-w-[150px]">Media Sosial</TableHead>
+                                    <TableHead className="min-w-[150px]">Bergabung</TableHead>
                                     <TableHead className="w-[70px]">Aksi</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {currentUsers.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                                             Tidak ada pengguna yang ditemukan
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     currentUsers.map((user) => (
                                         <TableRow key={user.id}>
-                                            <TableCell>
+                                            <TableCell className="align-top py-2">
                                                 <div className="flex items-center space-x-3">
-                                                    <Avatar className="h-10 w-10">
+                                                    <Avatar className="h-10 w-10 shrink-0">
                                                         <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.username} />
                                                         <AvatarFallback>{user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
                                                     </Avatar>
-                                                    <div>
-                                                        <div className="font-medium">{user.username}</div>
-                                                        <div className="text-sm text-muted-foreground">{user.email}</div>
-                                                        {user.bio && (
-                                                            <div className="text-xs text-muted-foreground mt-1 max-w-[200px] truncate">
+                                                    <div className="flex flex-col">
+                                                        <div className="font-medium text-sm">{user.username}</div>
+                                                        <div className="text-xs text-muted-foreground break-all">{user.email}</div>
+                                                        {user.bio && user.bio.trim() !== "" && (
+                                                            <div className="text-[10px] text-muted-foreground mt-1 max-w-[200px] truncate">
                                                                 {user.bio}
                                                             </div>
                                                         )}
                                                     </div>
                                                 </div>
                                             </TableCell>
-                                            <TableCell>
+                                            <TableCell className="align-top py-2">
                                                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
                                                     <MapPin className="h-3 w-3" />
-                                                    {user.location || "Tidak diset"}
+                                                    <span className="break-words">{user.location || "Tidak diset"}</span>
                                                 </div>
                                             </TableCell>
-                                            <TableCell>
-                                                <Badge
-                                                    variant={user.role === "admin" ? "default" : "secondary"}
-                                                    className="cursor-pointer hover:opacity-80"
-                                                    onClick={() => handleRoleChange(user.id, user.role === "admin" ? "user" : "admin")}
-                                                >
-                                                    {user.role === "admin" ? (
-                                                        <>
-                                                            <Shield className="h-3 w-3 mr-1" />
-                                                            Admin
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Eye className="h-3 w-3 mr-1" />
-                                                            User
-                                                        </>
-                                                    )}
-                                                </Badge>
+                                            <TableCell className="align-top py-2">
+                                                {/* Memanggil fungsi untuk badge role dan status */}
+                                                {getRoleAndStatusBadge(user)}
                                             </TableCell>
-                                            <TableCell>{getLoginTypeBadge(user.loginType)}</TableCell>
-                                            <TableCell>
+                                            <TableCell className="align-top py-2">{getLoginTypeBadge(user.loginType)}</TableCell>
+                                            <TableCell className="align-top py-2 text-sm">
+                                                <div className="space-y-0.5">
+                                                    <p>Harian: {user.dailyTokens} / {user.maxDailyTokens}</p>
+                                                    <p className="text-xs text-muted-foreground">Total: {user.totalUsage}</p>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell className="align-top py-2">
                                                 <div className="flex items-center gap-1">
-                                                    {user.github && <Github className="h-3 w-3 text-muted-foreground" />}
-                                                    {user.twitter && <Twitter className="h-3 w-3 text-muted-foreground" />}
-                                                    {user.linkedin && <Linkedin className="h-3 w-3 text-muted-foreground" />}
-                                                    {user.instagram && <Instagram className="h-3 w-3 text-muted-foreground" />}
-                                                    <span className="text-xs text-muted-foreground ml-1">{getSocialMediaCount(user)}</span>
+                                                    <TooltipProvider>
+                                                        {user.github && user.github.trim() !== "" && (
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Github className="h-3 w-3 text-muted-foreground" />
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p>GitHub: {user.github}</p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        )}
+                                                        {user.twitter && user.twitter.trim() !== "" && (
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Twitter className="h-3 w-3 text-muted-foreground" />
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p>Twitter: {user.twitter}</p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        )}
+                                                        {user.linkedin && user.linkedin.trim() !== "" && (
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Linkedin className="h-3 w-3 text-muted-foreground" />
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p>LinkedIn: {user.linkedin}</p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        )}
+                                                        {user.instagram && user.instagram.trim() !== "" && (
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Instagram className="h-3 w-3 text-muted-foreground" />
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    <p>Instagram: {user.instagram}</p>
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        )}
+                                                    </TooltipProvider>
+                                                    {getSocialMediaCount(user) > 0 && <span className="text-xs text-muted-foreground ml-1">({getSocialMediaCount(user)})</span>}
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="text-sm text-muted-foreground">{formatDate(user.createdAt)}</TableCell>
-                                            <TableCell>
+                                            <TableCell className="align-top py-2 text-sm text-muted-foreground whitespace-nowrap">{formatDate(user.createdAt)}</TableCell>
+                                            <TableCell className="align-top py-2">
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" className="h-8 w-8 p-0">
+                                                        <Button variant="ghost" className="h-8 w-8 p-0" disabled={isUpdatingUser}>
                                                             <span className="sr-only">Open menu</span>
                                                             <MoreHorizontal className="h-4 w-4" />
                                                         </Button>
@@ -475,32 +598,44 @@ export default function UsersPage() {
                                                             <Eye className="mr-2 h-4 w-4" />
                                                             Lihat Detail
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => handleEditUser(user)}>
-                                                            <Edit className="mr-2 h-4 w-4" />
-                                                            Edit Profil
-                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
+                                                        {/* Menu Ban/Unban */}
+                                                        {user.role !== "banned" ? (
+                                                            <DropdownMenuItem
+                                                                onClick={() => handleBanUserClick(user)}
+                                                                className="text-orange-500 focus:text-orange-500"
+                                                                disabled={isUpdatingUser}
+                                                            >
+                                                                <UserX className="mr-2 h-4 w-4" />
+                                                                Ban User
+                                                            </DropdownMenuItem>
+                                                        ) : (
+                                                            <DropdownMenuItem
+                                                                onClick={() => handleUnbanUserClick(user)}
+                                                                className="text-green-500 focus:text-green-500"
+                                                                disabled={isUpdatingUser}
+                                                            >
+                                                                <UserCheck className="mr-2 h-4 w-4" />
+                                                                Unban User
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                        {/* Menu Reset Token */}
                                                         <DropdownMenuItem
-                                                            onClick={() => handleRoleChange(user.id, user.role === "admin" ? "user" : "admin")}
+                                                            onClick={() => handleResetTokensClick(user)}
+                                                            disabled={isUpdatingUser}
                                                         >
-                                                            {user.role === "admin" ? (
-                                                                <>
-                                                                    <UserX className="mr-2 h-4 w-4" />
-                                                                    Jadikan User
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <UserCheck className="mr-2 h-4 w-4" />
-                                                                    Jadikan Admin
-                                                                </>
-                                                            )}
+                                                            <RotateCw className="mr-2 h-4 w-4" />
+                                                            Reset Token Harian
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator />
+                                                        {/* Menu Hapus Permanen */}
                                                         <DropdownMenuItem
-                                                            onClick={() => handleDeleteUser(user)}
+                                                            onClick={() => handleDeleteUserClick(user)}
                                                             className="text-destructive focus:text-destructive"
+                                                            disabled={isUpdatingUser}
                                                         >
                                                             <Trash2 className="mr-2 h-4 w-4" />
-                                                            Hapus User
+                                                            Hapus Permanen
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
@@ -510,18 +645,19 @@ export default function UsersPage() {
                                 )}
                             </TableBody>
                         </Table>
-                    </div>
+                        <ScrollBar orientation="horizontal" />
+                    </ScrollArea>
 
                     {totalPages > 1 && (
-                        <div className="mt-6">
+                        <div className="mt-6 flex justify-center">
                             <Pagination>
                                 <PaginationContent>
                                     <PaginationItem>
                                         <PaginationPrevious
                                             href="#"
                                             onClick={(e) => {
-                                                e.preventDefault()
-                                                if (currentPage > 1) setCurrentPage(currentPage - 1)
+                                                e.preventDefault();
+                                                if (currentPage > 1) setCurrentPage(currentPage - 1);
                                             }}
                                             className={currentPage <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
                                         />
@@ -534,8 +670,8 @@ export default function UsersPage() {
                                                     <PaginationLink
                                                         href="#"
                                                         onClick={(e) => {
-                                                            e.preventDefault()
-                                                            setCurrentPage(page)
+                                                            e.preventDefault();
+                                                            setCurrentPage(page);
                                                         }}
                                                         isActive={currentPage === page}
                                                         className="cursor-pointer"
@@ -543,23 +679,23 @@ export default function UsersPage() {
                                                         {page}
                                                     </PaginationLink>
                                                 </PaginationItem>
-                                            )
+                                            );
                                         } else if (page === currentPage - 2 || page === currentPage + 2) {
                                             return (
                                                 <PaginationItem key={page}>
                                                     <PaginationEllipsis />
                                                 </PaginationItem>
-                                            )
+                                            );
                                         }
-                                        return null
+                                        return null;
                                     })}
 
                                     <PaginationItem>
                                         <PaginationNext
                                             href="#"
                                             onClick={(e) => {
-                                                e.preventDefault()
-                                                if (currentPage < totalPages) setCurrentPage(currentPage + 1)
+                                                e.preventDefault();
+                                                if (currentPage < totalPages) setCurrentPage(currentPage + 1);
                                             }}
                                             className={currentPage >= totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
                                         />
@@ -576,6 +712,7 @@ export default function UsersPage() {
                 </CardContent>
             </Card>
 
+            {/* User Detail Dialog (Tidak Berubah) */}
             <Dialog open={showUserDetail} onOpenChange={setShowUserDetail}>
                 <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                     <DialogHeader>
@@ -587,11 +724,9 @@ export default function UsersPage() {
                         <div className="space-y-6">
                             <div className="relative">
                                 <div
-                                    className="h-32 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg"
+                                    className="h-32 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg bg-cover bg-center"
                                     style={{
-                                        backgroundImage: `url(${selectedUser.banner})`,
-                                        backgroundSize: "cover",
-                                        backgroundPosition: "center",
+                                        backgroundImage: `url(${selectedUser.banner || ''})`,
                                     }}
                                 />
                                 <div className="absolute -bottom-8 left-6">
@@ -615,19 +750,18 @@ export default function UsersPage() {
                                         <Badge variant={selectedUser.role === "admin" ? "default" : "secondary"}>
                                             {selectedUser.role === "admin" ? (
                                                 <>
-                                                    <Shield className="h-3 w-3 mr-1" />
-                                                    Admin
+                                                    <Shield className="h-3 w-3 mr-1" /> Admin
                                                 </>
                                             ) : (
                                                 <>
-                                                    <Eye className="h-3 w-3 mr-1" />
-                                                    User
+                                                    <Eye className="h-3 w-3 mr-1" /> User
                                                 </>
                                             )}
                                         </Badge>
                                         {getLoginTypeBadge(selectedUser.loginType)}
+                                        {selectedUser.role === "banned" && <Badge variant="destructive">Blocked</Badge>} {/* Tampilkan badge Blocked di sini */}
                                     </div>
-                                    {selectedUser.bio && <p className="mt-2 text-sm">{selectedUser.bio}</p>}
+                                    {selectedUser.bio && selectedUser.bio.trim() !== "" && <p className="mt-2 text-sm">{selectedUser.bio}</p>}
                                 </div>
 
                                 <div className="grid gap-6 md:grid-cols-2">
@@ -652,7 +786,7 @@ export default function UsersPage() {
                                                 </div>
                                             </div>
 
-                                            {selectedUser.location && (
+                                            {selectedUser.location && selectedUser.location.trim() !== "" && (
                                                 <div className="flex items-center gap-3">
                                                     <MapPin className="h-4 w-4 text-muted-foreground" />
                                                     <div>
@@ -669,7 +803,7 @@ export default function UsersPage() {
                                             <CardTitle className="text-lg">Media Sosial</CardTitle>
                                         </CardHeader>
                                         <CardContent className="space-y-3">
-                                            {selectedUser.github && (
+                                            {selectedUser.github && selectedUser.github.trim() !== "" && (
                                                 <div className="flex items-center gap-3">
                                                     <Github className="h-4 w-4 text-muted-foreground" />
                                                     <div>
@@ -686,7 +820,7 @@ export default function UsersPage() {
                                                 </div>
                                             )}
 
-                                            {selectedUser.twitter && (
+                                            {selectedUser.twitter && selectedUser.twitter.trim() !== "" && (
                                                 <div className="flex items-center gap-3">
                                                     <Twitter className="h-4 w-4 text-muted-foreground" />
                                                     <div>
@@ -703,7 +837,7 @@ export default function UsersPage() {
                                                 </div>
                                             )}
 
-                                            {selectedUser.linkedin && (
+                                            {selectedUser.linkedin && selectedUser.linkedin.trim() !== "" && (
                                                 <div className="flex items-center gap-3">
                                                     <Linkedin className="h-4 w-4 text-muted-foreground" />
                                                     <div>
@@ -720,7 +854,7 @@ export default function UsersPage() {
                                                 </div>
                                             )}
 
-                                            {selectedUser.instagram && (
+                                            {selectedUser.instagram && selectedUser.instagram.trim() !== "" && (
                                                 <div className="flex items-center gap-3">
                                                     <Instagram className="h-4 w-4 text-muted-foreground" />
                                                     <div>
@@ -751,27 +885,6 @@ export default function UsersPage() {
                     )}
                 </DialogContent>
             </Dialog>
-
-            <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Konfirmasi Hapus User</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Apakah Anda yakin ingin menghapus user <strong>{userToDelete?.username}</strong>? Tindakan ini tidak dapat
-                            dibatalkan dan akan menghapus semua data yang terkait dengan user ini.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Batal</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={confirmDeleteUser}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                            Hapus User
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
-    )
+    );
 }
