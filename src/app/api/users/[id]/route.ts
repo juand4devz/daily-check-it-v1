@@ -43,7 +43,7 @@ export async function GET(
     }
 }
 
-// --- PUT Request Handler --- (Penyesuaian untuk Reset Token)
+// --- PUT Request Handler ---
 export async function PUT(
     request: NextRequest,
     { params }: { params: { id: string } }
@@ -76,6 +76,9 @@ export async function PUT(
             }
         }
         if (updatedFields.bio !== undefined) allowedUpdateFields.bio = updatedFields.bio;
+        // ⭐ TAMBAHKAN BARIS INI UNTUK MENANGANI AVATAR
+        if (updatedFields.avatar !== undefined) allowedUpdateFields.avatar = updatedFields.avatar;
+        // ⭐
         if (updatedFields.banner !== undefined) allowedUpdateFields.banner = updatedFields.banner;
         if (updatedFields.location !== undefined) allowedUpdateFields.location = updatedFields.location;
         if (updatedFields.phone !== undefined) allowedUpdateFields.phone = updatedFields.phone;
@@ -89,11 +92,10 @@ export async function PUT(
 
         // --- Logika Reset Token Harian yang Diperbarui ---
         if (updatedFields.resetTokens === true) {
-            allowedUpdateFields.dailyTokens = existingUser.maxDailyTokens || 0; // Reset daily ke max
-            allowedUpdateFields.totalUsage = 0; // Reset total usage untuk periode ini ke 0
-            allowedUpdateFields.lastResetDate = getTodayDateString(); // Set tanggal reset hari ini
+            allowedUpdateFields.dailyTokens = existingUser.maxDailyTokens || 0;
+            allowedUpdateFields.totalUsage = 0;
+            allowedUpdateFields.lastResetDate = getTodayDateString();
         } else {
-            // Jika tidak ada permintaan reset, tapi ada update token secara manual
             if (updatedFields.dailyTokens !== undefined) allowedUpdateFields.dailyTokens = updatedFields.dailyTokens;
             if (updatedFields.maxDailyTokens !== undefined) allowedUpdateFields.maxDailyTokens = updatedFields.maxDailyTokens;
             if (updatedFields.lastResetDate !== undefined) allowedUpdateFields.lastResetDate = updatedFields.lastResetDate;
