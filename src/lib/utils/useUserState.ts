@@ -1,13 +1,13 @@
-// lib/utils/useUserState.ts
+// /lib/utils/useUserState.ts
 "use client";
 
 import { useState, useCallback } from "react";
+import { EmojiReactionKey } from "@/types/forum";
 
 export interface UserState {
     votes: { [replyId: string]: "up" | "down" | null };
     postLikes: { [postId: string]: boolean };
-    // PERUBAHAN PENTING: reactions sekarang hanya menyimpan SATU reactionKey aktif per replyId
-    reactions: { [replyId: string]: string | null }; // string untuk reactionKey, null jika tidak ada reaksi
+    reactions: { [replyId: string]: EmojiReactionKey | null };
     bookmarks: string[];
 }
 
@@ -19,14 +19,12 @@ const getStoredUserState = (): UserState => {
         const stored = localStorage.getItem("forum-user-state");
         const parsed = stored ? JSON.parse(stored) : {};
 
-        // Normalisasi reactions saat memuat dari localStorage
-        // Jika reactions masih berupa array (dari implementasi sebelumnya), ambil yang pertama
-        const normalizedReactions: { [replyId: string]: string | null } = {};
+        const normalizedReactions: { [replyId: string]: EmojiReactionKey | null } = {};
         for (const replyId in parsed.reactions) {
             if (Array.isArray(parsed.reactions[replyId]) && parsed.reactions[replyId].length > 0) {
-                normalizedReactions[replyId] = parsed.reactions[replyId][0]; // Ambil reaksi pertama
+                normalizedReactions[replyId] = parsed.reactions[replyId][0] as EmojiReactionKey;
             } else if (typeof parsed.reactions[replyId] === 'string') {
-                normalizedReactions[replyId] = parsed.reactions[replyId];
+                normalizedReactions[replyId] = parsed.reactions[replyId] as EmojiReactionKey;
             } else {
                 normalizedReactions[replyId] = null;
             }
@@ -35,7 +33,7 @@ const getStoredUserState = (): UserState => {
         return {
             votes: parsed.votes || {},
             postLikes: parsed.postLikes || {},
-            reactions: normalizedReactions, // Gunakan yang sudah dinormalisasi
+            reactions: normalizedReactions,
             bookmarks: parsed.bookmarks || [],
         };
     } catch (e) {

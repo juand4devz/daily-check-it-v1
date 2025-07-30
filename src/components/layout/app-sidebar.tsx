@@ -50,6 +50,8 @@ import { useSession } from "next-auth/react"
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
 import { Skeleton } from "../ui/skeleton"
 import { ScrollArea } from "../ui/scroll-area"
+import JustLogo from "../logo/JustLogo"
+import Image from "next/image"
 
 // --- Tipe untuk Struktur Navigasi ---
 interface NavItem {
@@ -221,11 +223,15 @@ export function SidebarNav({ className, ...props }: SidebarNavProps) {
                         <SidebarMenuButton size="lg" asChild>
                             <Link href="/">
                                 <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-zinc-900 text-white">
-                                    <Brain className="size-4" />
+                                    <JustLogo />
                                 </div>
                                 <div className="flex flex-col gap-0.5 leading-none">
-                                    <span className="font-semibold">DailyCheckIt</span>
-                                    <span className="text-xs">development v1</span>
+                                    <Image
+                                        className="h-8"
+                                        src="/logos/daily-cek-it-name.svg"
+                                        alt="Daily Cek It"
+                                        height="300"
+                                        width="300" />
                                 </div>
                             </Link>
                         </SidebarMenuButton>

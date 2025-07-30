@@ -10,44 +10,23 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-// import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // Tidak digunakan
 import { toast } from "sonner";
 import { MediaViewer } from "@/components/forum/media-viewer";
 import { MarkdownEditor } from "@/components/forum/markdown-editor";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-// import { Input } from "@/components/ui/input"; // Tidak digunakan langsung di sini
 import {
   ArrowLeft,
   MessageSquare,
   Heart,
-  // MoreHorizontal, // Tidak digunakan
   Send,
   Eye,
-  // Smile, // Tidak digunakan
-  // Flag, // Tidak digunakan
   CheckCircle,
-  // Award, // Tidak digunakan
-  // Copy, // Tidak digunakan
-  // Edit, // Tidak digunakan
-  // Trash2, // Tidak digunakan
   Pin,
-  // Archive, // Tidak digunakan
   Bookmark,
   BookmarkCheck,
-  // ExternalLink, // Tidak digunakan
   Share2,
-  // Clock, // Tidak digunakan
-  // Users, // Tidak digunakan
-  // TrendingUp, // Tidak digunakan
-  // Calendar, // Tidak digunakan
-  // Tag, // Tidak digunakan
   AlertTriangle,
-  // Settings, // Tidak digunakan
-  // Download, // Tidak digunakan
-  // Link, // Tidak digunakan
-  // ChevronUp, // Tidak digunakan
-  // ChevronDown, // Tidak digunakan
   BookOpenText,
   Loader2,
 } from "lucide-react";
@@ -57,7 +36,7 @@ import {
   ForumReply,
   EMOJI_REACTIONS,
   ForumMedia,
-  // NotificationType, // Tidak digunakan di page.tsx
+  EmojiReactionKey,
 } from "@/types/forum";
 import { getReadingTime, ProcessedForumReply } from "@/lib/utils/forum-utils";
 import { formatTimeAgo } from "@/lib/utils/date-utils";
@@ -77,12 +56,9 @@ import { buildReplyTree, flattenReplies } from "@/lib/utils/forum-utils";
 import { clientDb } from "@/lib/firebase/firebase-client";
 import { collection, query, where, orderBy, onSnapshot, doc } from "firebase/firestore";
 
-// import { User as UserType } from "@/types/types"; // Tidak digunakan di sini
-
 import { upload, ImageKitAbortError, ImageKitInvalidRequestError, ImageKitServerError, ImageKitUploadNetworkError } from "@imagekit/next";
 import { Progress } from "@/components/ui/progress";
 
-// NEW INTERFACE: Untuk mengelola file media di state komentar utama
 interface UploadedFileState {
   file: File | null;
   previewUrl: string | null;
@@ -275,7 +251,7 @@ export default function ForumDetailPage() {
 
     const file = files[0];
     if (mainCommentUploadState.file && mainCommentUploadState.file !== file) {
-      toast.error("Maksimal 1 media per komentar utama."); // Update pesan
+      toast.error("Maksimal 1 media per komentar utama.");
       return;
     }
 
@@ -731,26 +707,14 @@ export default function ForumDetailPage() {
     }
   }, [post, userId, userState.bookmarks, updateUserState, router]);
 
+  // handleReaction kini menerima newReactionKey (yang mungkin null)
+  // dan oldReactionKey untuk membantu backend memproses penggantian/penghapusan.
   const handleReaction = useCallback(
-    async (replyId: string, reactionKey: string, hasReacted: boolean) => {
+    async (replyId: string, newReactionKey: EmojiReactionKey | null, oldReactionKey: EmojiReactionKey | null) => {
       if (!userId || !post) {
         toast.error("Anda harus login untuk memberikan reaksi.");
         router.push("/login");
         return;
-      }
-
-      const currentReactionForUser = userState.reactions?.[replyId];
-      let newReactionToSet: string | null = null;
-      let newHasReacted = false; // Status baru untuk UI lokal dan server
-
-      if (currentReactionForUser === reactionKey) {
-        // Jika reaksi yang sama diklik lagi, berarti un-react
-        newReactionToSet = null;
-        newHasReacted = false;
-      } else {
-        // Jika reaksi baru dipilih (atau belum ada reaksi), set reaksi baru
-        newReactionToSet = reactionKey;
-        newHasReacted = true;
       }
 
       // Optimistic UI update
@@ -760,19 +724,17 @@ export default function ForumDetailPage() {
             if (r.id === replyId) {
               const updatedReactions = { ...r.reactions };
 
-              // Hapus reaksi lama pengguna dari semua kunci reaksi
-              EMOJI_REACTIONS.forEach(emoji => {
-                if (updatedReactions[emoji.key]) {
-                  updatedReactions[emoji.key] = updatedReactions[emoji.key].filter(id => id !== userId);
-                }
-              });
+              // Hapus pengguna dari reaksi lama (jika ada)
+              if (oldReactionKey && updatedReactions[oldReactionKey]) {
+                updatedReactions[oldReactionKey] = updatedReactions[oldReactionKey].filter(id => id !== userId);
+              }
 
-              // Tambahkan reaksi baru jika ada
-              if (newReactionToSet) {
-                if (!updatedReactions[newReactionToSet]) {
-                  updatedReactions[newReactionToSet] = [];
+              // Tambahkan pengguna ke reaksi baru (jika ada dan berbeda dari yang lama)
+              if (newReactionKey && newReactionKey !== oldReactionKey) {
+                if (!updatedReactions[newReactionKey]) {
+                  updatedReactions[newReactionKey] = [];
                 }
-                updatedReactions[newReactionToSet].push(userId);
+                updatedReactions[newReactionKey].push(userId);
               }
 
               return { ...r, reactions: updatedReactions };
@@ -782,12 +744,12 @@ export default function ForumDetailPage() {
         )
       );
 
-      // Update userState dengan reaksi baru (atau null jika un-react)
+      // Perbarui userState dengan reaksi baru (atau null jika un-react)
       updateUserState((prevUserState) => ({
         ...prevUserState,
         reactions: {
           ...(prevUserState.reactions || {}),
-          [replyId]: newReactionToSet, // Store single reactionKey or null
+          [replyId]: newReactionKey, // Simpan reaksi tunggal atau null
         },
       }));
 
@@ -795,19 +757,16 @@ export default function ForumDetailPage() {
         const response = await fetch(`/api/forum/posts/${post.id}/replies/${replyId}/react`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          // Kirim reactionKey yang baru dipilih, dan reactionKey sebelumnya (jika ada)
-          // Backend akan memproses logika penggantian/penghapusan
           body: JSON.stringify({
-            newReactionKey: newReactionToSet, // Reaksi yang ingin ditetapkan (atau null untuk un-react)
-            oldReactionKey: currentReactionForUser // Reaksi yang mungkin sudah ada sebelumnya
+            newReactionKey: newReactionKey,
+            oldReactionKey: oldReactionKey // Kirim juga reaksi yang lama untuk backend
           }),
         });
 
         const data = await response.json();
         if (!response.ok || !data.status) {
           toast.error("Gagal memperbarui reaksi", { description: data.message });
-          // Note: Untuk sistem real-time, Firestore listener akan mengoreksi UI secara otomatis.
-          // Untuk konsistensi visual segera saat kegagalan, Anda perlu logika rollback di sini.
+          // Logika rollback UI jika API gagal (Opsional, Firestore listener akan mengoreksi)
         } else {
           toast.success(data.message);
         }
@@ -1248,13 +1207,14 @@ export default function ForumDetailPage() {
                         postTitle={post?.title || ""}
                         postAuthorId={post?.authorId || ""}
                         onVote={handleVote}
+                        // PENTING: Passing newReactionKey and oldReactionKey
                         onReaction={handleReaction}
                         onMarkAsSolution={handleMarkAsSolution}
                         onCommentAction={handleCommentAction}
                         currentUserId={userId || undefined}
                         isAdmin={isAdmin}
                         currentUserVoteStatus={userState.votes?.[reply.id] || null}
-                        currentUserReactions={userState.reactions?.[reply.id] || null} // PERBAIKAN: null
+                        currentUserReaction={userState.reactions?.[reply.id] || null} // Mengirim reaksi tunggal
                         onSubmitReply={handleSubmitReply}
                         isSubmittingReply={submittingReply}
                         isNested={false}

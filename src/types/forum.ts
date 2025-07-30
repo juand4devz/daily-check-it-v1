@@ -62,13 +62,18 @@ export interface ForumReply {
     upvotedBy: string[];
     downvotedBy: string[];
     parentId?: string | null;
-    mentions?: string[] | null; // Bisa array atau null
-    isSolution: boolean;
-    reactions: { [key: string]: string[] | null }; // Bisa array user IDs atau null
-    media?: ForumMedia[] | null; // Bisa array atau null
+    mentions?: string[] | null;
+    // `reactions` tetap sebagai objek dengan array string[]
+    // karena menyimpan daftar user yang bereaksi dengan emoji tertentu.
+    // Logika di frontend/backend yang akan memastikan user hanya ada di satu array.
+    reactions: { [key: string]: string[] };
+    isSolution?: boolean;
+    media?: ForumMedia[] | null;
     isEdited: boolean;
     editedAt?: string | null;
 }
+
+export type EmojiReactionKey = (typeof EMOJI_REACTIONS)[number]["key"];
 
 export interface ForumBookmark {
     id: string; // Firestore document ID (optional, can use userId_postId)
@@ -83,8 +88,9 @@ export type NotificationType =
     "forum_reply_to_comment" |
     "forum_like_post" |
     "forum_mention" |
-    "forum_solution_marked" | // New notification type
-    "system";
+    "forum_solution_marked" |
+    "system" |
+    "forum_comment_reaction";
 
 export interface Notification {
     id: string; // Firestore document ID

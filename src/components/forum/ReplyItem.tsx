@@ -6,8 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // Diperlukan untuk EmojiReactionPopover
-import { Progress } from "@/components/ui/progress"; // Tambahkan import Progress
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -20,16 +19,18 @@ import {
     X,
     Loader2,
     Send,
-    Copy, // Digunakan di MarkdownEditor untuk "Salin URL"
-    Link as LinkIcon, // Digunakan di MarkdownEditor untuk "Sisipkan URL"
-    Image as ImageIcon, // Digunakan di MarkdownEditor untuk icon preview
-    Video, // Digunakan di MarkdownEditor untuk icon preview
+    Copy,
+    Link as LinkIcon,
+    Image as ImageIcon,
+    Video,
+    Smile, // Pastikan Smile diimpor jika digunakan di sini untuk default
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
     ForumReply,
     EMOJI_REACTIONS,
     ForumMedia,
+    EmojiReactionKey,
 } from "@/types/forum";
 import { formatTimeAgo } from "@/lib/utils/date-utils";
 import { MarkdownEditor } from "./markdown-editor";
@@ -39,12 +40,10 @@ import { UserProfileClickPopover } from "@/components/user/UserProfileClickPopov
 import { Card, CardContent } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 
-// Import komponen Popover yang sudah dipisah
 import { EmojiReactionPopover } from "./EmojiReactionPopover";
 import { CommentActionsPopover } from "./CommentActionsPopover";
 import { ReportDialog } from "@/components/shared/ReportDialog";
 
-// NEW INTERFACE: Untuk mengelola file media di state inline reply
 interface InlineMediaFile {
     file: File;
     id: string;
@@ -64,13 +63,12 @@ interface ReplyItemProps {
     postTitle?: string;
     postAuthorId: string;
     onVote: (replyId: string, voteType: "up" | "down", currentVoteStatus: "up" | "down" | null) => Promise<void>;
-    // PERUBAHAN: currentUserReactions sekarang string | null
-    onReaction: (replyId: string, reactionKey: string, hasReacted: boolean) => Promise<void>; // Prop ini tetap sama, logika penanganan ada di dalamnya
+    // PERUBAHAN: onReaction menerima newKey dan oldKey
+    onReaction: (replyId: string, newReactionKey: EmojiReactionKey | null, oldReactionKey: EmojiReactionKey | null) => Promise<void>;
     onMarkAsSolution: (replyId: string, isCurrentlySolution: boolean) => Promise<void>;
     onCommentAction: (replyId: string, action: string) => void;
     currentUserVoteStatus: "up" | "down" | null;
-    // PERUBAHAN PENTING: Tipe currentUserReactions menjadi string (kunci reaksi) atau null
-    currentUserReactions: string | null;
+    currentUserReaction: EmojiReactionKey | null; // Single reaction key or null
     onSubmitReply: (content: string, mediaFiles: ForumMedia[], parentId?: string, mentionedUserIds?: string[]) => Promise<void>;
     isSubmittingReply: boolean;
     isNested?: boolean;
@@ -104,7 +102,7 @@ export function ReplyItem({
     onMarkAsSolution,
     onCommentAction,
     currentUserVoteStatus,
-    currentUserReactions, // Ini sekarang adalah string | null
+    currentUserReaction, // Ini sekarang adalah EmojiReactionKey | null
     onSubmitReply,
     isSubmittingReply,
     isNested = false,
@@ -127,10 +125,9 @@ export function ReplyItem({
             uploading: fileItem.uploading,
             progress: fileItem.progress,
             uploadedUrl: fileItem.uploadedMediaData?.url,
-            type: fileItem.file.type.startsWith('image/') ? 'image' : fileItem.file.type.startsWith('video/') ? 'video' : undefined, // Tambahkan tipe
+            type: fileItem.file.type.startsWith('image/') ? 'image' : fileItem.file.type.startsWith('video/') ? 'video' : undefined,
         }));
     }, [inlineReplyMediaFiles]);
-
 
     const inlineReplyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
     const itemRef = useRef<HTMLDivElement>(null);
@@ -142,7 +139,6 @@ export function ReplyItem({
         : reply.content.slice(0, COMMENT_TRUNCATE_LIMIT) + (showReadMore ? "..." : "");
 
     const [showNestedReplies, setShowNestedReplies] = useState(false);
-    // const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false); // Tidak digunakan
     const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
 
     const [showMentionPopover, setShowMentionPopover] = useState(false);
@@ -171,7 +167,7 @@ export function ReplyItem({
         }
 
         const file = files[0];
-        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) { // Izinkan video
+        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
             toast.error("Hanya file gambar atau video yang diizinkan.");
             return;
         }
@@ -221,7 +217,6 @@ export function ReplyItem({
         toast.info("Media dihapus.");
     }, []);
 
-
     const handleReplySubmit = async () => {
         const isAnyMediaUploading = inlineReplyMediaFiles.some(item => item.uploading);
         const isAnyMediaUploadFailed = inlineReplyMediaFiles.some(item => !item.uploadedMediaData && !item.uploading);
@@ -264,11 +259,6 @@ export function ReplyItem({
             inlineReplyTextareaRef.current.setSelectionRange(length, length);
         }
     }, [isInlineReplyExpanded]);
-
-    // PERUBAHAN: hasUserReactedWith sekarang memeriksa string | null
-    const hasUserReactedWith = useCallback((reactionKey: string): boolean => {
-        return currentUserReactions === reactionKey;
-    }, [currentUserReactions]);
 
     const displayedChildren = showNestedReplies ? reply.children : [];
 
@@ -371,7 +361,6 @@ export function ReplyItem({
                     <div className="flex-1">
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2 w-full">
-                                {/* Menggunakan UserProfileClickPopover untuk avatar/username */}
                                 <UserProfileClickPopover userId={reply.authorId}>
                                     <div
                                         className="flex items-center gap-2 cursor-pointer"
@@ -436,20 +425,23 @@ export function ReplyItem({
 
                         {!isNested && (
                             <div className="flex items-center gap-2 text-sm">
-                                {/* PERBAIKAN: onSelect sekarang akan mengirim reactionKey yang dipilih dan apakah user sudah mereaksi itu sebelumnya */}
+                                {/* Tombol Popover Reaksi Utama */}
                                 <EmojiReactionPopover
-                                    onSelect={(reactionKey) => onReaction(reply.id, reactionKey, hasUserReactedWith(reactionKey))}
-                                    currentUserReactions={currentUserReactions !== null ? [currentUserReactions] : []} // Mengubah single reactionKey menjadi array untuk EmojiReactionPopover
+                                    onSelect={(selectedReactionKey) => onReaction(reply.id, selectedReactionKey, currentUserReaction)}
+                                    currentUserReaction={currentUserReaction}
                                     replyReactions={reply.reactions || {}}
                                     disabled={!currentUserId}
                                 />
+                                {/* Tampilkan reaksi-reaksi lain dari pengguna lain */}
                                 {EMOJI_REACTIONS.map((reaction) => {
                                     const count = reply.reactions?.[reaction.key]?.length || 0;
-                                    // PERUBAHAN: isActive sekarang membandingkan dengan reactionKey tunggal dari currentUserReactions
-                                    const isActive = currentUserReactions === reaction.key;
+                                    // Tampilkan hanya jika ada reaksi dari pengguna lain (bukan current user)
+                                    // atau jika current user bereaksi dengan ini, tapi itu sudah ditangani oleh popover utama.
+                                    // Jadi, kita hanya fokus pada reaksi yang DIBERIKAN oleh pengguna LAIN.
+                                    const isReactedByCurrentUser = currentUserReaction === reaction.key;
+                                    const isReactedByOthers = count > 0 && !isReactedByCurrentUser;
 
-                                    // Hanya tampilkan emoji jika ada yang bereaksi atau jika itu adalah reaksi aktif user
-                                    if (count === 0 && !isActive) return null;
+                                    if (!isReactedByOthers) return null;
 
                                     return (
                                         <Button
@@ -458,18 +450,21 @@ export function ReplyItem({
                                             variant="outline"
                                             size="sm"
                                             className={cn(
-                                                "h-6 px-2 text-xs flex items-center gap-1",
-                                                isActive && "bg-blue-100 text-blue-600 border-blue-200",
+                                                "h-6 px-2 text-xs flex items-center gap-1 opacity-80",
+                                                // Tambahkan styling jika ada reaksi dari orang lain
+                                                isReactedByOthers && "bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-gray-200",
+                                                "cursor-default" // Nonaktifkan kursor klik
                                             )}
-                                            // onReaction akan menangani logika un-react jika isActive true
-                                            onClick={() => onReaction(reply.id, reaction.key, isActive)}
-                                            disabled={!currentUserId}
+                                            disabled={true} // Selalu disabled karena hanya untuk tampilan jumlah dari user lain
+                                            aria-label={`${count} reaksi ${reaction.label}`}
                                         >
                                             {reaction.emoji}
-                                            {count > 0 && <span className="font-medium">{count}</span>}
+                                            <span className="font-medium">{count}</span>
                                         </Button>
                                     );
                                 })}
+
+                                {/* Tombol "Batalkan Reaksi" dihapus */}
 
                                 {(isPostAuthor || isAdmin) && (
                                     <Button
@@ -516,9 +511,7 @@ export function ReplyItem({
                                                 currentUserId && childReply.upvotedBy.includes(currentUserId) ? "up" :
                                                     currentUserId && childReply.downvotedBy.includes(currentUserId) ? "down" : null
                                             }
-                                            // PERUBAHAN: currentUserReactions di sini untuk nested ReplyItem
-                                            // Ambil reaksi tunggal dari childReply.reactions jika user saat ini ada di sana
-                                            currentUserReactions={
+                                            currentUserReaction={
                                                 currentUserId ? (
                                                     EMOJI_REACTIONS.find(emoji => childReply.reactions?.[emoji.key]?.includes(currentUserId))?.key || null
                                                 ) : null
@@ -597,7 +590,7 @@ export function ReplyItem({
                                                     placeholder={`Balas komentar...`}
                                                     rows={3}
                                                     disabled={isSubmittingReply || inlineReplyMediaFiles.some(f => f.uploading)}
-                                                    isUploadingMedia={inlineReplyMediaFiles.some(f => f.uploading)} // Tambahkan prop ini
+                                                    isUploadingMedia={inlineReplyMediaFiles.some(f => f.uploading)}
                                                     showMediaInput={true}
                                                     onRemoveMedia={handleRemoveInlineMedia}
                                                     allAvailableMentions={allAvailableMentions}

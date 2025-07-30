@@ -17,7 +17,7 @@ import {
 import { clientDb } from "./firebase-client";
 import bcrypt from "bcrypt";
 import type { Report, User } from "@/types/types";
-import type { ForumPost, ForumReply, ForumBookmark, Notification } from "@/types/forum"; // Import new types
+import type { ForumPost, ForumReply, ForumBookmark, Notification, EmojiReactionKey } from "@/types/forum"; // Import new types
 
 // Constants for default user data
 const DEFAULT_MAX_DAILY_TOKENS = 10;
@@ -400,16 +400,22 @@ export async function createForumReply(replyData: Omit<ForumReply, 'id' | 'creat
             downvotedBy: [],
             isSolution: false,
             isEdited: false,
-            reactions: {}, // Initialize with empty reactions
+            reactions: {},
         };
         const docRef = await addDoc(repliesCollectionRef, newReply);
 
-        // Increment replies count on the parent post
         const postRef = doc(clientDb, "forumPosts", replyData.postId);
-        await updateDoc(postRef, {
-            replies: (await getDoc(postRef)).data()?.replies + 1 || 1,
-            updatedAt: new Date().toISOString(),
+        await runTransaction(clientDb, async (transaction) => {
+            const postDoc = await transaction.get(postRef);
+            if (postDoc.exists()) {
+                const currentRepliesCount = postDoc.data()?.replies || 0;
+                transaction.update(postRef, {
+                    replies: currentRepliesCount + 1,
+                    updatedAt: new Date().toISOString(),
+                });
+            }
         });
+
 
         return { status: true, replyId: docRef.id, message: "Balasan forum berhasil dibuat." };
     } catch (error) {
@@ -446,13 +452,24 @@ export async function updateForumReply(replyId: string, updateData: Partial<Foru
 
 export async function deleteForumReply(replyId: string, postId: string): Promise<{ status: boolean; message: string }> {
     try {
-        await deleteDoc(doc(clientDb, "forumReplies", replyId));
+        await runTransaction(clientDb, async (transaction) => {
+            const replyDocRef = doc(clientDb, "forumReplies", replyId);
+            const postRef = doc(clientDb, "forumPosts", postId);
 
-        // Decrement replies count on the parent post
-        const postRef = doc(clientDb, "forumPosts", postId);
-        await updateDoc(postRef, {
-            replies: (await getDoc(postRef)).data()?.replies - 1 || 0,
-            updatedAt: new Date().toISOString(),
+            const replyDoc = await transaction.get(replyDocRef);
+            if (!replyDoc.exists()) {
+                throw new Error("Reply not found.");
+            }
+
+            const postDoc = await transaction.get(postRef);
+            if (postDoc.exists()) {
+                const currentRepliesCount = postDoc.data()?.replies || 0;
+                transaction.update(postRef, {
+                    replies: Math.max(0, currentRepliesCount - 1),
+                    updatedAt: new Date().toISOString(),
+                });
+            }
+            transaction.delete(replyDocRef);
         });
 
         return { status: true, message: "Balasan forum berhasil dihapus." };
@@ -529,7 +546,12 @@ export async function toggleReplyVote(replyId: string, userId: string, voteType:
     }
 }
 
-export async function toggleReplyReaction(replyId: string, userId: string, reactionKey: string): Promise<{ status: boolean; newReactions: { [key: string]: string[] }; message: string }> {
+export async function toggleReplyReaction(
+    replyId: string,
+    userId: string,
+    newReactionKey: EmojiReactionKey | null, // Reaction yang ingin ditetapkan (null jika un-react)
+    oldReactionKey: EmojiReactionKey | null // Reaction yang sebelumnya dimiliki user (dari frontend)
+): Promise<{ status: boolean; newReactions: { [key: string]: string[] }; message: string }> {
     const replyRef = doc(clientDb, "forumReplies", replyId);
 
     try {
@@ -542,27 +564,43 @@ export async function toggleReplyReaction(replyId: string, userId: string, react
             const replyData = replyDoc.data() as ForumReply;
             const reactions = replyData.reactions || {};
 
-            if (!reactions[reactionKey]) {
-                reactions[reactionKey] = [];
+            let updatedReactions = { ...reactions };
+
+            // 1. Hapus user dari oldReactionKey jika ada
+            if (oldReactionKey && updatedReactions[oldReactionKey]) {
+                updatedReactions[oldReactionKey] = updatedReactions[oldReactionKey].filter(id => id !== userId);
             }
 
-            if (reactions[reactionKey].includes(userId)) {
-                // User already reacted with this emoji, so remove it
-                reactions[reactionKey] = reactions[reactionKey].filter(id => id !== userId);
-            } else {
-                // Add reaction
-                reactions[reactionKey].push(userId);
+            // 2. Tambahkan user ke newReactionKey jika newReactionKey diberikan
+            if (newReactionKey) {
+                // Inisialisasi array jika belum ada
+                if (!updatedReactions[newReactionKey]) {
+                    updatedReactions[newReactionKey] = [];
+                }
+                // Tambahkan user jika belum ada di array reaksi baru
+                if (!updatedReactions[newReactionKey].includes(userId)) {
+                    updatedReactions[newReactionKey].push(userId);
+                }
             }
 
             transaction.update(replyRef, {
-                reactions: reactions,
+                reactions: updatedReactions,
                 updatedAt: new Date().toISOString(),
             });
 
-            return { newReactions: reactions };
+            return { newReactions: updatedReactions };
         });
 
-        return { status: true, ...result, message: "Reaksi berhasil diperbarui." };
+        let message = "Reaksi berhasil diperbarui.";
+        if (newReactionKey === null && oldReactionKey) {
+            message = "Reaksi berhasil dihapus.";
+        } else if (newReactionKey && newReactionKey === oldReactionKey) {
+            message = "Reaksi tidak berubah (sudah ada).";
+        } else if (newReactionKey) {
+            message = "Reaksi berhasil ditambahkan.";
+        }
+
+        return { status: true, ...result, message: message };
     } catch (error: any) {
         console.error("Error toggling reply reaction:", error);
         return { status: false, newReactions: {}, message: error.message || "Gagal mengubah status reaksi." };

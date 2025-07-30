@@ -1,0 +1,45 @@
+// components/logo/JustNameLogo.tsx
+import React from 'react';
+
+const JustNameLogo = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2236.96 476.92">
+        <g id="Layer_2" data-name="Layer 2">
+            <text
+                transform="translate(38.52 354.55)"
+                style={{
+                    fontSize: '384.90167236328125px',
+                    fill: '#fff',
+                    fontFamily: 'Poppins-Bold, Poppins',
+                    fontWeight: 700,
+                }}
+            >
+                DailyCek
+            </text>
+            <circle
+                cx="1802.98"
+                cy="343.51"
+                r="27.96"
+                style={{
+                    fill: '#fff',
+                    stroke: '#231f20',
+                    strokeMiterlimit: 10,
+                    strokeWidth: 13,
+                }}
+            />
+            <text
+                transform="translate(1903.95 353.19)"
+                style={{
+                    fontSize: '384.90167236328125px',
+                    fill: '#818386',
+                    fontFamily: 'Poppins-Bold, Poppins',
+                    fontWeight: 700,
+                    opacity: 0.6,
+                }}
+            >
+                it
+            </text>
+        </g>
+    </svg>
+);
+
+export default JustNameLogo;
