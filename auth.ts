@@ -7,7 +7,7 @@ import { compare } from "bcrypt";
 import { login, loginWithGithub, loginWithGoogle } from "@/lib/firebase/service";
 import type { User } from "@/types/types";
 import type {
-    Account,
+    // Account,
     DefaultSession,
     Profile,
 } from "@auth/core/types";
@@ -20,7 +20,7 @@ declare module "next-auth" {
             id: string;
             username: string;
             email: string;
-            role: "admin" | "user";
+            role: "admin" | "user" | "banned";
             loginType: "email" | "github" | "google";
             avatar: string; // Properti avatar kustom yang diinginkan
             dailyTokens: number;
@@ -34,15 +34,14 @@ declare module "next-auth" {
         id: string;
         username: string;
         email: string;
-        role: "admin" | "user";
+        role: "admin" | "user" | "banned"; // Tambahkan 'banned' role di JWT juga
         loginType: "email" | "github" | "google";
         avatar: string; // Properti avatar kustom yang diinginkan
         dailyTokens: number;
         maxDailyTokens: number;
         lastResetDate: string;
         totalUsage: number;
-        // Hapus properti 'image' bawaan dari JWT jika Anda tidak ingin menyimpannya sama sekali
-        // image?: string; // Jika Anda tetap ingin ada di JWT tapi tidak di session.user
+        // Tidak perlu mendeklarasikan image?: string; di sini jika kita ingin menghapusnya sepenuhnya
     }
 }
 
@@ -83,8 +82,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             }
         }),
         GoogleProvider({
-            clientId: process.env.AUTH_GOOGLE_ID! as string,
-            clientSecret: process.env.AUTH_GOOGLE_SECRET! as string,
+            clientId: process.env.AUTH_GOOGLE_ID as string,
+            clientSecret: process.env.AUTH_GOOGLE_SECRET as string,
             profile(profile: Record<string, any>) {
                 return {
                     id: profile.sub,
@@ -95,8 +94,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             },
         }),
         GitHubProvider({
-            clientId: process.env.GITHUB_CLIENT_ID! as string,
-            clientSecret: process.env.GITHUB_CLIENT_SECRET! as string,
+            clientId: process.env.GITHUB_CLIENT_ID as string,
+            clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
             profile(profile: Record<string, any>) {
                 return {
                     id: String(profile.id),
@@ -135,6 +134,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     image: githubProfile.avatar_url || null,
                 });
             } else if (token.email) {
+                // Jika sudah ada token dan email, coba ambil dari DB untuk memastikan data terbaru
                 const userFromDb = await login({ email: token.email as string });
                 if (userFromDb) {
                     dbUser = userFromDb as User;
@@ -148,14 +148,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 token.role = dbUser.role;
                 token.loginType = dbUser.loginType;
                 token.avatar = dbUser.avatar; // Ini adalah properti avatar kustom kita
-                // Hapus properti 'image' bawaan NextAuth dari JWT jika ada
-                // Ini penting jika 'image' di token masih muncul meskipun Anda tidak menyetelnya.
-                delete token.image; // <--- Hapus properti 'image' di sini
+
+                // Hapus properti 'image' bawaan NextAuth dari JWT
+                delete token.image;
 
                 token.dailyTokens = dbUser.dailyTokens;
                 token.maxDailyTokens = dbUser.maxDailyTokens;
                 token.lastResetDate = dbUser.lastResetDate;
                 token.totalUsage = dbUser.totalUsage;
+
+                // Pastikan `isBanned` juga ada di token
+                if (dbUser.isBanned !== undefined) {
+                    token.isBanned = dbUser.isBanned;
+                }
             }
             return token;
         },
@@ -164,29 +169,31 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 session.user.id = token.id as string;
                 session.user.username = token.username as string;
                 session.user.email = token.email as string;
-                session.user.role = token.role as "admin" | "user";
+                session.user.role = token.role as "admin" | "user" | "banned"; // Pastikan role ada
                 session.user.loginType = token.loginType as "email" | "github" | "google";
                 session.user.avatar = token.avatar as string; // Gunakan properti avatar kustom dari token
+
                 // Hapus properti 'image' dan 'name' bawaan dari session.user
-                // Karena kita sudah mendefinisikan 'username' dan 'avatar' secara eksplisit
-                // dan ingin mereka menjadi satu-satunya sumber kebenaran.
-                // Property 'name' juga bawaan NextAuth, bisa dihapus jika 'username' sudah cukup.
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
-                delete session.user.image; // <--- Hapus properti 'image' di sini
+                delete session.user.image;
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
-                delete session.user.name; // <--- Hapus properti 'name' bawaan jika Anda hanya ingin 'username'
+                delete session.user.name;
 
                 session.user.dailyTokens = token.dailyTokens as number;
                 session.user.maxDailyTokens = token.maxDailyTokens as number;
                 session.user.lastResetDate = token.lastResetDate as string;
                 session.user.totalUsage = token.totalUsage as number;
 
+                // Logic reset token harian
                 const todayDate = getTodayDateString();
                 if (session.user.lastResetDate !== todayDate) {
                     session.user.dailyTokens = session.user.maxDailyTokens;
                     session.user.lastResetDate = todayDate;
+                    // TODO: Update Firestore with new dailyTokens and lastResetDate for this user
+                    // This should ideally be done in a non-blocking way, perhaps via a separate API call
+                    // or a Cloud Function triggered by lastLogin. For simplicity, client can update.
                 }
             }
             return session;

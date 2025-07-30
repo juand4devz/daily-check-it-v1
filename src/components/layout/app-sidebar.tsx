@@ -5,7 +5,6 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
     Brain,
-    Computer,
     Home,
     Settings,
     Users,
@@ -18,7 +17,9 @@ import {
     User2,
     Bell,
     TagIcon,
-    Waypoints, // Import LucideIcon type for icon components
+    Waypoints,
+    Flag,
+    Boxes, // Import LucideIcon type for icon components
 } from "lucide-react"
 
 import {
@@ -48,6 +49,7 @@ import { Button } from "@/components/ui/button"
 import { useSession } from "next-auth/react"
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
 import { Skeleton } from "../ui/skeleton"
+import { ScrollArea } from "../ui/scroll-area"
 
 // --- Tipe untuk Struktur Navigasi ---
 interface NavItem {
@@ -74,7 +76,7 @@ const mainNavigation: NavItem[] = [
     {
         title: "Diagnose",
         href: "/diagnose",
-        icon: Computer,
+        icon: Boxes,
     },
 ]
 
@@ -120,6 +122,12 @@ const adminNavigation: NavItem[] = [
         title: "User Management",
         href: "/admin/users",
         icon: Users,
+        exactMatch: true,
+    },
+    {
+        title: "Reports",
+        href: "/admin/reports",
+        icon: Flag,
         exactMatch: true,
     },
 ]
@@ -224,18 +232,42 @@ export function SidebarNav({ className, ...props }: SidebarNavProps) {
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarHeader>
-            <SidebarContent>
-                {navigationGroups.map((group) => (
-                    <SidebarGroup key={group.label}>
-                        <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-                        <SidebarGroupContent>
-                            <SidebarMenu>
-                                {group.items.map(renderSidebarItem)}
-                            </SidebarMenu>
-                        </SidebarGroupContent>
-                    </SidebarGroup>
-                ))}
+            <SidebarContent className="relative group">
+                {/* Kontainer scroll hanya tampil saat sidebar tidak collapse */}
+                <div className="hidden data-[collapsible=icon]:hidden group-data-[collapsible=icon]:hidden sm:block h-full w-full">
+                    <ScrollArea className="h-full max-h-[calc(100vh-4rem)] pr-2">
+                        <div className="flex flex-col gap-2">
+                            {navigationGroups.map((group) => (
+                                <SidebarGroup key={group.label}>
+                                    <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+                                    <SidebarGroupContent>
+                                        <SidebarMenu>
+                                            {group.items.map(renderSidebarItem)}
+                                        </SidebarMenu>
+                                    </SidebarGroupContent>
+                                </SidebarGroup>
+                            ))}
+                        </div>
+                    </ScrollArea>
+                </div>
+
+                {/* Versi tanpa scroll (misalnya icon-only, bisa diatur beda jika perlu) */}
+                <div className="block data-[collapsible=icon]:block group-data-[collapsible=icon]:block sm:hidden h-full w-full">
+                    <div className="flex flex-col gap-2">
+                        {navigationGroups.map((group) => (
+                            <SidebarGroup key={group.label}>
+                                <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+                                <SidebarGroupContent>
+                                    <SidebarMenu>
+                                        {group.items.map(renderSidebarItem)}
+                                    </SidebarMenu>
+                                </SidebarGroupContent>
+                            </SidebarGroup>
+                        ))}
+                    </div>
+                </div>
             </SidebarContent>
+
             <SidebarFooter>
                 <SidebarMenu>
                     <SidebarMenuItem>

@@ -25,7 +25,7 @@ export default function GeneralLayout({ children }: MainLayoutProps) {
 
     return (
         <SessionProvider >
-            <ImageKitProvider urlEndpoint={process.env.IMAGEKIT_URL_ENDPOINT!}>
+            <ImageKitProvider urlEndpoint={process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT!}>
                 <ThemeProvider
                     attribute="class"
                     defaultTheme="system"

@@ -1,195 +1,290 @@
-"use client"
+// /app/notifications/page.tsx
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { toast } from "sonner"
-import { Bell, Check, Trash2, CheckCheck, X, User, MessageSquare, Settings, AlertCircle } from "lucide-react"
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { useSession } from "next-auth/react"; // Import useSession
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
+import { Bell, Check, Trash2, CheckCheck, X, MessageSquare, Settings, AtSign, ThumbsUp } from "lucide-react";
+import { formatTimeAgo } from "@/lib/utils/date-utils"; // Import formatTimeAgo
 
-interface Notification {
-    id: string
-    type: "welcome" | "diagnosis" | "forum" | "system" | "account"
-    title: string
-    message: string
-    read: boolean
-    createdAt: string
-}
+// Firestore imports for real-time listeners
+import { clientDb } from "@/lib/firebase/firebase-client";
+import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
 
-const mockNotifications: Notification[] = [
-    {
-        id: "1",
-        type: "welcome",
-        title: "Selamat Datang!",
-        message: "Terima kasih telah bergabung dengan Sistem Diagnosa Pakar. Mulai diagnosa pertama Anda sekarang!",
-        read: false,
-        createdAt: "2024-01-20T10:30:00Z",
-    },
-    {
-        id: "2",
-        type: "diagnosis",
-        title: "Diagnosa Selesai",
-        message: "Hasil diagnosa untuk masalah 'Komputer tidak bisa booting' telah tersedia. Tingkat kepercayaan: 85%",
-        read: false,
-        createdAt: "2024-01-21T14:15:00Z",
-    },
-    {
-        id: "3",
-        type: "forum",
-        title: "Balasan Baru",
-        message: "Ada balasan baru untuk pertanyaan Anda tentang 'Masalah Blue Screen'",
-        read: true,
-        createdAt: "2024-01-22T09:30:00Z",
-    },
-    {
-        id: "4",
-        type: "system",
-        title: "Pembaruan Sistem",
-        message: "Sistem telah diperbarui dengan algoritma diagnosa yang lebih akurat",
-        read: false,
-        createdAt: "2024-01-23T08:00:00Z",
-    },
-    {
-        id: "5",
-        type: "account",
-        title: "Profil Diperbarui",
-        message: "Profil Anda telah berhasil diperbarui",
-        read: true,
-        createdAt: "2024-01-25T15:45:00Z",
-    },
-    {
-        id: "6",
-        type: "forum",
-        title: "Post Disukai",
-        message: "Post Anda 'Tips Maintenance PC' mendapat 10 likes baru",
-        read: false,
-        createdAt: "2024-01-26T11:20:00Z",
-    },
-]
+// --- Interface Notifikasi & Tipe Terkait (dari @/types/forum) ---
+import { Notification, NotificationType } from "@/types/forum";
+import { Skeleton } from "@/components/ui/skeleton";
 
-const getNotificationIcon = (type: string) => {
+
+// --- Fungsi untuk mendapatkan ikon notifikasi ---
+const getNotificationIcon = (type: NotificationType) => {
     switch (type) {
-        case "welcome":
-            return <User className="h-4 w-4" />
-        case "diagnosis":
-            return <AlertCircle className="h-4 w-4" />
-        case "forum":
-            return <MessageSquare className="h-4 w-4" />
+        case "forum_comment_on_post":
+        case "forum_reply_to_comment":
+            return <MessageSquare className="h-4 w-4" />;
+        case "forum_like_post":
+            return <ThumbsUp className="h-4 w-4" />;
+        case "forum_mention":
+            return <AtSign className="h-4 w-4" />;
+        case "forum_solution_marked":
+            return <Check className="h-4 w-4" />; // Or a custom solution icon
         case "system":
-            return <Settings className="h-4 w-4" />
-        case "account":
-            return <User className="h-4 w-4" />
+            return <Settings className="h-4 w-4" />;
         default:
-            return <Bell className="h-4 w-4" />
+            return <Bell className="h-4 w-4" />;
     }
-}
+};
 
-const getNotificationColor = (type: string): string => {
+// --- Fungsi untuk mendapatkan warna ikon notifikasi ---
+const getNotificationColor = (type: NotificationType): string => {
     switch (type) {
-        case "welcome":
-            return "bg-blue-500"
-        case "diagnosis":
-            return "bg-green-500"
-        case "forum":
-            return "bg-purple-500"
+        case "forum_comment_on_post":
+        case "forum_reply_to_comment":
+        case "forum_mention":
+            return "bg-purple-500";
+        case "forum_like_post":
+            return "bg-pink-500";
+        case "forum_solution_marked":
+            return "bg-green-500";
         case "system":
-            return "bg-orange-500"
-        case "account":
-            return "bg-gray-500"
+            return "bg-orange-500";
         default:
-            return "bg-blue-500"
+            return "bg-blue-500";
     }
-}
+};
 
 export default function NotificationsPage() {
-    const [notifications, setNotifications] = useState<Notification[]>(mockNotifications)
-    const [activeTab, setActiveTab] = useState("all")
+    const { data: session, status } = useSession();
+    const userId = session?.user?.id;
 
-    const unreadCount = notifications.filter((n) => !n.read).length
-    const readCount = notifications.filter((n) => n.read).length
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<"all" | "unread" | "read">("all");
 
-    const filteredNotifications = notifications.filter((notification) => {
-        if (activeTab === "unread") return !notification.read
-        if (activeTab === "read") return notification.read
-        return true
-    })
+    const router = useRouter();
 
-    const markAsRead = (id: string) => {
-        setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)))
-        toast.success("Notifikasi ditandai sebagai sudah dibaca")
-    }
+    // Redirect if not authenticated
+    useEffect(() => {
+        if (status === "loading") return;
+        if (!userId) {
+            toast.error("Anda harus login untuk melihat notifikasi.", { duration: 3000 });
+            router.push("/login");
+            return;
+        }
+        setLoading(false); // Set loading false after auth check
+    }, [userId, status, router]);
 
-    const markAllAsRead = () => {
+    // --- Real-time Notifications with Firestore Snapshot ---
+    useEffect(() => {
+        if (!userId) return; // Don't fetch if user not logged in
+
+        setLoading(true);
+        const notificationsCollectionRef = collection(clientDb, "notifications");
+        const q = query(
+            notificationsCollectionRef,
+            where("userId", "==", userId),
+            orderBy("createdAt", "desc") // Newest first
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const fetchedNotifications: Notification[] = [];
+            snapshot.forEach((doc) => {
+                fetchedNotifications.push({ id: doc.id, ...(doc.data() as Omit<Notification, 'id'>) });
+            });
+            setNotifications(fetchedNotifications);
+            setLoading(false); // Data loaded
+        }, (error) => {
+            console.error("Error listening to notifications:", error);
+            toast.error("Error real-time notifikasi", { description: "Gagal memuat notifikasi secara real-time." });
+            setLoading(false);
+        });
+
+        // Cleanup listener on component unmount
+        return () => unsubscribe();
+    }, [userId]); // Re-run effect if userId changes
+
+    const unreadCount = notifications.filter((n) => !n.read).length;
+    const readCount = notifications.filter((n) => n.read).length;
+
+    const filteredNotifications = useMemo(() => {
+        return notifications.filter((notification) => {
+            if (activeTab === "unread") return !notification.read;
+            if (activeTab === "read") return notification.read;
+            return true;
+        });
+    }, [notifications, activeTab]);
+
+    // --- Action Handlers ---
+
+    // Menandai notifikasi sebagai sudah dibaca
+    const markAsRead = useCallback(async (id: string) => {
+        try {
+            const response = await fetch(`/api/forum/notifications/${id}`, { method: "PATCH" });
+            const data = await response.json();
+            if (!response.ok || !data.status) {
+                throw new Error(data.message || "Gagal menandai notifikasi.");
+            }
+            toast.success("Notifikasi ditandai sebagai sudah dibaca.");
+            // State will be updated by snapshot listener automatically
+        } catch (error) {
+            console.error("Error marking notification as read:", error);
+            toast.error("Gagal menandai notifikasi.", { description: (error as Error).message });
+        }
+    }, []);
+
+    // Menandai semua notifikasi sebagai sudah dibaca
+    const markAllAsRead = useCallback(() => {
+        if (!userId) {
+            toast.error("Anda harus login untuk melakukan aksi ini.");
+            return;
+        }
         toast("Tandai Semua Sebagai Dibaca", {
             description: "Apakah Anda yakin ingin menandai semua notifikasi sebagai sudah dibaca?",
             action: {
                 label: "Konfirmasi",
-                onClick: () => {
-                    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
-                    toast.success("Semua notifikasi ditandai sebagai sudah dibaca")
+                onClick: async () => {
+                    try {
+                        const response = await fetch("/api/forum/notifications", { method: "PATCH" });
+                        const data = await response.json();
+                        if (!response.ok || !data.status) {
+                            throw new Error(data.message || "Gagal menandai semua notifikasi.");
+                        }
+                        toast.success("Semua notifikasi ditandai sebagai sudah dibaca.");
+                        // State will be updated by snapshot listener automatically
+                    } catch (error) {
+                        console.error("Error marking all notifications as read:", error);
+                        toast.error("Gagal menandai semua notifikasi.", { description: (error as Error).message });
+                    }
                 },
             },
             cancel: {
                 label: "Batal",
                 onClick: () => toast.dismiss(),
             },
-        })
-    }
+        });
+    }, [userId]);
 
-    const deleteNotification = (id: string) => {
-        const notification = notifications.find((n) => n.id === id)
-        if (!notification) return
-
+    // Menghapus notifikasi individu
+    const deleteNotification = useCallback((id: string) => {
+        if (!userId) {
+            toast.error("Anda harus login untuk melakukan aksi ini.");
+            return;
+        }
         toast("Hapus Notifikasi", {
             description: "Apakah Anda yakin ingin menghapus notifikasi ini?",
             action: {
                 label: "Hapus",
-                onClick: () => {
-                    setNotifications((prev) => prev.filter((n) => n.id !== id))
-                    toast.success("Notifikasi berhasil dihapus")
+                onClick: async () => {
+                    try {
+                        const response = await fetch(`/api/forum/notifications/${id}`, { method: "DELETE" });
+                        const data = await response.json();
+                        if (!response.ok || !data.status) {
+                            throw new Error(data.message || "Gagal menghapus notifikasi.");
+                        }
+                        toast.success("Notifikasi berhasil dihapus.");
+                        // State will be updated by snapshot listener automatically
+                    } catch (error) {
+                        console.error("Error deleting notification:", error);
+                        toast.error("Gagal menghapus notifikasi.", { description: (error as Error).message });
+                    }
                 },
             },
             cancel: {
                 label: "Batal",
                 onClick: () => toast.dismiss(),
             },
-        })
-    }
+        });
+    }, [userId]);
 
-    const clearAllNotifications = () => {
+    // Menghapus semua notifikasi
+    const clearAllNotifications = useCallback(() => {
+        if (!userId) {
+            toast.error("Anda harus login untuk melakukan aksi ini.");
+            return;
+        }
         toast("Hapus Semua Notifikasi", {
             description: "Apakah Anda yakin ingin menghapus semua notifikasi? Tindakan ini tidak dapat dibatalkan.",
             action: {
                 label: "Hapus Semua",
-                onClick: () => {
-                    setNotifications([])
-                    toast.success("Semua notifikasi berhasil dihapus")
+                onClick: async () => {
+                    try {
+                        const response = await fetch("/api/forum/notifications", { method: "DELETE" });
+                        const data = await response.json();
+                        if (!response.ok || !data.status) {
+                            throw new Error(data.message || "Gagal menghapus semua notifikasi.");
+                        }
+                        toast.success("Semua notifikasi berhasil dihapus.");
+                        // State will be updated by snapshot listener automatically
+                    } catch (error) {
+                        console.error("Error deleting all notifications:", error);
+                        toast.error("Gagal menghapus semua notifikasi.", { description: (error as Error).message });
+                    }
                 },
             },
             cancel: {
                 label: "Batal",
                 onClick: () => toast.dismiss(),
             },
-        })
-    }
+        });
+    }, [userId]);
 
-    const formatDate = (dateString: string): string => {
-        const date = new Date(dateString)
-        const now = new Date()
-        const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60))
+    // --- Handler saat notifikasi diklik ---
+    const handleNotificationClick = useCallback((notification: Notification) => {
+        // Tandai sebagai dibaca saat diklik
+        if (!notification.read) {
+            markAsRead(notification.id);
+        }
 
-        if (diffInHours < 1) return "Baru saja"
-        if (diffInHours < 24) return `${diffInHours} jam yang lalu`
+        // Arahkan pengguna berdasarkan tipe notifikasi dan link
+        if (notification.link) {
+            router.push(notification.link);
+        } else if (notification.postId) {
+            // Default to post detail page if specific link not provided but postId exists
+            const fragment = notification.replyId ? `#comment-${notification.replyId}` : '';
+            router.push(`/forum/${notification.postId}${fragment}`);
+        } else {
+            toast.info("Tidak ada tautan untuk notifikasi ini.");
+        }
+    }, [router, markAsRead]);
 
-        const diffInDays = Math.floor(diffInHours / 24)
-        if (diffInDays < 7) return `${diffInDays} hari yang lalu`
-
-        return date.toLocaleDateString("id-ID", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-        })
+    if (loading) {
+        return (
+            <div className="mx-2 md:mx-4 py-6 space-y-6">
+                <div className="flex items-center justify-between">
+                    <Skeleton className="h-8 w-64" />
+                    <div className="flex gap-2">
+                        <Skeleton className="h-9 w-32" />
+                        <Skeleton className="h-9 w-28" />
+                    </div>
+                </div>
+                <Card>
+                    <CardHeader>
+                        <Skeleton className="h-6 w-48" />
+                        <Skeleton className="h-4 w-96" />
+                    </CardHeader>
+                    <CardContent>
+                        <Skeleton className="h-10 w-full mb-6" />
+                        <div className="space-y-4">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                                <div key={i} className="flex items-start space-x-4 p-4 rounded-lg border">
+                                    <Skeleton className="h-10 w-10 rounded-full" />
+                                    <div className="flex-1 space-y-2">
+                                        <Skeleton className="h-4 w-3/4" />
+                                        <Skeleton className="h-3 w-full" />
+                                        <Skeleton className="h-3 w-24" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        );
     }
 
     return (
@@ -252,8 +347,8 @@ export default function NotificationsPage() {
                                     {filteredNotifications.map((notification) => (
                                         <div
                                             key={notification.id}
-                                            className={`flex items-start space-x-4 p-4 rounded-lg border transition-colors ${!notification.read ? "bg-muted/50 border-primary/20" : "bg-background"
-                                                }`}
+                                            className={`flex items-start space-x-4 p-4 rounded-lg border transition-colors cursor-pointer hover:bg-muted/50 ${!notification.read ? "bg-muted/50 border-primary/20" : "bg-background"}`}
+                                            onClick={() => handleNotificationClick(notification)}
                                         >
                                             <div className={`p-2 rounded-full text-white ${getNotificationColor(notification.type)}`}>
                                                 {getNotificationIcon(notification.type)}
@@ -267,17 +362,26 @@ export default function NotificationsPage() {
                                                     </h4>
                                                     <div className="flex items-center space-x-2">
                                                         {!notification.read && (
-                                                            <Button onClick={() => markAsRead(notification.id)} variant="ghost" size="sm">
+                                                            <Button onClick={(e) => { e.stopPropagation(); markAsRead(notification.id); }} variant="ghost" size="sm" className="h-7 w-7 p-0">
                                                                 <Check className="h-4 w-4" />
                                                             </Button>
                                                         )}
-                                                        <Button onClick={() => deleteNotification(notification.id)} variant="ghost" size="sm">
+                                                        <Button onClick={(e) => { e.stopPropagation(); deleteNotification(notification.id); }} variant="ghost" size="sm" className="h-7 w-7 p-0">
                                                             <X className="h-4 w-4" />
                                                         </Button>
                                                     </div>
                                                 </div>
-                                                <p className="text-sm text-muted-foreground">{notification.message}</p>
-                                                <p className="text-xs text-muted-foreground">{formatDate(notification.createdAt)}</p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {notification.message}
+                                                    {(notification.type === "forum_comment_on_post" ||
+                                                        notification.type === "forum_reply_to_comment" ||
+                                                        notification.type === "forum_mention" ||
+                                                        notification.type === "forum_solution_marked") &&
+                                                        notification.commentContentPreview && (
+                                                            <span className="ml-1 italic">{notification.commentContentPreview}</span>
+                                                        )}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">{formatTimeAgo(notification.createdAt)}</p>
                                             </div>
                                         </div>
                                     ))}
@@ -288,5 +392,5 @@ export default function NotificationsPage() {
                 </CardContent>
             </Card>
         </div>
-    )
+    );
 }

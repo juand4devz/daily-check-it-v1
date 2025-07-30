@@ -1,1645 +1,1099 @@
-"use client"
+// /forum/[id]/page.tsx
+"use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react"
-import { useRouter, useParams } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { toast } from "sonner"
-import { MediaViewer } from "@/components/forum/media-viewer"
-import { MarkdownEditor } from "@/components/forum/markdown-editor"
-import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
-import { Input } from "@/components/ui/input"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+// import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // Tidak digunakan
+import { toast } from "sonner";
+import { MediaViewer } from "@/components/forum/media-viewer";
+import { MarkdownEditor } from "@/components/forum/markdown-editor";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+// import { Input } from "@/components/ui/input"; // Tidak digunakan langsung di sini
 import {
   ArrowLeft,
   MessageSquare,
   Heart,
-  MoreHorizontal,
+  // MoreHorizontal, // Tidak digunakan
   Send,
-  X,
   Eye,
-  Smile,
-  Flag,
+  // Smile, // Tidak digunakan
+  // Flag, // Tidak digunakan
   CheckCircle,
-  Award,
-  Copy,
-  Edit,
-  Trash2,
+  // Award, // Tidak digunakan
+  // Copy, // Tidak digunakan
+  // Edit, // Tidak digunakan
+  // Trash2, // Tidak digunakan
   Pin,
-  Archive,
+  // Archive, // Tidak digunakan
   Bookmark,
   BookmarkCheck,
-  ExternalLink,
+  // ExternalLink, // Tidak digunakan
   Share2,
-  Clock,
-  Users,
-  TrendingUp,
-  MessageCircle,
-  Loader2,
-  Calendar,
-  Tag,
+  // Clock, // Tidak digunakan
+  // Users, // Tidak digunakan
+  // TrendingUp, // Tidak digunakan
+  // Calendar, // Tidak digunakan
+  // Tag, // Tidak digunakan
   AlertTriangle,
-  Settings,
-  Download,
-  Link,
-  ChevronUp,
-  ChevronDown,
-} from "lucide-react"
-import forumPostsData from "@/data/forum-posts.json"
-import forumRepliesData from "@/data/forum-replies.json"
-import Image from "next/image"
-import { cn } from "@/lib/utils" // Import cn for conditional class names
+  // Settings, // Tidak digunakan
+  // Download, // Tidak digunakan
+  // Link, // Tidak digunakan
+  // ChevronUp, // Tidak digunakan
+  // ChevronDown, // Tidak digunakan
+  BookOpenText,
+  Loader2,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  ForumPost,
+  ForumReply,
+  EMOJI_REACTIONS,
+  ForumMedia,
+  // NotificationType, // Tidak digunakan di page.tsx
+} from "@/types/forum";
+import { getReadingTime, ProcessedForumReply } from "@/lib/utils/forum-utils";
+import { formatTimeAgo } from "@/lib/utils/date-utils";
+import { ReplyItem } from "@/components/forum/ReplyItem";
+import { ReportDialog } from "@/components/shared/ReportDialog";
 
-// Types (copying from previous block to ensure full context)
-interface ForumPost {
-  id: string
-  title: string
-  content: string
-  author: string
-  avatar: string
-  category: string
-  tags: string[]
-  timestamp: string
-  likes: number
-  replies: number
-  views?: number
-  isResolved?: boolean
-  isPinned?: boolean
-  isArchived?: boolean
-  media?: MediaItem[]
-  thumbnail?: string
+import { PostHeaderSkeleton, PostContentSkeleton, CommentSkeleton } from "@/components/ui/skeleton-loader";
+import { PostThumbnail } from "@/components/forum/PostThumbnail";
+import { PostStats } from "@/components/forum/PostStats";
+import { QuickActions } from "@/components/forum/QuickActions";
+import { RelatedPosts } from "@/components/forum/RelatedPosts";
+import { PostActionsPopover } from "@/components/forum/PostActionsPopover";
+
+import { UserState, useUserState } from "@/lib/utils/useUserState";
+import { buildReplyTree, flattenReplies } from "@/lib/utils/forum-utils";
+
+import { clientDb } from "@/lib/firebase/firebase-client";
+import { collection, query, where, orderBy, onSnapshot, doc } from "firebase/firestore";
+
+// import { User as UserType } from "@/types/types"; // Tidak digunakan di sini
+
+import { upload, ImageKitAbortError, ImageKitInvalidRequestError, ImageKitServerError, ImageKitUploadNetworkError } from "@imagekit/next";
+import { Progress } from "@/components/ui/progress";
+
+// NEW INTERFACE: Untuk mengelola file media di state komentar utama
+interface UploadedFileState {
+  file: File | null;
+  previewUrl: string | null;
+  uploadedData: ForumMedia | null;
+  uploading: boolean;
+  progress: number;
+  error: string | null;
 }
 
-interface ForumReply {
-  id: string
-  content: string
-  author: string
-  avatar: string
-  createdAt: string
-  upvotes: number
-  downvotes: number
-  parentId?: string
-  mentions?: string[]
-  isSolution?: boolean
-  reactions?: ReactionMap
-  media?: MediaItem[]
-  isEdited?: boolean
-  editedAt?: string
+// Interface untuk komponen yang diimpor (jika belum ada di file komponen aslinya)
+interface PostActionsPopoverProps {
+  post: ForumPost;
+  isBookmarked: boolean;
+  isPostAuthor: boolean;
+  onAction: (action: string) => Promise<void>;
+  isAdmin: boolean;
+  isLoggedIn: boolean;
 }
 
-interface ProcessedForumReply extends ForumReply {
-  children: ProcessedForumReply[]
+interface MarkdownEditorProps {
+  textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
+  value: string;
+  onChange: (value: string) => void;
+  onMediaFilesChange?: (files: File[]) => void;
+  onRemoveMedia?: (id: string) => void;
+  placeholder?: string;
+  rows?: number;
+  disabled?: boolean;
+  isUploadingMedia?: boolean;
+  mediaPreviews?: {
+    id: string;
+    url: string;
+    filename: string;
+    uploading?: boolean;
+    progress?: number;
+    uploadedUrl?: string;
+    type?: "image" | "video";
+  }[];
+  className?: string;
+  allAvailableMentions?: { id: string; username: string }[];
+  showMediaInput?: boolean;
 }
 
-interface MediaItem {
-  type: "image" | "video"
-  url: string
-  thumbnail?: string
+interface MediaViewerProps {
+  media: ForumMedia[];
 }
 
-interface ReactionMap {
-  [key: string]: string[]
-}
 
-interface UserState {
-  votes: { [replyId: string]: "up" | "down" | null }
-  reactions: { [replyId: string]: string[] }
-  bookmarks: string[]
-}
-
-// Constants
-const EMOJI_REACTIONS = [
-  { emoji: "👍", label: "Like", key: "like" },
-  { emoji: "❤️", label: "Love", key: "love" },
-  { emoji: "😂", label: "Laugh", key: "laugh" },
-  { emoji: "😮", label: "Wow", key: "wow" },
-  { emoji: "😢", label: "Sad", key: "sad" },
-  { emoji: "😡", label: "Angry", key: "angry" },
-] as const
-
-const CURRENT_USER = "CurrentUser" // Simulating current user
-const IS_ADMIN = true // Simulating admin status
-
-const COMMENT_TRUNCATE_LIMIT = 500 // Characters limit for comments
-const NESTED_REPLIES_DISPLAY_COUNT = 0 // Default to 0 nested replies shown
-
-// Utility functions (copying to ensure full context)
-const formatTimeAgo = (timestamp: string): string => {
-  const now = new Date()
-  const time = new Date(timestamp)
-  const diffInSeconds = Math.floor((now.getTime() - time.getTime()) / 1000)
-
-  if (diffInSeconds < 60) return "Baru saja"
-  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} menit yang lalu`
-  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} jam yang lalu`
-  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} hari yang lalu`
-
-  return time.toLocaleDateString("id-ID", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  })
-}
-
-const getStoredUserState = (): UserState => {
-  if (typeof window === "undefined") {
-    return { votes: {}, reactions: {}, bookmarks: [] }
-  }
-
-  try {
-    const stored = localStorage.getItem("forum-user-state")
-    return stored ? JSON.parse(stored) : { votes: {}, reactions: {}, bookmarks: [] }
-  } catch {
-    return { votes: {}, reactions: {}, bookmarks: [] }
-  }
-}
-
-const saveUserState = (state: UserState) => {
-  if (typeof window !== "undefined") {
-    try {
-      localStorage.setItem("forum-user-state", JSON.stringify(state))
-    } catch (error) {
-      console.error("Failed tosave user state:", error)
-    }
-  }
-}
-
-// Function to build reply tree from flat list
-const buildReplyTree = (replies: ForumReply[]): ProcessedForumReply[] => {
-  const map = new Map<string, ProcessedForumReply>()
-  const roots: ProcessedForumReply[] = []
-
-  replies.forEach((reply) => {
-    map.set(reply.id, { ...reply, children: [] })
-  })
-
-  replies.forEach((reply) => {
-    const processedReply = map.get(reply.id)!
-    if (reply.parentId) {
-      const parent = map.get(reply.parentId)
-      if (parent) {
-        parent.children.push(processedReply)
-      } else {
-        roots.push(processedReply)
-      }
-    } else {
-      roots.push(processedReply)
-    }
-  })
-
-  map.forEach((value) => {
-    value.children.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-  })
-
-  return roots.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-}
-
-// Helper to flatten the tree back to a list for easier addition
-const flattenReplies = (replies: ProcessedForumReply[]): ForumReply[] => {
-  let flat: ForumReply[] = []
-  replies.forEach((reply) => {
-    const { children, ...rest } = reply
-    flat.push(rest)
-    if (children && children.length > 0) {
-      flat = flat.concat(flattenReplies(children))
-    }
-  })
-  return flat
-}
-
-// Helper function to update solution status in the nested tree
-const updateSolutionStatusInTree = (
-  reply: ProcessedForumReply,
-  targetReplyId: string,
-  newStatus: boolean,
-): ProcessedForumReply => {
-  const updatedReply = { ...reply }
-  if (reply.id === targetReplyId) {
-    updatedReply.isSolution = newStatus
-  }
-  updatedReply.children = updatedReply.children.map((child) =>
-    updateSolutionStatusInTree(child, targetReplyId, newStatus),
-  )
-  return updatedReply
-}
-
-// Custom hooks
-const useUserState = () => {
-  const [userState, setUserState] = useState<UserState>(getStoredUserState)
-
-  const updateUserState = useCallback((updates: Partial<UserState>) => {
-    setUserState((prev) => {
-      const newState = { ...prev, ...updates }
-      saveUserState(newState)
-      return newState
-    })
-  }, [])
-
-  return { userState, updateUserState }
-}
-
-// Skeleton Components (copying to ensure full context)
-const PostHeaderSkeleton = () => (
-  <div className="space-y-4">
-    <div className="flex items-center gap-3">
-      <Skeleton className="h-12 w-12 rounded-full" />
-      <div className="space-y-2">
-        <Skeleton className="h-4 w-32" />
-        <Skeleton className="h-3 w-24" />
-      </div>
-    </div>
-    <Skeleton className="h-8 w-3/4" />
-    <div className="flex gap-2">
-      <Skeleton className="h-6 w-20" />
-      <Skeleton className="h-6 w-16" />
-      <Skeleton className="h-6 w-24" />
-    </div>
-  </div>
-)
-
-const PostContentSkeleton = () => (
-  <div className="space-y-4">
-    <div className="space-y-2">
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-4 w-full" />
-      <Skeleton className="h-4 w-3/4" />
-    </div>
-    <Skeleton className="h-64 w-full rounded-lg" />
-    <div className="flex items-center gap-4">
-      <Skeleton className="h-8 w-16" />
-      <Skeleton className="h-8 w-20" />
-      <Skeleton className="h-8 w-24" />
-    </div>
-  </div>
-)
-
-const CommentSkeleton = () => (
-  <Card className="mb-4">
-    <CardContent className="p-4">
-      <div className="flex gap-3">
-        <div className="flex flex-col items-center gap-1 mr-2">
-          <Skeleton className="h-8 w-8" />
-          <Skeleton className="h-4 w-6" />
-          <Skeleton className="h-8 w-8" />
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-2">
-            <Skeleton className="h-8 w-8 rounded-full" />
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-3 w-16" />
-          </div>
-          <div className="space-y-2 mb-3">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-3/4" />
-          </div>
-          <div className="flex gap-2">
-            <Skeleton className="h-6 w-12" />
-            <Skeleton className="h-6 w-14" />
-            <Skeleton className="h-6 w-16" />
-          </div>
-        </div>
-      </div>
-    </CardContent>
-  </Card>
-)
-
-const SidebarSkeleton = () => (
-  <div className="space-y-4">
-    <Card>
-      <CardHeader>
-        <Skeleton className="h-6 w-32" />
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="text-center p-3 bg-gray-50 dark:bg-zinc-700 rounded-lg">
-            <Skeleton className="h-8 w-12 mx-auto mb-1" />
-            <Skeleton className="h-3 w-8 mx-auto" />
-          </div>
-          <div className="text-center p-3 bg-gray-50 dark:bg-zinc-700 rounded-lg">
-            <Skeleton className="h-8 w-12 mx-auto mb-1" />
-            <Skeleton className="h-3 w-8 mx-auto" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-    <Card>
-      <CardContent className="p-4 space-y-3">
-        <Skeleton className="h-8 w-full" />
-        <Skeleton className="h-8 w-full" />
-        <Skeleton className="h-8 w-full" />
-      </CardContent>
-    </Card>
-  </div>
-)
-
-// Components (copying to ensure full context)
-const PostActionsPopover = ({
-  post,
-  isBookmarked,
-  isPostAuthor,
-  onAction,
-}: {
-  post: ForumPost
-  isBookmarked: boolean
-  isPostAuthor: boolean
-  onAction: (action: string) => void
-}) => (
-  <Popover>
-    <PopoverTrigger asChild>
-      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-gray-100">
-        <MoreHorizontal className="h-4 w-4" />
-        <span className="sr-only">Opsi post</span>
-      </Button>
-    </PopoverTrigger>
-    <PopoverContent className="w-56 p-2" align="end">
-      <div className="space-y-1">
-        <Button variant="ghost" size="sm" className="w-full justify-start h-8" onClick={() => onAction("share-link")}>
-          <Copy className="h-4 w-4 mr-2" />
-          Salin Link
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start h-8"
-          onClick={() => onAction("share-external")}
-        >
-          <ExternalLink className="h-4 w-4 mr-2" />
-          Buka di Tab Baru
-        </Button>
-        <Button variant="ghost" size="sm" className="w-full justify-start h-8" onClick={() => onAction("bookmark")}>
-          {isBookmarked ? (
-            <>
-              <BookmarkCheck className="h-4 w-4 mr-2" />
-              Hapus Bookmark
-            </>
-          ) : (
-            <>
-              <Bookmark className="h-4 w-4 mr-2" />
-              Bookmark
-            </>
-          )}
-        </Button>
-        <Button variant="ghost" size="sm" className="w-full justify-start h-8" onClick={() => onAction("download")}>
-          <Download className="h-4 w-4 mr-2" />
-          Download Media
-        </Button>
-        <Separator className="my-1" />
-        {(isPostAuthor || IS_ADMIN) && (
-          <>
-            <Button variant="ghost" size="sm" className="w-full justify-start h-8" onClick={() => onAction("edit")}>
-              <Edit className="h-4 w-4 mr-2" />
-              Edit Post
-            </Button>
-            {IS_ADMIN && (
-              <Button variant="ghost" size="sm" className="w-full justify-start h-8" onClick={() => onAction("pin")}>
-                <Pin className="h-4 w-4 mr-2" />
-                {post.isPinned ? "Lepas Pin" : "Pin Post"}
-              </Button>
-            )}
-            {IS_ADMIN && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full justify-start h-8"
-                onClick={() => onAction("archive")}
-              >
-                <Archive className="h-4 w-4 mr-2" />
-                {post.isArchived ? "Buka Arsip" : "Arsipkan"}
-              </Button>
-            )}
-            <Separator className="my-1" />
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-              onClick={() => onAction("delete")}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Hapus Post
-            </Button>
-          </>
-        )}
-        {!isPostAuthor && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-            onClick={() => onAction("report")}
-          >
-            <Flag className="h-4 w-4 mr-2" />
-            Laporkan
-          </Button>
-        )}
-      </div>
-    </PopoverContent>
-  </Popover>
-)
-
-const CommentActionsPopover = ({
-  reply,
-  isAuthor,
-  onAction,
-}: {
-  reply: ForumReply
-  isAuthor: boolean
-  onAction: (action: string) => void
-}) => (
-  <Popover>
-    <PopoverTrigger asChild>
-      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-gray-100">
-        <MoreHorizontal className="h-3 w-3" />
-        <span className="sr-only">Opsi komentar</span>
-      </Button>
-    </PopoverTrigger>
-    <PopoverContent className="w-48 p-2" align="end">
-      <div className="space-y-1">
-        <Button variant="ghost" size="sm" className="w-full justify-start h-8" onClick={() => onAction("share-link")}>
-          <Link className="h-3 w-3 mr-2" />
-          Salin Link
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start h-8"
-          onClick={() => onAction("share-external")}
-        >
-          <ExternalLink className="h-3 w-3 mr-2" />
-          Buka Link
-        </Button>
-        <Separator className="my-1" />
-        {(isAuthor || IS_ADMIN) && (
-          <>
-            <Button variant="ghost" size="sm" className="w-full justify-start h-8" onClick={() => onAction("edit")}>
-              <Edit className="h-3 w-3 mr-2" />
-              Edit
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-              onClick={() => onAction("delete")}
-            >
-              <Trash2 className="h-3 w-3 mr-2" />
-              Hapus
-            </Button>
-            <Separator className="my-1" />
-          </>
-        )}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-start h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-          onClick={() => onAction("report")}
-        >
-          <Flag className="h-3 w-3 mr-2" />
-          Laporkan
-        </Button>
-      </div>
-    </PopoverContent>
-  </Popover>
-)
-
-const EmojiReactionPopover = ({
-  onSelect,
-  userReactions,
-  replyReactions,
-}: {
-  onSelect: (key: string) => void
-  userReactions: string[]
-  replyReactions: ReactionMap
-}) => (
-  <Popover>
-    <PopoverTrigger asChild>
-      <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
-        <Smile className="h-3 w-3 mr-1" />
-        Reaksi
-      </Button>
-    </PopoverTrigger>
-    <PopoverContent className="w-auto p-2" align="start">
-      <div className="flex gap-1">
-        {EMOJI_REACTIONS.map((reaction) => {
-          const count = replyReactions[reaction.key]?.length || 0
-          const isActive = userReactions.includes(reaction.key)
-          return (
-            <button
-              key={reaction.key}
-              onClick={() => onSelect(reaction.key)}
-              className={cn(
-                "p-2 hover:bg-gray-100 rounded text-lg transition-colors flex items-center gap-1",
-                isActive && "bg-blue-100 text-blue-600", // Highlight if active
-              )}
-              title={reaction.label}
-            >
-              {reaction.emoji}
-              {count > 0 && <span className="text-xs font-medium">{count}</span>}
-            </button>
-          )
-        })}
-      </div>
-    </PopoverContent>
-  </Popover>
-)
-
-const PostThumbnail = ({ post, isLoading }: { post: ForumPost | null; isLoading: boolean }) => {
-  if (isLoading) {
-    return <Skeleton className="w-full h-64 rounded-lg" />
-  }
-
-  if (!post) return null
-
-  const thumbnail = post.thumbnail || (post.media && post.media.length > 0 ? post.media[0].url : null)
-
-  if (!thumbnail) {
-    return (
-      <div className="w-full h-64 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-lg flex items-center justify-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-black/20"></div>
-        <div className="relative z-10 text-center text-white">
-          <MessageSquare className="h-16 w-16 mx-auto mb-4 opacity-80" />
-          <h3 className="text-xl font-semibold mb-2">{post.category}</h3>
-          <p className="text-sm opacity-90">Forum Diskusi</p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="relative w-full h-64 rounded-lg overflow-hidden group">
-      <Image
-        height={500}
-        width={500}
-        src={thumbnail || "/placeholder.svg"}
-        alt={post.title}
-        className="w-full h-full object-cover transition-transform group-hover:scale-105"
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
-      <div className="absolute bottom-4 left-4 right-4 text-white">
-        <Badge variant="secondary" className="bg-black/50 text-white border-0 mb-2">
-          {post.category}
-        </Badge>
-        <h2 className="text-xl font-bold line-clamp-2">{post.title}</h2>
-      </div>
-      {post.media && post.media.length > 1 && (
-        <div className="absolute top-4 right-4">
-          <Badge variant="secondary" className="bg-black/50 text-white border-0">
-            +{post.media.length - 1} media
-          </Badge>
-        </div>
-      )}
-    </div>
-  )
-}
-
-const PostStats = ({
-  post,
-  views,
-  isLiked,
-  isLoading,
-}: {
-  post: ForumPost | null
-  views: number
-  isLiked: boolean
-  isLoading: boolean
-}) => {
-  if (isLoading) {
-    return <SidebarSkeleton />
-  }
-
-  if (!post) return null
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5" />
-          <span className="font-semibold">Statistik Post</span>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="text-center p-3 bg-blue-50 rounded-lg">
-            <div className="flex items-center justify-center gap-1 text-blue-600 mb-1">
-              <Eye className="h-4 w-4" />
-            </div>
-            <div className="text-2xl font-bold text-blue-700">{views.toLocaleString()}</div>
-            <div className="text-xs text-blue-600">Views</div>
-          </div>
-          <div className="text-center p-3 bg-red-50 rounded-lg">
-            <div className="flex items-center justify-center gap-1 text-red-600 mb-1">
-              <Heart className="h-4 w-4" />
-            </div>
-            <div className="text-2xl font-bold text-red-700">{(post.likes + (isLiked ? 1 : 0)).toLocaleString()}</div>
-            <div className="text-xs text-red-600">Likes</div>
-          </div>
-        </div>
-        <Separator />
-        <div className="space-y-3">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600 flex items-center gap-1">
-              <MessageCircle className="h-4 w-4" />
-              Komentar
-            </span>
-            <span className="font-medium">{post.replies}</span>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600 flex items-center gap-1">
-              <Clock className="h-4 w-4" />
-              Status
-            </span>
-            <Badge variant={post.isResolved ? "default" : "secondary"} className="text-xs">
-              {post.isResolved ? "Selesai" : "Belum Selesai"}
-            </Badge>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600 flex items-center gap-1">
-              <Users className="h-4 w-4" />
-              Kategori
-            </span>
-            <Badge variant="outline" className="text-xs">
-              {post.category}
-            </Badge>
-          </div>
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600 flex items-center gap-1">
-              <Calendar className="h-4 w-4" />
-              Dibuat
-            </span>
-            <span className="text-xs text-gray-600">{formatTimeAgo(post.timestamp)}</span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-const QuickActions = ({
-  onBookmark,
-  onShare,
-  onNewPost,
-  isBookmarked,
-  isLoading,
-}: {
-  onBookmark: () => void
-  onShare: () => void
-  onNewPost: () => void
-  isBookmarked: boolean
-  isLoading: boolean
-}) => {
-  if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <Skeleton className="h-8 w-full" />
-          <Skeleton className="h-8 w-full" />
-          <Skeleton className="h-8 w-full" />
-        </CardContent>
-      </Card>
-    )
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Settings className="h-5 w-5" />
-          <span className="font-semibold">Aksi Cepat</span>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <Button
-          variant={isBookmarked ? "default" : "outline"}
-          size="sm"
-          className="w-full justify-start"
-          onClick={onBookmark}
-        >
-          {isBookmarked ? <BookmarkCheck className="h-4 w-4 mr-2" /> : <Bookmark className="h-4 w-4 mr-2" />}
-          {isBookmarked ? "Tersimpan" : "Bookmark Post"}
-        </Button>
-        <Button variant="outline" size="sm" className="w-full justify-start bg-transparent" onClick={onShare}>
-          <Share2 className="h-4 w-4 mr-2" />
-          Bagikan Post
-        </Button>
-        <Button variant="outline" size="sm" className="w-full justify-start bg-transparent" onClick={onNewPost}>
-          <MessageSquare className="h-4 w-4 mr-2" />
-          Buat Post Baru
-        </Button>
-      </CardContent>
-    </Card>
-  )
-}
-
-const RelatedPosts = ({ currentPost, isLoading }: { currentPost: ForumPost | null; isLoading: boolean }) => {
-  const relatedPosts = useMemo(() => {
-    if (!currentPost) return []
-    return forumPostsData.filter((p) => p.id !== currentPost.id && p.category === currentPost.category).slice(0, 3)
-  }, [currentPost])
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-32" />
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="p-3 border rounded-lg">
-              <Skeleton className="h-4 w-full mb-2" />
-              <div className="flex gap-2">
-                <Skeleton className="h-3 w-12" />
-                <Skeleton className="h-3 w-12" />
-                <Skeleton className="h-3 w-16" />
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (relatedPosts.length === 0) return null
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Tag className="h-5 w-5" />
-          <span className="font-semibold">Post Terkait</span>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {relatedPosts.map((relatedPost) => (
-          <div
-            key={relatedPost.id}
-            className="p-3 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors border border-gray-100"
-            onClick={() => (window.location.href = `/forum/${relatedPost.id}`)}
-          >
-            <h4 className="font-medium text-sm line-clamp-2 mb-2">{relatedPost.title}</h4>
-            <div className="flex items-center gap-4 text-xs text-gray-500">
-              <span className="flex items-center gap-1">
-                <MessageSquare className="h-3 w-3" />
-                {relatedPost.replies}
-              </span>
-              <span className="flex items-center gap-1">
-                <Heart className="h-3 w-3" />
-                {relatedPost.likes}
-              </span>
-              <Badge variant="outline" className="text-xs">
-                {relatedPost.category}
-              </Badge>
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  )
-}
-
-interface ReplyItemProps {
-  reply: ProcessedForumReply
-  postAuthor: string
-  onVote: (replyId: string, voteType: "up" | "down") => void
-  onReaction: (replyId: string, reactionKey: string) => void
-  onMarkAsSolution: (replyId: string, isCurrentlySolution: boolean) => void
-  onCommentAction: (replyId: string, action: string) => void
-  userState: UserState
-  onSubmitReply: (content: string, mediaFiles: File[], parentId?: string) => Promise<void>
-  isSubmittingReply: boolean
-  isNested?: boolean
-}
-
-const ReplyItem = ({
-  reply,
-  postAuthor,
-  onVote,
-  onReaction,
-  onMarkAsSolution,
-  onCommentAction,
-  userState,
-  onSubmitReply,
-  isSubmittingReply,
-  isNested = false,
-}: ReplyItemProps) => {
-  const [isInlineReplyExpanded, setIsInlineReplyExpanded] = useState(false)
-  const [inlineReplyContent, setInlineReplyContent] = useState<string>(reply.author ? `@${reply.author} ` : "")
-  const [inlineReplyMedia, setInlineReplyMedia] = useState<File[]>([])
-  const inlineReplyTextareaRef = useRef<HTMLTextAreaElement>(null)
-
-  // State for content truncation
-  const [isContentExpanded, setIsContentExpanded] = useState(false)
-  const showReadMore = reply.content.length > COMMENT_TRUNCATE_LIMIT
-
-  // State for showing/hiding nested children (default to false)
-  const [showNestedReplies, setShowNestedReplies] = useState(false)
-
-  const isReplyAuthor = reply.author === CURRENT_USER
-  const isUpvoted = userState.votes[reply.id] === "up"
-  const isDownvoted = userState.votes[reply.id] === "down"
-
-  const handleReplySubmit = async () => {
-    if (!inlineReplyContent.trim()) return
-    await onSubmitReply(inlineReplyContent, inlineReplyMedia, reply.id)
-    setInlineReplyContent(reply.author ? `@${reply.author} ` : "")
-    setInlineReplyMedia([])
-    setIsInlineReplyExpanded(false)
-  }
-
-  useEffect(() => {
-    if (isInlineReplyExpanded && inlineReplyTextareaRef.current) {
-      inlineReplyTextareaRef.current.focus()
-      const length = inlineReplyTextareaRef.current.value.length
-      inlineReplyTextareaRef.current.setSelectionRange(length, length)
-    }
-  }, [isInlineReplyExpanded])
-
-  const mediaPreviews = useMemo(() => {
-    return inlineReplyMedia.map((file) => ({
-      url: URL.createObjectURL(file),
-      filename: file.name,
-    }))
-  }, [inlineReplyMedia])
-
-  // Content to display based on truncation state
-  const displayedContent = isContentExpanded
-    ? reply.content
-    : reply.content.slice(0, COMMENT_TRUNCATE_LIMIT) + (showReadMore ? "..." : "")
-
-  // Determine which children to display (only if showNestedReplies is true)
-  const displayedChildren = showNestedReplies ? reply.children : []
-
-  const replyBody = (
-    <div className="flex gap-3">
-      {/* Vote buttons (only for non-nested replies) */}
-      {!isNested && (
-        <div className="flex flex-col items-center gap-1 mr-2">
-          <Button
-            variant={isUpvoted ? "default" : "ghost"}
-            size="sm"
-            className="h-8 w-8 p-0"
-            onClick={() => onVote(reply.id, "up")}
-          >
-            <ChevronUp className="h-4 w-4" />
-          </Button>
-          <span className="text-sm font-medium text-center min-w-[2rem]">{reply.upvotes - reply.downvotes}</span>
-          <Button
-            variant={isDownvoted ? "default" : "ghost"}
-            size="sm"
-            className="h-8 w-8 p-0"
-            onClick={() => onVote(reply.id, "down")}
-          >
-            <ChevronDown className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
-
-      <div className="flex-1">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2 w-full">
-
-            {
-              isNested ? (
-                <div className="flex space-x-2 items-center min-w-sm border-t-[1px] w-full border-gray-200 dark:border-zinc-800">
-                  <Avatar className="h-7 w-7 border border-gray-300 -left-[30px] top-0"> {/* Smaller size and lighter border */}
-                    <AvatarImage src={reply.avatar || "/placeholder.svg"} />
-                    <AvatarFallback className="bg-gray-100 text-gray-600">{reply.author[0]}</AvatarFallback> {/* Different fallback style */}
-                  </Avatar>
-                  <div className="flex items-center space-x-2 absolute left-28">
-                    <div>
-                      <span className="font-medium">{reply.author}</span>
-                      <span className="text-sm text-gray-500">{formatTimeAgo(reply.createdAt)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex space-x-2 items-center justify-center">
-                  <Avatar className="h-9 w-9 border-2 border-blue-400"> {/* Added larger size and blue border */}
-                    <AvatarImage src={reply.avatar || "/placeholder.svg"} />
-                    <AvatarFallback className="bg-blue-200 text-blue-800 font-semibold">{reply.author[0]}</AvatarFallback> {/* Different fallback style */}
-                  </Avatar>
-                  <span className="font-medium">{reply.author}</span>
-                  <span className="text-sm text-gray-500">{formatTimeAgo(reply.createdAt)}</span>
-                </div>
-              )
-            }
-            {reply.isSolution && (
-              <Badge className="bg-green-600 text-white">
-                <Award className="h-3 w-3 mr-1" />
-                Solusi
-              </Badge>
-            )}
-            {reply.isEdited && (
-              <Badge variant="outline" className="text-xs">
-                Diedit
-              </Badge>
-            )}
-          </div>
-          <CommentActionsPopover
-            reply={reply}
-            isAuthor={isReplyAuthor || false}
-            onAction={(action) => onCommentAction(reply.id, action)}
-          />
-        </div>
-
-        <div className={
-          isNested ? (
-            "prose prose-sm max-w-none dark:prose-invert"
-          ) : (
-            "prose prose-sm max-w-none dark:prose-invert mb-2"
-          )
-        }>
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayedContent}</ReactMarkdown>
-          {showReadMore && (
-            <Button variant="link" onClick={() => setIsContentExpanded(!isContentExpanded)} className="p-0 h-auto">
-              {isContentExpanded ? "Sembunyikan" : "Baca Selengkapnya"}
-            </Button>
-          )}
-        </div>
-
-        {reply.media && reply.media.length > 0 && (
-          <div className="mb-3">
-            <MediaViewer media={reply.media} />
-          </div>
-        )}
-
-        {/* Reactions and Solution Button (only for non-nested replies) */}
-        {!isNested && (
-          <div className="flex items-center gap-2 text-sm">
-            {/* Popover for adding new reactions */}
-            <EmojiReactionPopover
-              onSelect={(reactionKey) => onReaction(reply.id, reactionKey)}
-              userReactions={userState.reactions[reply.id] || []}
-              replyReactions={reply.reactions || {}}
-            />
-            {(postAuthor === CURRENT_USER || IS_ADMIN) && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onMarkAsSolution(reply.id, reply.isSolution || false)}
-                className={`h-6 px-2 text-xs ${reply.isSolution ? "text-green-600 hover:text-red-700" : "text-gray-600 hover:text-green-700"}`}
-              >
-                {reply.isSolution ? (
-                  <>
-                    <X className="h-3 w-3 mr-1" />
-                    Batalkan Solusi
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Tandai Solusi
-                  </>
-                )}
-              </Button>
-            )}
-            {/* Display existing reactions */}
-            {EMOJI_REACTIONS.map((reaction) => {
-              const count = reply.reactions?.[reaction.key]?.length || 0
-              const isActive = userState.reactions[reply.id]?.includes(reaction.key)
-              if (count === 0 && !isActive) return null // Only show if there's a count or user has reacted
-
-              return (
-                <Button
-                  key={reaction.key}
-                  variant="outline" // Use outline variant for display
-                  size="sm"
-                  className={cn(
-                    "h-6 px-2 text-xs flex items-center gap-1",
-                    isActive && "bg-blue-100 text-blue-600 border-blue-200", // Highlight if active
-                  )}
-                  onClick={() => onReaction(reply.id, reaction.key)} // Make them clickable to toggle
-                >
-                  {reaction.emoji}
-                  {count > 0 && <span className="font-medium">{count}</span>}
-                </Button>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Nested replies (children) - conditional rendering based on showNestedReplies */}
-        {reply.children && reply.children.length > 0 && (
-          <div className="ml-4 mt-4 space-y-4 border-l pl-4">
-            {showNestedReplies &&
-              displayedChildren.map((childReply) => (
-                <ReplyItem
-                  key={childReply.id}
-                  reply={childReply}
-                  postAuthor={postAuthor}
-                  onVote={onVote}
-                  onReaction={onReaction}
-                  onMarkAsSolution={onMarkAsSolution}
-                  onCommentAction={onCommentAction}
-                  userState={userState}
-                  onSubmitReply={onSubmitReply}
-                  isSubmittingReply={isSubmittingReply}
-                  isNested={true}
-                />
-              ))}
-            <Button
-              variant="link"
-              size="sm"
-              onClick={() => setShowNestedReplies(!showNestedReplies)}
-              className="w-full justify-start pl-0 text-sm font-medium"
-            >
-              {showNestedReplies ? (
-                <>
-                  <ChevronUp className="h-4 w-4 mr-2" />
-                  Sembunyikan Balasan ({reply.children.length})
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="h-4 w-4 mr-2" />
-                  Lihat Balasan ({reply.children.length})
-                </>
-              )}
-            </Button>
-          </div>
-        )}
-
-        {/* Inline Reply Input (only for non-nested replies) */}
-        {!isNested && (
-          <div className="mt-4 border-t pt-4">
-            <div className="flex items-start gap-3">
-              <div className="flex-1">
-                {!isInlineReplyExpanded ? (
-                  <div className="flex items-center gap-2 w-full">
-                    <Input
-                      // placeholder={`Balas @${reply.author}...`}
-                      value={inlineReplyContent}
-                      onChange={(e) => setInlineReplyContent(e.target.value)}
-                      onFocus={() => setIsInlineReplyExpanded(true)}
-                      className="flex-1"
-                      disabled={isSubmittingReply}
-                    />
-                    <Button
-                      size="sm"
-                      onClick={handleReplySubmit}
-                      disabled={!inlineReplyContent.trim() || isSubmittingReply}
-                      className="shrink-0"
-                    >
-                      {isSubmittingReply ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                      <span className="sr-only">Kirim</span>
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <MarkdownEditor
-                      // textareaRef={inlineReplyTextareaRef}
-                      value={inlineReplyContent}
-                      onChange={setInlineReplyContent}
-                      onMediaFilesChange={setInlineReplyMedia}
-                      mediaPreviews={mediaPreviews}
-                      // placeholder={`Balas @${reply.author}...`}
-                      rows={3}
-                      disabled={isSubmittingReply}
-                      showMediaInput={true}
-                    // allowFullScreen={false} // This prop is now removed from MarkdownEditor
-                    />
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs text-gray-500">Tekan Ctrl+Enter untuk mengirim cepat</div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setIsInlineReplyExpanded(false)
-                            setInlineReplyContent(reply.author ? `@${reply.author} ` : "")
-                            setInlineReplyMedia([])
-                          }}
-                          disabled={isSubmittingReply}
-                        >
-                          Batal
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={handleReplySubmit}
-                          disabled={!inlineReplyContent.trim() || isSubmittingReply}
-                        >
-                          {isSubmittingReply ? (
-                            <>
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                              Mengirim...
-                            </>
-                          ) : (
-                            <>
-                              <Send className="h-3 w-3 mr-1" />
-                              Kirim
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-
-  return isNested ? (
-    replyBody
-  ) : (
-    <Card
-      id={`comment-${reply.id}`}
-      className={`${reply.isSolution ? "border-green-200 border-2 bg-green-50/50 dark:bg-green-50/0" : ""}`}
-    >
-      <CardContent className="p-4">{replyBody}</CardContent>
-    </Card>
-  )
-}
-
-// Main component
 export default function ForumDetailPage() {
-  const params = useParams()
-  const router = useRouter()
-  const { userState, updateUserState } = useUserState()
+  const params = useParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { data: session } = useSession();
+  const userId = session?.user?.id;
+  const username = session?.user?.username;
+  const avatar = session?.user?.avatar;
+  const isAdmin = session?.user?.role === "admin";
 
-  // State
-  const [post, setPost] = useState<ForumPost | null>(null)
-  const [replies, setReplies] = useState<ProcessedForumReply[]>([])
-  const [newReply, setNewReply] = useState("")
-  const [selectedMedia, setSelectedMedia] = useState<File[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadingComments, setLoadingComments] = useState(false)
-  const [submittingReply, setSubmittingReply] = useState(false)
-  const [views, setViews] = useState(0)
+  const { userState, updateUserState } = useUserState();
 
-  const mainReplyTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const [post, setPost] = useState<ForumPost | null>(null);
+  const [replies, setReplies] = useState<ProcessedForumReply[]>([]);
+  const [newReplyContent, setNewReplyContent] = useState("");
+  const [mainCommentUploadState, setMainCommentUploadState] = useState<UploadedFileState>({
+    file: null,
+    previewUrl: null,
+    uploadedData: null,
+    uploading: false,
+    progress: 0,
+    error: null,
+  });
+  const [loadingPost, setLoadingPost] = useState(true);
+  const [submittingReply, setSubmittingReply] = useState(false);
+  const [views, setViews] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
-  // Computed values
-  const isPostAuthor = post?.author === CURRENT_USER
-  const isLiked = post ? userState.votes[`post-${post.id}`] === "up" : false
-  const isBookmarked = post ? userState.bookmarks.includes(post.id) : false
+  const mainReplyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const highlightCommentRef = useRef<HTMLDivElement | null>(null);
+
+  const isPostAuthor = post?.authorId === userId;
+  const isLiked = post ? (userState.postLikes?.[post.id] === true) : false;
+  const isBookmarked = post ? (userState.bookmarks?.includes(post.id) === true) : false;
 
   const mainCommentMediaPreviews = useMemo(() => {
-    return selectedMedia.map((file) => ({
-      url: URL.createObjectURL(file),
-      filename: file.name,
-    }))
-  }, [selectedMedia])
+    if (!mainCommentUploadState.file && !mainCommentUploadState.uploadedData) return [];
 
-  // Load data
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true)
-        const postId = params.id as string
+    const preview: { id: string; url: string; filename: string; uploading?: boolean; progress?: number; uploadedUrl?: string; type?: "image" | "video"; } = {
+      id: mainCommentUploadState.uploadedData?.id || mainCommentUploadState.file?.name || 'temp',
+      url: mainCommentUploadState.uploadedData?.url || mainCommentUploadState.previewUrl || '/placeholder.svg',
+      filename: mainCommentUploadState.uploadedData?.filename || mainCommentUploadState.file?.name || 'media',
+      uploading: mainCommentUploadState.uploading,
+      progress: mainCommentUploadState.progress,
+      uploadedUrl: mainCommentUploadState.uploadedData?.url,
+      type: mainCommentUploadState.uploadedData?.type || (mainCommentUploadState.file?.type.startsWith('image/') ? 'image' : mainCommentUploadState.file?.type.startsWith('video/') ? 'video' : undefined),
+    };
+    return [preview];
+  }, [mainCommentUploadState]);
 
-        await new Promise((resolve) => setTimeout(resolve, 1200))
+  const commentIdToHighlight = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    const hash = window.location.hash;
+    if (hash.startsWith('#comment-')) {
+      return hash.substring('#comment-'.length);
+    }
+    return null;
+  }, [searchParams]);
 
-        const foundPost = forumPostsData.find((p) => p.id === postId)
+  const [allCommentAuthors, setAllCommentAuthors] = useState<{ id: string; username: string }[]>([]);
 
-        if (foundPost) {
-          setPost(foundPost as ForumPost)
-          setViews(Math.floor(Math.random() * 1000) + 100)
-
-          setLoadingComments(true)
-          await new Promise((resolve) => setTimeout(resolve, 800))
-
-          const postReplies = (forumRepliesData as any)[postId] || []
-          const transformedReplies = postReplies.map((reply: any) => ({
-            ...reply,
-            upvotes: Math.floor(Math.random() * 20) + 1,
-            downvotes: Math.floor(Math.random() * 5),
-            reactions: {
-              like: [],
-              love: [],
-              laugh: [],
-              wow: [],
-              sad: [],
-              angry: [],
-            },
-          }))
-          setReplies(buildReplyTree(transformedReplies))
-          setLoadingComments(false)
-        }
-      } catch (error) {
-        console.error("Error loading data:", error)
-        toast.error("Error", {
-          description: "Gagal memuat data forum",
-        })
-      } finally {
-        setLoading(false)
-      }
+  const uploadMediaToImageKit = useCallback(async (file: File, onProgress: (p: number) => void): Promise<ForumMedia | null> => {
+    if (!userId) {
+      toast.error("Anda harus login untuk mengunggah media.");
+      return null;
+    }
+    if (!(file instanceof File)) {
+      console.error("No file provided or invalid file object for uploadMediaToImageKit:", file);
+      toast.error("File tidak valid untuk diunggah. Harap coba lagi.");
+      return null;
     }
 
-    loadData()
-  }, [params.id])
+    try {
+      const authRes = await fetch("/api/upload-auth");
+      if (!authRes.ok) {
+        const errorText = await authRes.text();
+        throw new Error(`Authentication request failed: ${authRes.status} ${errorText}`);
+      }
+      const authData = await authRes.json();
 
-  // Handlers
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = (now.getMonth() + 1).toString().padStart(2, '0');
+      const day = now.getDate().toString().padStart(2, '0');
+      const hours = now.getHours().toString().padStart(2, '0');
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      const seconds = now.getSeconds().toString().padStart(2, '0');
+      const randomString = Math.random().toString(36).substring(2, 8);
+      const fileExtension = file.name.split('.').pop();
+      const uniqueFileName = `forum-media-${userId}-${year}${month}${day}-${hours}${minutes}${seconds}-${randomString}.${fileExtension}`;
+
+
+      const uploadResponse = await upload({
+        publicKey: authData.publicKey,
+        fileName: uniqueFileName,
+        file: file,
+        folder: "forum-media",
+        signature: authData.signature,
+        token: authData.token,
+        expire: authData.expire,
+        onProgress: (event) => {
+          if (event.lengthComputable) {
+            onProgress((event.loaded / event.total) * 100);
+          }
+        },
+        useUniqueFileName: false,
+        overwriteFile: true,
+      });
+
+      if (uploadResponse.url) {
+        return {
+          id: uploadResponse.fileId,
+          type: file.type.startsWith('image/') ? 'image' : 'video',
+          filename: uploadResponse.name,
+          size: uploadResponse.size,
+          url: uploadResponse.url,
+          thumbnailUrl: uploadResponse.thumbnailUrl || undefined,
+        };
+      } else {
+        throw new Error("URL gambar tidak ditemukan dari respons upload ImageKit.");
+      }
+    } catch (error) {
+      console.error("Error uploading file to ImageKit:", error);
+      let errorMessage = "Terjadi kesalahan saat mengunggah file.";
+      if (error instanceof ImageKitAbortError) errorMessage = "Upload dibatalkan.";
+      else if (error instanceof ImageKitInvalidRequestError) errorMessage = `Permintaan upload tidak valid: ${error.message}`;
+      else if (error instanceof ImageKitUploadNetworkError) errorMessage = `Kesalahan jaringan saat upload: ${error.message}`;
+      else if (error instanceof ImageKitServerError) errorMessage = `Kesalahan server ImageKit: ${error.message}`;
+      else if (error instanceof Error) errorMessage = `Gagal mengunggah file: ${error.message}`;
+
+      toast.error(errorMessage);
+      return null;
+    }
+  }, [userId]);
+
+  const handleMainMediaFilesChange = useCallback(async (files: File[]) => {
+    if (files.length === 0) {
+      if (mainCommentUploadState.previewUrl) URL.revokeObjectURL(mainCommentUploadState.previewUrl);
+      setMainCommentUploadState({ file: null, previewUrl: null, uploadedData: null, uploading: false, progress: 0, error: null });
+      return;
+    }
+
+    const file = files[0];
+    if (mainCommentUploadState.file && mainCommentUploadState.file !== file) {
+      toast.error("Maksimal 1 media per komentar utama."); // Update pesan
+      return;
+    }
+
+    if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+      toast.error("Hanya file gambar atau video yang diizinkan untuk komentar utama.");
+      setMainCommentUploadState({ file: null, previewUrl: null, uploadedData: null, uploading: false, progress: 0, error: "Hanya file gambar atau video yang diizinkan." });
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setMainCommentUploadState(prev => ({
+      ...prev,
+      file,
+      previewUrl,
+      uploading: true,
+      progress: 0,
+      uploadedData: null,
+      error: null,
+    }));
+
+    try {
+      const uploadedMedia = await uploadMediaToImageKit(file, (p: number) => {
+        setMainCommentUploadState(prev => ({ ...prev, progress: p }));
+      });
+
+      if (uploadedMedia) {
+        toast.success(`Media "${file.name}" berhasil diunggah.`);
+        setMainCommentUploadState(prev => ({ ...prev, uploading: false, progress: 100, uploadedData: uploadedMedia, error: null }));
+      } else {
+        toast.error(`Gagal mengunggah media "${file.name}".`);
+        setMainCommentUploadState(prev => ({ ...prev, file: null, previewUrl: null, uploadedData: null, uploading: false, progress: 0, error: "Gagal mengunggah media." }));
+      }
+    } catch (error) {
+      console.error("Error uploading main comment media:", error);
+      toast.error("Gagal mengunggah media utama.");
+      setMainCommentUploadState(prev => ({ ...prev, file: null, previewUrl: null, uploadedData: null, uploading: false, progress: 0, error: "Gagal mengunggah media utama." }));
+    }
+  }, [mainCommentUploadState, uploadMediaToImageKit]);
+
+  const handleRemoveMainMedia = useCallback((idToRemove: string) => {
+    setMainCommentUploadState(prev => {
+      if (prev.previewUrl) {
+        URL.revokeObjectURL(prev.previewUrl);
+      }
+      return { file: null, previewUrl: null, uploadedData: null, uploading: false, progress: 0, error: null };
+    });
+    toast.info("Media dihapus.");
+  }, []);
+
+  useEffect(() => {
+    const postId = params.id as string;
+    if (!postId) {
+      setLoadingPost(false);
+      return;
+    }
+
+    const postDocRef = doc(clientDb, "forumPosts", postId);
+
+    const unsubscribePost = onSnapshot(postDocRef, async (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        const fetchedPost = { id: docSnapshot.id, ...(docSnapshot.data() as Omit<ForumPost, 'id'>) };
+        setPost(fetchedPost);
+        setViews(fetchedPost.views);
+        setError(null);
+      } else {
+        setPost(null);
+        setError("Postingan tidak ditemukan.");
+        toast.error("Postingan tidak ditemukan.", { description: "Postingan yang Anda cari mungkin sudah dihapus." });
+      }
+      setLoadingPost(false);
+    }, (err) => {
+      console.error("Error listening to post data:", err);
+      setError("Gagal memuat detail postingan.");
+      setLoadingPost(false);
+      toast.error("Error", { description: "Gagal memuat detail postingan." });
+    });
+
+    return () => unsubscribePost();
+  }, [params.id]);
+
+  const viewIncrementRef = useRef<{ [key: string]: boolean }>({});
+
+  useEffect(() => {
+    const postId = params.id as string;
+    if (!postId) return;
+
+    const currentViewIncrementRef = viewIncrementRef.current;
+
+    if (!currentViewIncrementRef[postId]) {
+      const incrementView = async () => {
+        try {
+          const viewsRes = await fetch(`/api/forum/posts/${postId}/views`, { method: "PATCH" });
+          const viewsData = await viewsRes.json();
+          if (viewsRes.ok && viewsData.status) {
+            setViews(viewsData.newViewCount);
+            currentViewIncrementRef[postId] = true;
+          } else {
+            console.warn("Failed to increment view count via API (already viewed or API error):", viewsData.message);
+          }
+        } catch (error) {
+          console.error("Error calling views API:", error);
+        }
+      };
+      incrementView();
+    }
+    return () => {
+      delete currentViewIncrementRef[postId];
+    };
+  }, [params.id]);
+
+  useEffect(() => {
+    const postId = params.id as string;
+    if (!postId) return;
+
+    const repliesCollectionRef = collection(clientDb, "forumReplies");
+    const qReplies = query(repliesCollectionRef, where("postId", "==", postId), orderBy("createdAt", "asc"));
+
+    const unsubscribeReplies = onSnapshot(qReplies, async (snapshot) => {
+      const fetchedReplies: ForumReply[] = [];
+      const uniqueAuthors = new Map<string, { id: string; username: string }>();
+
+      if (post?.authorId && post?.authorUsername) {
+        uniqueAuthors.set(post.authorId, { id: post.authorId, username: post.authorUsername });
+      }
+
+      snapshot.forEach((doc) => {
+        const replyData = { id: doc.id, ...(doc.data() as Omit<ForumReply, 'id'>) };
+        fetchedReplies.push(replyData);
+        if (replyData.authorId && replyData.authorUsername && !uniqueAuthors.has(replyData.authorId)) {
+          uniqueAuthors.set(replyData.authorId, { id: replyData.authorId, username: replyData.authorUsername });
+        }
+      });
+
+      if (userId) {
+        uniqueAuthors.delete(userId);
+      }
+
+      setAllCommentAuthors(Array.from(uniqueAuthors.values()));
+      setReplies(buildReplyTree(fetchedReplies));
+    }, (error) => {
+      console.error("Error listening to replies:", error);
+      toast.error("Error real-time komentar", { description: "Gagal memuat komentar secara real-time." });
+    });
+
+    return () => unsubscribeReplies();
+  }, [params.id, userId, post?.authorId, post?.authorUsername]);
+
+  useEffect(() => {
+    const postId = params.id as string;
+    if (!postId || !userId || !post) {
+      return;
+    }
+
+    const fetchUserPostStatus = async () => {
+      try {
+        const bookmarkCheckRes = await fetch(`/api/forum/bookmarks?userId=${userId}&postId=${postId}`);
+        const bookmarkCheckData = await bookmarkCheckRes.json();
+        if (bookmarkCheckRes.ok && bookmarkCheckData.status) {
+          const isBookmarkedNow = bookmarkCheckData.data.some((b: any) => b.postId === postId && b.userId === userId);
+          updateUserState(prevUserState => {
+            const currentBookmarks = prevUserState.bookmarks || [];
+            const prevBookmarked = currentBookmarks.includes(postId);
+            if (isBookmarkedNow !== prevBookmarked) {
+              const newBookmarks = isBookmarkedNow
+                ? [...currentBookmarks, postId]
+                : currentBookmarks.filter(id => id !== postId);
+              return { ...prevUserState, bookmarks: newBookmarks };
+            }
+            return prevUserState;
+          });
+        } else {
+          console.warn("Failed to fetch bookmark status:", bookmarkCheckData.message);
+        }
+
+        const postIsLiked = post.likedBy?.includes(userId) || false;
+        updateUserState(prevUserState => {
+          const currentPostLikes = prevUserState.postLikes || {};
+          const prevLiked = currentPostLikes[postId];
+          if (postIsLiked !== prevLiked) {
+            return {
+              ...prevUserState,
+              postLikes: {
+                ...currentPostLikes,
+                [postId]: postIsLiked,
+              },
+            };
+          }
+          return prevUserState;
+        });
+
+      } catch (error) {
+        console.error("Error fetching user post status:", error);
+      }
+    };
+
+    fetchUserPostStatus();
+  }, [params.id, userId, post?.likedBy, post?.id, updateUserState, post]);
+
   const handleSubmitReply = useCallback(
-    async (content: string, mediaFiles: File[], parentId?: string) => {
-      if (submittingReply) return
+    async (content: string, mediaFilesInput: ForumMedia[], parentId?: string, mentionedUserIds?: string[]) => {
+      if (submittingReply || !userId || !username || !avatar || !post) {
+        if (!userId) toast.error("Anda harus login untuk berkomentar.");
+        return;
+      }
 
-      if (!content.trim()) return
+      if (!content.trim() && mediaFilesInput.length === 0 && (!parentId && !mainCommentUploadState.uploadedData)) {
+        toast.error("Komentar tidak boleh kosong.");
+        return;
+      }
+
+      // Check if there are any pending uploads from the main comment editor
+      if (!parentId && mainCommentUploadState.uploading) {
+        toast.error("Tunggu! Ada media yang masih diunggah. Harap tunggu hingga upload selesai.");
+        return;
+      }
+      // Check for failed uploads from the main comment editor
+      if (!parentId && mainCommentUploadState.file && !mainCommentUploadState.uploadedData && !mainCommentUploadState.uploading) {
+        toast.error("Ada media yang gagal diunggah. Harap hapus atau coba unggah ulang.");
+        return;
+      }
+
+      const finalMediaForSubmission: ForumMedia[] = parentId ? mediaFilesInput : (mainCommentUploadState.uploadedData ? [mainCommentUploadState.uploadedData] : []);
+
+      setSubmittingReply(true);
 
       try {
-        setSubmittingReply(true)
+        const replyPayload = {
+          postId: post.id,
+          content: content,
+          authorId: userId,
+          authorUsername: username,
+          authorAvatar: avatar || "/placeholder.svg",
+          parentId: parentId || null,
+          mentions: mentionedUserIds || [],
+          media: finalMediaForSubmission,
+        };
 
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        const response = await fetch(`/api/forum/posts/${post.id}/replies`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(replyPayload),
+        });
 
-        const reply: ForumReply = {
-          id: Date.now().toString(),
-          content,
-          author: CURRENT_USER,
-          avatar: "/placeholder.svg?height=40&width=40",
-          createdAt: new Date().toISOString(),
-          upvotes: 0,
-          downvotes: 0,
-          parentId,
-          reactions: {
-            like: [],
-            love: [],
-            laugh: [],
-            wow: [],
-            sad: [],
-            angry: [],
-          },
-          media:
-            mediaFiles.length > 0
-              ? mediaFiles.map((file) => ({
-                type: file.type.startsWith("image/") ? ("image" as const) : ("video" as const),
-                url: URL.createObjectURL(file),
-              }))
-              : undefined,
-          isSolution: false,
+        const data = await response.json();
+        if (response.ok && data.status) {
+          toast.success("Komentar berhasil", { description: "Komentar Anda telah ditambahkan." });
+          setNewReplyContent("");
+          if (!parentId) {
+            if (mainCommentUploadState.previewUrl) URL.revokeObjectURL(mainCommentUploadState.previewUrl);
+            setMainCommentUploadState({ file: null, previewUrl: null, uploadedData: null, uploading: false, progress: 0, error: null });
+          }
+        } else {
+          throw new Error(data.message || "Gagal menambahkan komentar.");
         }
-
-        setReplies((prevReplies) => {
-          const flatReplies = flattenReplies(prevReplies)
-          flatReplies.push(reply)
-          return buildReplyTree(flatReplies)
-        })
-
-        if (!parentId && post) {
-          setPost((prev) => (prev ? { ...prev, replies: prev.replies + 1 } : null))
-        }
-
-        toast("Komentar berhasil", { description: "Komentar Anda telah ditambahkan" })
       } catch (error) {
-        console.error(error)
-        toast("Error", { description: "Gagal menambahkan komentar" })
+        console.error("Error submitting reply:", error);
+        toast.error("Gagal menambahkan komentar", {
+          description: (error instanceof Error) ? error.message : "Terjadi kesalahan yang tidak diketahui."
+        });
       } finally {
-        setSubmittingReply(false)
-        if (!parentId) {
-          setNewReply("")
-          setSelectedMedia([])
-        }
+        setSubmittingReply(false);
       }
     },
-    [submittingReply, post],
-  )
+    [submittingReply, userId, username, avatar, post, mainCommentUploadState],
+  );
 
   const handleVote = useCallback(
-    (replyId: string, voteType: "up" | "down") => {
-      const currentVote = userState.votes[replyId]
-      let newVote: "up" | "down" | null = voteType
-
-      if (currentVote === voteType) {
-        newVote = null
+    async (replyId: string, voteType: "up" | "down", currentVoteStatus: "up" | "down" | null) => {
+      if (!userId) {
+        toast.error("Anda harus login untuk voting.");
+        router.push("/login");
+        return;
       }
-
-      updateUserState({
-        votes: { ...userState.votes, [replyId]: newVote },
-      })
-
-      setReplies((prev) => prev.map((rootReply) => updateVoteStatusInTree(rootReply, replyId, currentVote, newVote)))
-
-      toast("Vote berhasil", {
-        description: `Anda telah ${newVote === "up" ? "upvote" : newVote === "down" ? "downvote" : "membatalkan vote"}`,
-      })
-    },
-    [userState.votes, updateUserState],
-  )
-
-  const updateVoteStatusInTree = (
-    reply: ProcessedForumReply,
-    targetReplyId: string,
-    currentVote: "up" | "down" | null,
-    newVote: "up" | "down" | null,
-  ): ProcessedForumReply => {
-    let updatedReply = { ...reply }
-    if (reply.id === targetReplyId) {
-      let upvotes = reply.upvotes
-      let downvotes = reply.downvotes
-
-      if (currentVote === "up") upvotes--
-      if (currentVote === "down") downvotes--
-      if (newVote === "up") upvotes++
-      if (newVote === "down") downvotes++
-
-      updatedReply = { ...reply, upvotes, downvotes }
-    }
-    updatedReply.children = updatedReply.children.map((child) =>
-      updateVoteStatusInTree(child, targetReplyId, currentVote, newVote),
-    )
-    return updatedReply
-  }
-
-  const handleLike = useCallback(() => {
-    if (!post) return
-
-    const postKey = `post-${post.id}`
-    const currentLike = userState.votes[postKey] === "up"
-    const newLike = !currentLike
-
-    updateUserState({
-      votes: { ...userState.votes, [postKey]: newLike ? "up" : null },
-    })
-
-    setPost((prev) => {
-      if (!prev) return null
-      return {
-        ...prev,
-        likes: prev.likes + (newLike ? 1 : currentLike ? -1 : 0),
-      }
-    })
-
-    toast(newLike ? "Post disukai" : "Like dibatalkan", {
-      description: newLike ? "Anda menyukai post ini" : "Anda membatalkan like",
-    })
-  }, [post, userState.votes, updateUserState])
-
-  const handleBookmark = useCallback(() => {
-    if (!post) return
-
-    const isCurrentlyBookmarked = userState.bookmarks.includes(post.id)
-    const newBookmarks = isCurrentlyBookmarked
-      ? userState.bookmarks.filter((id) => id !== post.id)
-      : [...userState.bookmarks, post.id]
-
-    updateUserState({
-      bookmarks: newBookmarks,
-    })
-
-    toast(isCurrentlyBookmarked ? "Bookmark dihapus" : "Post di-bookmark", {
-      description: isCurrentlyBookmarked ? "Post dihapus dari bookmark" : "Post ditambahkan ke bookmark",
-    })
-  }, [post, userState.bookmarks, updateUserState])
-
-  const handleReaction = useCallback(
-    (replyId: string, reactionKey: string) => {
-      const currentUserReactions = userState.reactions[replyId] || []
-      const hasReacted = currentUserReactions.includes(reactionKey)
-
-      let newReactions: string[]
-      if (hasReacted) {
-        newReactions = currentUserReactions.filter((r) => r !== reactionKey)
-      } else {
-        newReactions = [...currentUserReactions, reactionKey]
-      }
-
-      updateUserState({
-        reactions: { ...userState.reactions, [replyId]: newReactions },
-      })
+      if (!post?.id) return;
 
       setReplies((prev) =>
-        prev.map((rootReply) => updateReactionStatusInTree(rootReply, replyId, reactionKey, hasReacted)),
-      )
+        buildReplyTree(
+          flattenReplies(prev).map((r: ForumReply) => {
+            if (r.id === replyId) {
+              let newUpvotedBy = [...r.upvotedBy];
+              let newDownvotedBy = [...r.downvotedBy];
+              let newUpvotes = r.upvotes;
+              let newDownvotes = r.downvotes;
 
-      toast("Reaksi berhasil", {
-        description: `Anda telah ${hasReacted ? "menghapus" : "menambahkan"} reaksi`,
-      })
-    },
-    [userState.reactions, updateUserState],
-  )
+              if (currentVoteStatus === voteType) {
+                if (voteType === "up") {
+                  newUpvotes = Math.max(0, newUpvotes - 1);
+                  newUpvotedBy = newUpvotedBy.filter(id => id !== userId);
+                } else {
+                  newDownvotes = Math.max(0, newDownvotes - 1);
+                  newDownvotedBy = newDownvotedBy.filter(id => id !== userId);
+                }
+                updateUserState((prevUserState) => ({
+                  ...prevUserState,
+                  votes: { ...(prevUserState.votes || {}), [replyId]: null }
+                }));
+              } else {
+                if (voteType === "up") {
+                  newUpvotes++;
+                  newUpvotedBy.push(userId);
+                  if (newDownvotedBy.includes(userId)) {
+                    newDownvotedBy = newDownvotedBy.filter(id => id !== userId);
+                    newDownvotes = Math.max(0, newDownvotes - 1);
+                  }
+                } else {
+                  newDownvotes++;
+                  newDownvotedBy.push(userId);
+                  if (newUpvotedBy.includes(userId)) {
+                    newUpvotedBy = newUpvotedBy.filter(id => id !== userId);
+                    newUpvotes = Math.max(0, newUpvotes - 1);
+                  }
+                }
+                updateUserState((prevUserState) => ({
+                  ...prevUserState,
+                  votes: { ...(prevUserState.votes || {}), [replyId]: voteType }
+                }));
+              }
+              return { ...r, upvotes: newUpvotes, downvotes: newDownvotes, upvotedBy: newUpvotedBy, downvotedBy: newDownvotedBy };
+            }
+            return r;
+          })
+        )
+      );
 
-  const updateReactionStatusInTree = (
-    reply: ProcessedForumReply,
-    targetReplyId: string,
-    reactionKey: string,
-    hasReacted: boolean,
-  ): ProcessedForumReply => {
-    let updatedReply = { ...reply }
-    if (reply.id === targetReplyId) {
-      const updatedReactions = { ...reply.reactions }
-      if (hasReacted) {
-        updatedReactions[reactionKey] = updatedReactions[reactionKey].filter((user) => user !== CURRENT_USER)
-      } else {
-        updatedReactions[reactionKey] = [...(updatedReactions[reactionKey] || []), CURRENT_USER]
+      try {
+        const response = await fetch(`/api/forum/posts/${post.id}/replies/${replyId}/vote`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ voteType }),
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.status) {
+          toast.error("Gagal memperbarui vote", { description: data.message });
+        } else {
+          toast.success("Vote berhasil diperbarui.");
+        }
+      } catch (error) {
+        console.error("Error updating vote:", error);
+        toast.error("Gagal memperbarui vote.");
       }
-      updatedReply = { ...reply, reactions: updatedReactions }
+    },
+    [post, userId, updateUserState, setReplies, router],
+  );
+
+  const handleLike = useCallback(async () => {
+    if (!post || !userId) {
+      toast.error("Anda harus login untuk menyukai postingan.");
+      router.push("/login");
+      return;
     }
-    updatedReply.children = updatedReply.children.map((child) =>
-      updateReactionStatusInTree(child, targetReplyId, reactionKey, hasReacted),
-    )
-    return updatedReply
-  }
+
+    const currentLikeStatus = userState.postLikes?.[post.id] === true;
+
+    updateUserState((prevUserState) => ({
+      ...prevUserState,
+      postLikes: {
+        ...(prevUserState.postLikes || {}),
+        [post.id]: !currentLikeStatus,
+      },
+    }));
+    setPost((prev) => {
+      if (!prev) return null;
+      let newLikedBy = [...prev.likedBy];
+      let newLikes = prev.likes;
+
+      if (currentLikeStatus) {
+        newLikes--;
+        newLikedBy = newLikedBy.filter(id => id !== userId);
+      } else {
+        newLikes++;
+        newLikedBy.push(userId);
+      }
+
+      return {
+        ...prev,
+        likes: newLikes,
+        likedBy: newLikedBy,
+      };
+    });
+
+    try {
+      const response = await fetch(`/api/forum/posts/${post.id}/like`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok || !data.status) {
+        updateUserState((prevUserState) => ({
+          ...prevUserState,
+          postLikes: {
+            ...(prevUserState.postLikes || {}),
+            [post.id]: currentLikeStatus,
+          },
+        }));
+        setPost((prev) => {
+          if (!prev) return null;
+          let newLikedBy = [...prev.likedBy];
+          let newLikes = prev.likes;
+          if (currentLikeStatus) {
+            newLikes++;
+            newLikedBy.push(userId);
+          } else {
+            newLikes--;
+            newLikedBy = newLikedBy.filter(id => id !== userId);
+          }
+          return {
+            ...prev,
+            likes: newLikes,
+            likedBy: newLikedBy,
+          };
+        });
+        toast.error("Gagal mengubah status suka.", { description: data.message });
+      } else {
+        toast.success(data.message);
+      }
+    } catch (error) {
+      console.error("Error changing like status:", error);
+      toast.error("Gagal mengubah status suka.");
+    }
+  }, [post, userId, userState.postLikes, updateUserState, router, setPost]);
+
+  const handleBookmark = useCallback(async () => {
+    if (!post || !userId) {
+      toast.error("Anda harus login untuk membookmark postingan.");
+      router.push("/login");
+      return;
+    }
+
+    const isCurrentlyBookmarked = userState.bookmarks?.includes(post.id) === true;
+
+    updateUserState((prevUserState) => ({
+      ...prevUserState,
+      bookmarks: isCurrentlyBookmarked
+        ? (prevUserState.bookmarks || []).filter((id) => id !== post.id)
+        : [...(prevUserState.bookmarks || []), post.id],
+    }));
+
+    try {
+      const response = await fetch(`/api/forum/posts/${post.id}/bookmarks`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok || !data.status) {
+        updateUserState((prevUserState) => ({
+          ...prevUserState,
+          bookmarks: isCurrentlyBookmarked
+            ? [...(prevUserState.bookmarks || []), post.id]
+            : (prevUserState.bookmarks || []).filter((id) => id !== post.id),
+        }));
+        toast.error("Gagal mengubah status bookmark.", { description: data.message });
+      } else {
+        toast.success(data.message);
+      }
+    } catch (error) {
+      console.error("Error changing bookmark status:", error);
+      toast.error("Gagal mengubah status bookmark.");
+    }
+  }, [post, userId, userState.bookmarks, updateUserState, router]);
+
+  const handleReaction = useCallback(
+    async (replyId: string, reactionKey: string, hasReacted: boolean) => {
+      if (!userId || !post) {
+        toast.error("Anda harus login untuk memberikan reaksi.");
+        router.push("/login");
+        return;
+      }
+
+      const currentReactionForUser = userState.reactions?.[replyId];
+      let newReactionToSet: string | null = null;
+      let newHasReacted = false; // Status baru untuk UI lokal dan server
+
+      if (currentReactionForUser === reactionKey) {
+        // Jika reaksi yang sama diklik lagi, berarti un-react
+        newReactionToSet = null;
+        newHasReacted = false;
+      } else {
+        // Jika reaksi baru dipilih (atau belum ada reaksi), set reaksi baru
+        newReactionToSet = reactionKey;
+        newHasReacted = true;
+      }
+
+      // Optimistic UI update
+      setReplies((prev) =>
+        buildReplyTree(
+          flattenReplies(prev).map((r: ForumReply) => {
+            if (r.id === replyId) {
+              const updatedReactions = { ...r.reactions };
+
+              // Hapus reaksi lama pengguna dari semua kunci reaksi
+              EMOJI_REACTIONS.forEach(emoji => {
+                if (updatedReactions[emoji.key]) {
+                  updatedReactions[emoji.key] = updatedReactions[emoji.key].filter(id => id !== userId);
+                }
+              });
+
+              // Tambahkan reaksi baru jika ada
+              if (newReactionToSet) {
+                if (!updatedReactions[newReactionToSet]) {
+                  updatedReactions[newReactionToSet] = [];
+                }
+                updatedReactions[newReactionToSet].push(userId);
+              }
+
+              return { ...r, reactions: updatedReactions };
+            }
+            return r;
+          })
+        )
+      );
+
+      // Update userState dengan reaksi baru (atau null jika un-react)
+      updateUserState((prevUserState) => ({
+        ...prevUserState,
+        reactions: {
+          ...(prevUserState.reactions || {}),
+          [replyId]: newReactionToSet, // Store single reactionKey or null
+        },
+      }));
+
+      try {
+        const response = await fetch(`/api/forum/posts/${post.id}/replies/${replyId}/react`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          // Kirim reactionKey yang baru dipilih, dan reactionKey sebelumnya (jika ada)
+          // Backend akan memproses logika penggantian/penghapusan
+          body: JSON.stringify({
+            newReactionKey: newReactionToSet, // Reaksi yang ingin ditetapkan (atau null untuk un-react)
+            oldReactionKey: currentReactionForUser // Reaksi yang mungkin sudah ada sebelumnya
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.status) {
+          toast.error("Gagal memperbarui reaksi", { description: data.message });
+          // Note: Untuk sistem real-time, Firestore listener akan mengoreksi UI secara otomatis.
+          // Untuk konsistensi visual segera saat kegagalan, Anda perlu logika rollback di sini.
+        } else {
+          toast.success(data.message);
+        }
+      } catch (error) {
+        console.error("Error updating reaction:", error);
+        toast.error("Gagal memperbarui reaksi.");
+      }
+    },
+    [userId, post, userState.reactions, updateUserState, setReplies, router],
+  );
 
   const handleMarkAsSolution = useCallback(
-    (replyId: string, isCurrentlySolution: boolean) => {
-      toast.promise(
-        new Promise((resolve) => {
-          setTimeout(() => {
-            setReplies((prev) => {
-              const updatedReplies = prev.map((rootReply) =>
-                updateSolutionStatusInTree(rootReply, replyId, !isCurrentlySolution),
-              )
-              return updatedReplies
-            })
+    async (replyId: string, isCurrentlySolution: boolean) => {
+      if (!userId || !post || (post.authorId !== userId && !isAdmin)) {
+        toast.error("Anda tidak memiliki izin untuk menandai solusi.");
+        return;
+      }
 
-            setPost((prevPost) => {
-              if (!prevPost) return null
-              const allRepliesFlat = flattenReplies(replies)
-              const anySolution = allRepliesFlat.some((r) => (r.id === replyId ? !isCurrentlySolution : r.isSolution))
-              return { ...prevPost, isResolved: anySolution }
-            })
+      setPost(prevPost => {
+        if (!prevPost) return null;
+        let newSolutionReplyIds = [...(prevPost.solutionReplyIds || [])];
 
-            resolve(null)
-          }, 500)
-        }),
-        {
-          loading: isCurrentlySolution ? "Membatalkan solusi..." : "Menandai solusi...",
-          success: (
-            <div>
-              <span className="font-semibold">{isCurrentlySolution ? "Solusi Dibatalkan!" : "Solusi Ditandai!"}</span>
-              <p className="text-sm text-gray-500 mt-1">
-                {isCurrentlySolution
-                  ? "Komentar tidak lagi ditandai sebagai solusi."
-                  : "Komentar ini telah ditandai sebagai solusi."}
-              </p>
-            </div>
-          ),
-          error: "Gagal memperbarui status solusi.",
-        },
-      )
+        if (isCurrentlySolution) {
+          const index = newSolutionReplyIds.indexOf(replyId);
+          if (index > -1) newSolutionReplyIds.splice(index, 1);
+        } else {
+          newSolutionReplyIds.push(replyId);
+        }
+        const finalIsResolved = newSolutionReplyIds.length > 0;
+
+        return {
+          ...prevPost,
+          solutionReplyIds: newSolutionReplyIds,
+          isResolved: finalIsResolved,
+        };
+      });
+
+      setReplies((prev) =>
+        buildReplyTree(
+          flattenReplies(prev).map((r: ForumReply) =>
+            r.id === replyId ? { ...r, isSolution: !isCurrentlySolution } : r
+          )
+        )
+      );
+
+      try {
+        const response = await fetch(`/api/forum/posts/${post.id}/replies/${replyId}/solution`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isSolution: !isCurrentlySolution }),
+        });
+
+        const data = await response.json();
+        if (!response.ok || !data.status) {
+          toast.error("Gagal memperbarui status solusi", { description: data.message });
+        } else {
+          toast.success(data.message);
+        }
+      } catch (error) {
+        console.error("Error marking solution:", error);
+        toast.error("Gagal memperbarui status solusi.");
+      }
     },
-    [replies],
-  )
+    [userId, post, isAdmin, setPost, setReplies],
+  );
+
+  const [isPostReportDialogOpen, setIsPostReportDialogOpen] = useState(false);
 
   const handlePostAction = useCallback(
     async (action: string) => {
-      if (!post) return
+      if (!post) return;
 
       try {
         switch (action) {
           case "edit":
-            router.push(`/forum/${post.id}/edit`)
-            break
+            router.push(`/forum/${post.id}/edit`);
+            break;
           case "delete":
             if (confirm("Apakah Anda yakin ingin menghapus post ini?")) {
-              toast("Post dihapus", { description: "Post berhasil dihapus" })
-              router.push("/forum")
+              const response = await fetch(`/api/forum/posts/${post.id}`, { method: "DELETE" });
+              const data = await response.json();
+              if (response.ok && data.status) {
+                toast.success("Post berhasil dihapus", { description: data.message });
+                router.push("/forum");
+              } else {
+                toast.error("Gagal menghapus post", { description: data.message });
+              }
             }
-            break
+            break;
           case "pin":
-            setPost((prev) => (prev ? { ...prev, isPinned: !prev.isPinned } : null))
-            toast(post.isPinned ? "Post dilepas pin" : "Post dipasang pin", {
-              description: post.isPinned ? "Post tidak lagi dipasang di atas" : "Post dipasang di bagian atas forum",
-            })
-            break
           case "archive":
-            setPost((prev) => (prev ? { ...prev, isArchived: !prev.isArchived } : null))
-            toast(post.isArchived ? "Post dibuka arsip" : "Post diarsipkan", {
-              description: post.isArchived ? "Post kembali aktif" : "Post diarsipkan",
-            })
-            break
+            if (!isAdmin) {
+              toast.error("Anda tidak memiliki izin untuk melakukan aksi ini.");
+              return;
+            }
+            const updateData: Partial<ForumPost> = {};
+            if (action === "pin") updateData.isPinned = !post.isPinned;
+            if (action === "archive") updateData.isArchived = !post.isArchived;
+
+            const response = await fetch(`/api/forum/posts/${post.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(updateData),
+            });
+            const data = await response.json();
+            if (response.ok && data.status) {
+              setPost((prev) => (prev ? { ...prev, ...updateData } : null));
+              toast.success(data.message);
+            } else {
+              toast.error("Gagal melakukan aksi", { description: data.message });
+            }
+            break;
           case "bookmark":
-            handleBookmark()
-            break
+            handleBookmark();
+            break;
           case "share-link":
-            await navigator.clipboard.writeText(window.location.href)
-            toast("Link disalin", { description: "Link post telah disalin ke clipboard" })
-            break
+            if (typeof window !== "undefined") {
+              await navigator.clipboard.writeText(window.location.href);
+              toast.success("Link disalin", { description: "Link post telah disalin ke clipboard" });
+            }
+            break;
           case "share-external":
-            window.open(window.location.href, "_blank")
-            break
+            if (typeof window !== "undefined") {
+              window.open(window.location.href, "_blank");
+            }
+            break;
           case "download":
             if (post.media && post.media.length > 0) {
               post.media.forEach((media, index) => {
-                const link = document.createElement("a")
-                link.href = media.url
-                link.download = `media-${index + 1}.${media.type === "image" ? "jpg" : "mp4"}`
-                link.click()
-              })
-              toast("Download dimulai", { description: "Media sedang diunduh" })
+                const link = document.createElement("a");
+                link.href = media.url;
+                link.download = `media-${post.id}-${index + 1}.${media.type === "image" ? "jpg" : "mp4"}`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              });
+              toast.info("Download dimulai", { description: "Media sedang diunduh" });
+            } else {
+              toast.info("Tidak ada media untuk diunduh.", { description: "Postingan ini tidak memiliki lampiran media." });
             }
-            break
+            break;
           case "report":
-            toast("Laporan dikirim", { description: "Post telah dilaporkan untuk ditinjau moderator" })
-            break
+            if (!userId) {
+              toast.error("Anda harus login untuk melaporkan.");
+              router.push("/login");
+              return;
+            }
+            setIsPostReportDialogOpen(true);
+            break;
+          default:
+            break;
         }
       } catch (error) {
-        console.error(error)
-        toast.error("Error", { description: "Gagal melakukan aksi" })
+        console.error(error);
+        toast.error("Error", { description: "Gagal melakukan aksi" });
       }
     },
-    [post, router, handleBookmark],
-  )
+    [post, router, handleBookmark, isAdmin, userId, setPost],
+  );
 
   const handleCommentAction = useCallback(
     async (replyId: string, action: string) => {
-      if (!post) return
+      if (!post) return;
 
       try {
         switch (action) {
           case "share-link":
-            const shareUrl = `${window.location.origin}/forum/${post.id}#comment-${replyId}`
-            await navigator.clipboard.writeText(shareUrl)
-            toast("Link disalin", { description: "Link komentar telah disalin ke clipboard" })
-            break
+            if (typeof window !== "undefined") {
+              const shareUrl = `${window.location.origin}/forum/${post.id}#comment-${replyId}`;
+              await navigator.clipboard.writeText(shareUrl);
+              toast.success("Link disalin", { description: "Link komentar telah disalin ke clipboard" });
+            }
+            break;
           case "share-external":
-            const externalUrl = `${window.location.origin}/forum/${post.id}#comment-${replyId}`
-            window.open(externalUrl, "_blank")
-            break
+            if (typeof window !== "undefined") {
+              const externalUrl = `${window.location.origin}/forum/${post.id}#comment-${replyId}`;
+              window.open(externalUrl, "_blank");
+            }
+            break;
           case "report":
-            toast("Laporan dikirim", { description: "Komentar telah dilaporkan untuk ditinjau moderator" })
-            break
+            if (!userId) {
+              toast.error("Anda harus login untuk melaporkan.");
+              router.push("/login");
+              return;
+            }
+            toast.info("Fitur lapor komentar akan segera tersedia.");
+            break;
           case "edit":
-            toast("Edit", { description: "Fitur edit komentar akan segera tersedia" })
-            break
+            toast.info("Fitur edit komentar akan segera tersedia.");
+            break;
           case "delete":
             if (confirm("Apakah Anda yakin ingin menghapus komentar ini?")) {
-              setReplies((prev) => {
-                const flat = flattenReplies(prev).filter((r) => r.id !== replyId)
-                return buildReplyTree(flat)
-              })
-              toast("Komentar dihapus", { description: "Komentar berhasil dihapus" })
+              const response = await fetch(`/api/forum/posts/${post.id}/replies/${replyId}`, { method: "DELETE" });
+              const data = await response.json();
+              if (response.ok && data.status) {
+                toast.success("Komentar dihapus", { description: data.message });
+              } else {
+                toast.error("Gagal menghapus komentar", { description: data.message });
+              }
             }
-            break
+            break;
+          default:
+            break;
         }
       } catch (error) {
-        console.error(error)
-        toast.error("Error", { description: "Gagal melakukan aksi" })
+        console.error(error);
+        toast.error("Error", { description: "Gagal melakukan aksi" });
       }
     },
-    [post],
-  )
+    [post, userId, router],
+  );
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Ensure the event is from the main reply MarkdownEditor only
-      const isMainEditorFocused = mainReplyTextareaRef.current === document.activeElement
+      const isMainEditorFocused = mainReplyTextareaRef.current === document.activeElement;
 
       if (isMainEditorFocused && (event.ctrlKey || event.metaKey) && event.key === "Enter") {
-        if (newReply.trim()) {
-          event.preventDefault() // Prevent new line in textarea
-          handleSubmitReply(newReply, selectedMedia)
+        if (newReplyContent.trim() || mainCommentUploadState.uploadedData) {
+          event.preventDefault();
+          handleSubmitReply(newReplyContent, mainCommentUploadState.uploadedData ? [mainCommentUploadState.uploadedData] : []);
         }
       }
+    };
 
-      if ((event.ctrlKey || event.metaKey) && event.key === "b") {
-        event.preventDefault()
-        handleBookmark()
-      }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [newReplyContent, mainCommentUploadState.uploadedData, handleSubmitReply]);
+
+  useEffect(() => {
+    if (commentIdToHighlight && replies.length > 0) {
+      setTimeout(() => {
+        const targetElement = document.getElementById(`comment-${commentIdToHighlight}`);
+        if (targetElement) {
+          targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
     }
+  }, [commentIdToHighlight, replies]);
 
-    document.addEventListener("keydown", handleKeyDown)
-    return () => document.removeEventListener("keydown", handleKeyDown)
-  }, [newReply, selectedMedia, handleBookmark, handleSubmitReply])
+  const fullPostContent = useMemo(() => `${post?.title || ""} ${post?.description || ""} ${post?.content || ""}`, [post]);
+  const readingTime = useMemo(() => getReadingTime(fullPostContent), [fullPostContent]);
 
-  // Render not found state
-  if (!loading && !post) {
+  if (!loadingPost && !post) {
     return (
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <Card>
           <CardContent className="p-8 text-center">
             <AlertTriangle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Post tidak ditemukan</h2>
-            <p className="text-gray-600 mb-4">Post yang Anda cari tidak ada atau telah dihapus.</p>
-            <Button onClick={() => router.push("/forum")}>
+            <p className="text-gray-600 mb-4">{error || "Post yang Anda cari tidak ada atau telah dihapus."}</p>
+            <Button type="button" onClick={() => router.push("/forum")}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Kembali ke Forum
             </Button>
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   return (
     <div className={`container mx-auto px-4 py-8 max-w-7xl`}>
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <Button variant="outline" onClick={() => router.push("/forum")}>
+        <Button type="button" variant="outline" onClick={() => router.push("/forum")}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Kembali ke Forum
         </Button>
         <div className="flex items-center gap-2">
           <Button
+            type="button"
             variant={isBookmarked ? "default" : "outline"}
             size="sm"
             onClick={handleBookmark}
             className="hidden sm:flex"
-            disabled={loading}
+            disabled={loadingPost || !userId}
           >
             {isBookmarked ? <BookmarkCheck className="h-4 w-4 mr-1" /> : <Bookmark className="h-4 w-4 mr-1" />}
             {isBookmarked ? "Tersimpan" : "Bookmark"}
           </Button>
           <Button
+            type="button"
             variant="outline"
             size="sm"
             onClick={() => handlePostAction("share-link")}
             className="hidden sm:flex"
-            disabled={loading}
+            disabled={loadingPost}
           >
             <Share2 className="h-4 w-4 mr-1" />
             Bagikan
@@ -1647,31 +1101,26 @@ export default function ForumDetailPage() {
         </div>
       </div>
 
-      {/* Thumbnail Section */}
       <div className="mb-6">
-        <PostThumbnail post={post} isLoading={loading} />
+        <PostThumbnail post={post} isLoading={loadingPost} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content */}
         <div className="col-span-2 space-y-6">
-          {/* Post Card */}
           <Card className="overflow-hidden">
             <CardHeader className="pb-4">
-              {loading ? (
+              {loadingPost ? (
                 <PostHeaderSkeleton />
               ) : post ? (
                 <>
                   <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-12 w-12">
-                        <AvatarImage src={post.avatar || "/placeholder.svg"} />
-                        <AvatarFallback>{post.author[0]}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-semibold">{post.author}</p>
-                        <p className="text-sm text-gray-500">{formatTimeAgo(post.timestamp)}</p>
-                      </div>
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={post.authorAvatar || "/placeholder.svg"} />
+                      <AvatarFallback>{post.authorUsername?.[0] || '?'}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <p className="font-semibold">{post.authorUsername}</p>
+                      <p className="text-sm text-gray-500">{formatTimeAgo(post.createdAt)}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant={post.isResolved ? "default" : "secondary"} className="shrink-0">
@@ -1693,8 +1142,10 @@ export default function ForumDetailPage() {
                       <PostActionsPopover
                         post={post}
                         isBookmarked={isBookmarked}
-                        isPostAuthor={isPostAuthor || false}
+                        isPostAuthor={isPostAuthor}
                         onAction={handlePostAction}
+                        isAdmin={isAdmin}
+                        isLoggedIn={!!userId}
                       />
                     </div>
                   </div>
@@ -1715,16 +1166,18 @@ export default function ForumDetailPage() {
             </CardHeader>
 
             <CardContent>
-              {loading ? (
+              {loadingPost ? (
                 <PostContentSkeleton />
               ) : post ? (
                 <>
                   <div className="prose prose-sm max-w-none dark:prose-invert">
-                    <p className="whitespace-pre-wrap leading-relaxed">{post.content}</p>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {post.content}
+                    </ReactMarkdown>
                   </div>
 
                   {post.media && post.media.length > 0 && (
-                    <div className="mb-6">
+                    <div className="mb-6 mt-4">
                       <MediaViewer media={post.media} />
                     </div>
                   )}
@@ -1734,59 +1187,80 @@ export default function ForumDetailPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <Button
+                        type="button"
                         variant={isLiked ? "default" : "outline"}
                         size="sm"
                         onClick={handleLike}
                         className="flex items-center gap-2"
+                        disabled={!userId}
                       >
                         <Heart className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`} />
                         {post.likes}
                       </Button>
                       <div className="flex items-center gap-1 text-sm text-gray-500">
                         <MessageSquare className="h-4 w-4" />
-                        {replies.length} balasan
+                        {post.replies} balasan
                       </div>
                       <div className="flex items-center gap-1 text-sm text-gray-500">
                         <Eye className="h-4 w-4" />
                         {views.toLocaleString()} views
                       </div>
+                      <span className="flex items-center gap-1 text-sm text-gray-500">
+                        <BookOpenText className="h-4 w-4" />
+                        {readingTime}
+                      </span>
                     </div>
-                    <div className="text-xs text-gray-500">Dibuat {formatTimeAgo(post.timestamp)}</div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => handlePostAction("share-link")}
+                    >
+                      <Share2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </>
               ) : null}
             </CardContent>
           </Card>
 
-          {/* Comments Section */}
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
                 <MessageSquare className="h-5 w-5" />
                 <span className="font-semibold">
-                  Komentar {loadingComments ? "" : `(${flattenReplies(replies).length})`}
+                  Komentar ({flattenReplies(replies).length})
                 </span>
               </div>
             </CardHeader>
             <CardContent>
-              {/* Comments List */}
-              <ScrollArea>
-                <div className="space-y-4">
-                  {loadingComments ? (
+              <ScrollArea className="h-[400px]">
+                <div ref={highlightCommentRef} className="space-y-4 pr-4">
+                  {loadingPost ? (
                     Array.from({ length: 3 }).map((_, i) => <CommentSkeleton key={i} />)
                   ) : replies.length > 0 ? (
                     replies.map((reply) => (
                       <ReplyItem
                         key={reply.id}
                         reply={reply}
-                        postAuthor={post?.author || ""}
+                        postId={post?.id || ""}
+                        postTitle={post?.title || ""}
+                        postAuthorId={post?.authorId || ""}
                         onVote={handleVote}
                         onReaction={handleReaction}
                         onMarkAsSolution={handleMarkAsSolution}
                         onCommentAction={handleCommentAction}
-                        userState={userState}
+                        currentUserId={userId || undefined}
+                        isAdmin={isAdmin}
+                        currentUserVoteStatus={userState.votes?.[reply.id] || null}
+                        currentUserReactions={userState.reactions?.[reply.id] || null} // PERBAIKAN: null
                         onSubmitReply={handleSubmitReply}
                         isSubmittingReply={submittingReply}
+                        isNested={false}
+                        isHighlighted={commentIdToHighlight === reply.id}
+                        uploadMediaToImageKit={uploadMediaToImageKit}
+                        allAvailableMentions={allCommentAuthors}
                       />
                     ))
                   ) : (
@@ -1797,64 +1271,98 @@ export default function ForumDetailPage() {
                     </div>
                   )}
                 </div>
-                {/* NEW LOCATION: New Reply Form is now here, outside the comments card */}
-                {!loading && (
-                  <div className="mt-6">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1">
-                        <MarkdownEditor
-                          // textareaRef={mainReplyTextareaRef}
-                          value={newReply}
-                          onChange={setNewReply}
-                          onMediaFilesChange={setSelectedMedia}
-                          mediaPreviews={mainCommentMediaPreviews}
-                          placeholder="Tulis komentar Anda..."
-                          rows={6}
-                          disabled={submittingReply}
-                          showMediaInput={true}
-                        />
-                        <div className="flex items-center justify-between mt-3">
-                          <div className="text-xs text-gray-500">Tekan Ctrl+Enter untuk mengirim cepat</div>
-                          <Button
-                            onClick={() => handleSubmitReply(newReply, selectedMedia)}
-                            disabled={!newReply.trim() || submittingReply}
-                          >
-                            {submittingReply ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Mengirim...
-                              </>
-                            ) : (
-                              <>
-                                <Send className="h-4 w-4 mr-2" />
-                                Kirim Komentar
-                              </>
-                            )}
-                          </Button>
-                        </div>
+              </ScrollArea>
+              {!loadingPost && userId && (
+                <div className="mt-6 border-t pt-4">
+                  <div className="flex items-start gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={avatar || "/placeholder.svg"} />
+                      <AvatarFallback>{username?.[0] || '?'}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <MarkdownEditor
+                        textareaRef={mainReplyTextareaRef}
+                        value={newReplyContent}
+                        onChange={setNewReplyContent}
+                        onMediaFilesChange={handleMainMediaFilesChange}
+                        mediaPreviews={mainCommentMediaPreviews}
+                        placeholder="Tulis komentar Anda..."
+                        rows={4}
+                        disabled={submittingReply || mainCommentUploadState.uploading}
+                        isUploadingMedia={mainCommentUploadState.uploading}
+                        showMediaInput={true}
+                        onRemoveMedia={handleRemoveMainMedia}
+                        allAvailableMentions={allCommentAuthors}
+                      />
+                      <div className="flex justify-between text-sm text-gray-500 mt-1">
+                        <span>Mendukung Markdown formatting</span>
+                        {mainCommentUploadState.uploading && (
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                            <Progress value={mainCommentUploadState.progress} className="w-24 h-2" />
+                            <span>{Math.round(mainCommentUploadState.progress)}%</span>
+                          </div>
+                        )}
+                        {mainCommentUploadState.error && (
+                          <p className="text-red-500 text-xs mt-1">{mainCommentUploadState.error}</p>
+                        )}
+                        <span>{newReplyContent.length}/5000</span>
+                      </div>
+                      <div className="flex items-center justify-between mt-3">
+                        <div className="text-xs text-gray-500">Tekan Ctrl+Enter untuk mengirim cepat</div>
+                        <Button
+                          type="button"
+                          onClick={() => handleSubmitReply(newReplyContent, mainCommentUploadState.uploadedData ? [mainCommentUploadState.uploadedData] : [])}
+                          disabled={(!newReplyContent.trim() && !mainCommentUploadState.file) || submittingReply || mainCommentUploadState.uploading || (mainCommentUploadState.file && !mainCommentUploadState.uploadedData)}
+                        >
+                          {submittingReply || mainCommentUploadState.uploading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Mengirim...
+                            </>
+                          ) : (
+                            <>
+                              <Send className="h-4 w-4 mr-2" />
+                              Kirim Komentar
+                            </>
+                          )}
+                        </Button>
                       </div>
                     </div>
                   </div>
-                )}
-              </ScrollArea>
+                </div>
+              )}
+              {!userId && !loadingPost && (
+                <div className="text-center py-6 text-muted-foreground">
+                  <p>Login untuk bergabung dalam diskusi dan meninggalkan komentar.</p>
+                  <Button type="button" variant="link" onClick={() => router.push('/login')} className="mt-2">Login Sekarang</Button>
+                </div>
+              )}
             </CardContent>
           </Card>
-
         </div>
 
-        {/* Right Sidebar */}
         <div className="hidden lg:block space-y-6 lg:sticky lg:top-[87px] h-fit">
-          <PostStats post={post} views={views} isLiked={isLiked} isLoading={loading} />
+          <PostStats post={post} views={views} isLiked={isLiked} isLoading={loadingPost} />
           <QuickActions
             onBookmark={handleBookmark}
             onShare={() => handlePostAction("share-link")}
             onNewPost={() => router.push("/forum/new")}
             isBookmarked={isBookmarked}
-            isLoading={loading}
+            isLoading={loadingPost}
           />
-          <RelatedPosts currentPost={post} isLoading={loading} />
+          <RelatedPosts currentPost={post} isLoading={loadingPost} />
         </div>
       </div>
+      <ReportDialog
+        isOpen={isPostReportDialogOpen}
+        onOpenChange={setIsPostReportDialogOpen}
+        reportType="forum_post"
+        entityId={post?.id || ""}
+        entityTitle={post?.title}
+        entityAuthorId={post?.authorId}
+        entityAuthorUsername={post?.authorUsername}
+      />
     </div>
-  )
+  );
 }

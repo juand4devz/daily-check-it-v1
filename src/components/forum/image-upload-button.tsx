@@ -1,46 +1,47 @@
-"use client"
+// /components/forum/ImageUploadButton.tsx
+"use client";
 
-import type React from "react"
-import { useRef, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { ImageIcon, Loader2 } from "lucide-react"
-import { toast } from "sonner"
+import type React from "react";
+import { useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { ImageIcon, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface ImageUploadButtonProps {
-    onFilesSelect: (files: File[]) => void
-    disabled?: boolean
-    maxSize?: number // in MB
+    onFilesSelect: (files: File[]) => void; // This will receive the File object(s)
+    disabled?: boolean;
+    maxSize?: number; // in MB
 }
 
 export function ImageUploadButton({ onFilesSelect, disabled = false, maxSize = 5 }: ImageUploadButtonProps) {
-    const fileInputRef = useRef<HTMLInputElement>(null)
-    const [isLoading, setIsLoading] = useState(false)
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isLoading, setIsLoading] = useState(false);
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const files = event.target.files
-        if (!files || files.length === 0) return
+        const files = event.target.files;
+        if (!files || files.length === 0) return;
 
-        setIsLoading(true)
-        const validFiles: File[] = []
+        setIsLoading(true);
+        const validFiles: File[] = [];
 
         for (const file of Array.from(files)) {
             if (!file.type.startsWith("image/")) {
-                toast.error(`File ${file.name} bukan gambar.`)
-                continue
+                toast.error(`File ${file.name} bukan gambar.`);
+                continue;
             }
             if (file.size > maxSize * 1024 * 1024) {
-                toast.error(`File ${file.name} terlalu besar (maks ${maxSize}MB).`)
-                continue
+                toast.error(`File ${file.name} terlalu besar (maks ${maxSize}MB).`);
+                continue;
             }
-            validFiles.push(file)
+            validFiles.push(file);
         }
 
         if (validFiles.length > 0) {
-            onFilesSelect(validFiles)
+            onFilesSelect(validFiles); // Pass the valid files to the parent
         }
-        setIsLoading(false)
-        event.target.value = "" // Clear input so same file can be selected again
-    }
+        setIsLoading(false);
+        event.target.value = ""; // Clear input so same file can be selected again
+    };
 
     return (
         <>
@@ -57,5 +58,5 @@ export function ImageUploadButton({ onFilesSelect, disabled = false, maxSize = 5
             </Button>
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
         </>
-    )
+    );
 }
