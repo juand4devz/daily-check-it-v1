@@ -1,7 +1,7 @@
 // /diagnose/page.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,34 +27,13 @@ import {
   WifiOff,
 } from "lucide-react";
 import Image from "next/image";
-
-// --- Interfaces ---
-interface Gejala {
-  kode: string;
-  nama: string;
-  deskripsi: string;
-  kategori: string;
-  perangkat: string[];
-  mass_function: Record<string, number>;
-  gambar: string;
-}
-
-interface DiagnoseApiInfo {
-  message: string;
-  usage: string;
-  algorithm: string;
-  max_symptoms: number;
-  available_devices: string[];
-  available_symptoms: string[];
-  available_damages: string[];
-  total_symptoms: number;
-  total_damages: number;
-  improvements: string[];
-  timestamp: string;
-}
+import Fuse from "fuse.js";
+import { Gejala, Kerusakan, StoredDiagnosisResult } from "@/types/diagnose";
+import { toast } from "sonner";
+import { useSession } from "next-auth/react";
 
 // --- Konstanta ---
-const MAX_GEJALA_DEFAULT = 5; // Nilai default jika data API tidak tersedia
+const MAX_GEJALA_DEFAULT = 5;
 const MIN_GEJALA = 1;
 
 // --- Komponen Skeleton Loader ---
@@ -76,85 +55,91 @@ const GejalaCardSkeleton = () => (
 
 // --- Komponen Utama ---
 export default function DiagnosaPage() {
-  const router = useRouter(); // Pastikan useRouter dipanggil di awal
+  const router = useRouter();
+  const { data: status } = useSession();
 
-  const [selectedGejala, setSelectedGejala] = useState<string[]>([]);
+  const [selectedGejala, setSelectedGejala] = useState<Gejala[]>([]);
   const [isLoadingDiagnose, setIsLoadingDiagnose] = useState(false);
   const [filterCategory, setFilterCategory] = useState("Semua");
   const [filterPerangkat, setFilterPerangkat] = useState("Semua");
   const [searchTerm, setSearchTerm] = useState("");
   const [gejalaList, setGejalaList] = useState<Gejala[]>([]);
-  const [loadingGejala, setLoadingGejala] = useState(true);
-  const [errorGejala, setErrorGejala] = useState<string | null>(null);
+  const [kerusakanList, setKerusakanList] = useState<Kerusakan[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [errorData, setErrorData] = useState<string | null>(null);
   const [apiMaxGejala, setApiMaxGejala] = useState<number>(MAX_GEJALA_DEFAULT);
-  const [apiAvailableDevices, setApiAvailableDevices] = useState<string[]>([
-    "Komputer",
-    "Laptop",
-  ]);
+  const [apiAvailableDevices, setApiAvailableDevices] = useState<string[]>([]);
 
-  // --- Ambil Data Awal (Daftar Gejala dan Info Diagnosa) ---
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      setLoadingGejala(true);
-      setErrorGejala(null);
-      try {
-        // Ambil Daftar Gejala dari rute API yang didedikasikan
-        const gejalaResponse = await fetch("/api/gejala");
-        if (!gejalaResponse.ok) {
-          const errorText = await gejalaResponse.text();
-          throw new Error(
-            `Gagal mengambil data gejala: ${gejalaResponse.status} ${errorText}`
-          );
-        }
-        const fetchedGejalaList: Gejala[] = await gejalaResponse.json();
-
-        // Urutkan daftar gejala berdasarkan 'kode' (misalnya, G1, G2, ..., G10)
-        const sortedGejalaList = fetchedGejalaList.sort((a, b) => {
-          const numA = parseInt(a.kode.replace("G", "")) || 0;
-          const numB = parseInt(b.kode.replace("G", "")) || 0;
-          return numA - numB;
-        });
-        setGejalaList(sortedGejalaList);
-
-        // Secara opsional, ambil info diagnosa untuk max_symptoms dan available_devices
-        const diagnoseInfoResponse = await fetch("/api/diagnose");
-        if (diagnoseInfoResponse.ok) {
-          const diagnoseInfo: DiagnoseApiInfo =
-            await diagnoseInfoResponse.json();
-          setApiMaxGejala(diagnoseInfo.max_symptoms || MAX_GEJALA_DEFAULT);
-          setApiAvailableDevices(diagnoseInfo.available_devices || ["Komputer", "Laptop"]);
-        } else {
-          console.warn(
-            "Tidak dapat mengambil info diagnosa (max_symptoms, dll.). Menggunakan nilai default."
-          );
-        }
-      } catch (caughtError: unknown) {
-        console.error("Terjadi kesalahan saat mengambil data awal:", caughtError);
-        let errorMessage = "Terjadi kesalahan yang tidak diketahui.";
-        if (caughtError instanceof Error) {
-          errorMessage = caughtError.message;
-        }
-        setErrorGejala(errorMessage);
-      } finally {
-        setLoadingGejala(false);
+  // --- Ambil Data Awal (Daftar Gejala dan Kerusakan) ---
+  const fetchInitialData = useCallback(async () => {
+    setLoadingData(true);
+    setErrorData(null);
+    try {
+      if (status === 'loading') return;
+      if (status === 'unauthenticated') {
+        toast.error("Anda harus login untuk menggunakan fitur diagnosa.");
+        router.push("/login");
+        return;
       }
-    };
 
+      const [gejalaResponse, kerusakanResponse] = await Promise.all([
+        fetch("/api/diagnose/symptoms"), // Perbarui nama route
+        fetch("/api/diagnose/damages"), // Perbarui nama route
+      ]);
+
+      const [gejalaData, kerusakanData] = await Promise.all([
+        gejalaResponse.json(),
+        kerusakanResponse.json(),
+      ]);
+
+      if (!gejalaResponse.ok) {
+        throw new Error(gejalaData.message || `Kesalahan HTTP pada gejala: ${gejalaResponse.status}`);
+      }
+      if (!kerusakanResponse.ok) {
+        throw new Error(kerusakanData.message || `Kesalahan HTTP pada kerusakan: ${kerusakanResponse.status}`);
+      }
+
+      const sortedGejalaList = (gejalaData.data as Gejala[]).sort((a, b) => {
+        const numA = parseInt(a.kode.replace("G", "")) || 0;
+        const numB = parseInt(b.kode.replace("G", "")) || 0;
+        return numA - numB;
+      });
+
+      setGejalaList(sortedGejalaList);
+      setKerusakanList(kerusakanData.data as Kerusakan[]);
+      setApiAvailableDevices([...new Set((gejalaData.data as Gejala[]).flatMap(g => g.perangkat))]);
+
+    } catch (caughtError: unknown) {
+      console.error("Terjadi kesalahan saat mengambil data awal:", caughtError);
+      let errorMessage = "Terjadi kesalahan yang tidak diketahui.";
+      if (caughtError instanceof Error) {
+        errorMessage = caughtError.message;
+      }
+      setErrorData(errorMessage);
+    } finally {
+      setLoadingData(false);
+    }
+  }, [status, router]);
+
+  useEffect(() => {
     fetchInitialData();
-  }, []);
+  }, [fetchInitialData]);
 
   // --- Penangan Event ---
   const handleGejalaChange = useCallback(
-    (kodeGejala: string, checked: boolean) => {
+    (gejala: Gejala, checked: boolean) => {
       setSelectedGejala((prevSelected) => {
-        if (checked) {
+        const isSelected = prevSelected.some(g => g.kode === gejala.kode);
+        if (checked && !isSelected) {
           if (prevSelected.length >= apiMaxGejala) {
+            toast.error(`Maksimal ${apiMaxGejala} gejala dapat dipilih.`);
             return prevSelected;
           }
-          return [...prevSelected, kodeGejala];
-        } else {
-          return prevSelected.filter((g) => g !== kodeGejala);
+          return [...prevSelected, gejala];
+        } else if (!checked && isSelected) {
+          return prevSelected.filter((g) => g.kode !== gejala.kode);
         }
+        return prevSelected;
       });
     },
     [apiMaxGejala]
@@ -162,73 +147,78 @@ export default function DiagnosaPage() {
 
   const handleSubmit = async () => {
     if (selectedGejala.length < MIN_GEJALA) {
-      alert(`Pilih minimal ${MIN_GEJALA} gejala untuk melakukan diagnosa.`);
+      toast.error(`Pilih minimal ${MIN_GEJALA} gejala untuk melakukan diagnosa.`);
       return;
     }
 
     setIsLoadingDiagnose(true);
 
     try {
-      const response = await fetch("/api/diagnose", {
+      // Kirim data yang diperlukan ke API
+      const response = await fetch("/api/diagnose", { // Route diagnosa utama
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          gejala: selectedGejala,
-          perangkat:
-            filterPerangkat !== "Semua" ? filterPerangkat.toLowerCase() : undefined,
-          gejalaList: gejalaList, // Kirim seluruh data gejala dari klien ke server
+          gejala: selectedGejala.map(g => g.kode),
+          perangkat: filterPerangkat !== "Semua" ? filterPerangkat.toLowerCase() : undefined,
+          gejalaList: gejalaList,
+          kerusakanList: kerusakanList,
         }),
       });
 
       if (!response.ok) {
         const errorData: { error?: string } = await response.json();
-        throw new Error(
-          errorData.error || `Kesalahan HTTP! status: ${response.status}`
-        );
+        throw new Error(errorData.error || `Kesalahan HTTP! status: ${response.status}`);
       }
 
-      const result = await response.json();
+      const result: StoredDiagnosisResult = await response.json();
 
-      // Simpan seluruh objek hasil (termasuk selectedGejalaDetails yang baru)
-      sessionStorage.setItem(
-        "diagnosisResult",
-        JSON.stringify(result) // Simpan seluruh objek result
-      );
+      sessionStorage.setItem("diagnosisResult", JSON.stringify(result));
 
       router.push("/diagnose/hasil");
     } catch (caughtError: unknown) {
       console.error("Terjadi kesalahan:", caughtError);
       let errorMessage = "Terjadi kesalahan saat memproses diagnosa. Silakan coba lagi.";
       if (caughtError instanceof Error) {
-        errorMessage = `Terjadi kesalahan saat memproses diagnosa: ${caughtError.message}. Silakan coba lagi.`;
+        errorMessage = `Terjadi kesalahan saat memproses diagnosa: ${caughtError.message}.`;
       }
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoadingDiagnose(false);
     }
   };
 
-  // --- Logika Penyaringan ---
-  const filteredGejala = gejalaList.filter((gejala) => {
-    const categoryMatch =
-      filterCategory === "Semua" || gejala.kategori === filterCategory;
+  // --- Logika Pencarian dan Penyaringan dengan Fuse.js ---
+  const fuse = useMemo(() => {
+    const options = {
+      keys: ['nama', 'deskripsi', 'kode'],
+      threshold: 0.3,
+    };
+    return new Fuse(gejalaList, options);
+  }, [gejalaList]);
 
-    const deviceMatch =
-      filterPerangkat === "Semua" ||
-      gejala.perangkat.includes(filterPerangkat.toLowerCase());
+  const filteredGejala = useMemo(() => {
+    const searchResult = searchTerm
+      ? fuse.search(searchTerm).map(result => result.item)
+      : gejalaList;
 
-    const searchMatch =
-      gejala.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      gejala.deskripsi.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      gejala.kode.toLowerCase().includes(searchTerm.toLowerCase());
-    return categoryMatch && deviceMatch && searchMatch;
-  });
+    return searchResult.filter((gejala) => {
+      const categoryMatch = filterCategory === "Semua" || gejala.kategori === filterCategory;
+      const deviceMatch = filterPerangkat === "Semua" || gejala.perangkat.includes(filterPerangkat.toLowerCase());
+      return categoryMatch && deviceMatch;
+    });
+  }, [searchTerm, gejalaList, filterCategory, filterPerangkat, fuse]);
 
   // Dapatkan kategori unik dan jenis perangkat yang tersedia untuk filter
-  const categories = [...new Set(gejalaList.map((g) => g.kategori))];
-  const perangkatTypes = apiAvailableDevices;
+  const categories = useMemo(() => {
+    const uniqueCategories = [...new Set(gejalaList.map((g) => g.kategori))];
+    return uniqueCategories.sort();
+  }, [gejalaList]);
+
+  const perangkatTypes = useMemo(() => {
+    const uniqueDevices = [...new Set(gejalaList.flatMap(g => g.perangkat))];
+    return uniqueDevices.map(d => d.charAt(0).toUpperCase() + d.slice(1)).sort();
+  }, [gejalaList]);
 
   const isMaxReached = selectedGejala.length >= apiMaxGejala;
 
@@ -294,7 +284,7 @@ export default function DiagnosaPage() {
             <Select value={filterPerangkat} onValueChange={setFilterPerangkat}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <Filter className="h-4 w-4 mr-2" />
-                <SelectValue />
+                <SelectValue placeholder="Semua Perangkat" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Semua">Semua Perangkat</SelectItem>
@@ -308,7 +298,7 @@ export default function DiagnosaPage() {
             <Select value={filterCategory} onValueChange={setFilterCategory}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <Filter className="h-4 w-4 mr-2" />
-                <SelectValue />
+                <SelectValue placeholder="Semua Kategori" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Semua">Semua Kategori</SelectItem>
@@ -334,25 +324,25 @@ export default function DiagnosaPage() {
       </div>
 
       {/* Kartu Gejala */}
-      {loadingGejala ? (
+      {loadingData ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-8">
           {[...Array(10)].map((_, index) => (
             <GejalaCardSkeleton key={index} />
           ))}
         </div>
-      ) : errorGejala ? (
+      ) : errorData ? (
         <Alert variant="destructive" className="mb-6">
           <WifiOff className="h-4 w-4" />
           <AlertTitle>Gagal Memuat Gejala!</AlertTitle>
           <AlertDescription>
-            Terjadi kesalahan: {errorGejala}. Pastikan server API berjalan dan
+            Terjadi kesalahan: {errorData}. Pastikan server API berjalan dan
             Firestore dapat diakses.
           </AlertDescription>
         </Alert>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mb-8">
           {filteredGejala.map((gejala) => {
-            const isSelected = selectedGejala.includes(gejala.kode);
+            const isSelected = selectedGejala.some(g => g.kode === gejala.kode);
             const isDisabled = !isSelected && isMaxReached;
 
             return (
@@ -362,7 +352,7 @@ export default function DiagnosaPage() {
                   ? "bg-background dark:bg-background border-1 border-gray-300 shadow-2xl ring-1 ring-gray-400 scale-105"
                   : "border-gray-200 border dark:border-gray-500 hover:border-gray-300"
                   } ${isDisabled ? "opacity-50 cursor-not-allowed bg-background" : ""}`}
-                onClick={() => !isDisabled && handleGejalaChange(gejala.kode, !isSelected)}
+                onClick={() => !isDisabled && handleGejalaChange(gejala, !isSelected)}
               >
                 <div className="relative">
                   <div className="aspect-video relative overflow-hidden rounded-t-lg">
@@ -371,8 +361,7 @@ export default function DiagnosaPage() {
                       width={500}
                       src={gejala.gambar || "/placeholder.svg"}
                       alt={gejala.nama}
-                      className={`w-full h-full object-cover transition-all duration-200 ${isDisabled ? "grayscale" : "group-hover:scale-105"
-                        }`}
+                      className={`w-full h-full object-cover transition-all duration-200 ${isDisabled ? "grayscale" : "group-hover:scale-105"}`}
                     />
 
                     {/* Overlay untuk status terpilih */}
@@ -386,10 +375,7 @@ export default function DiagnosaPage() {
 
                     {/* Badge Kode */}
                     <div className="absolute top-1 left-2">
-                      <Badge
-                        className="w-5 h-5"
-                        variant={isSelected ? "default" : "secondary"}
-                      >
+                      <Badge className="w-5 h-5" variant={isSelected ? "default" : "secondary"}>
                         {gejala.kode}
                       </Badge>
                     </div>
@@ -399,11 +385,7 @@ export default function DiagnosaPage() {
                       <div className="absolute top-2 right-2">
                         <div className="flex flex-wrap gap-1">
                           {gejala.perangkat.map((device) => (
-                            <Badge
-                              key={device}
-                              variant="outline"
-                              className="h-5 backdrop-blur-sm text-white border-none"
-                            >
+                            <Badge key={device} variant="outline" className="h-5 backdrop-blur-sm text-white border-none">
                               {device === "computer" ? "PC" : "Laptop"}
                             </Badge>
                           ))}
@@ -416,30 +398,19 @@ export default function DiagnosaPage() {
                     <div className="space-y-2">
                       <div className="flex items-start justify-between gap-2">
                         <h3
-                          className={`font-semibold text-sm leading-tight line-clamp-2 ${isDisabled
-                            ? "text-gray-500"
-                            : "text-gray-900 dark:text-gray-200"
-                            }`}
+                          className={`font-semibold text-sm leading-tight line-clamp-2 ${isDisabled ? "text-gray-500" : "text-gray-900 dark:text-gray-200"}`}
                         >
                           {gejala.nama}
                         </h3>
                       </div>
-
                       <Badge
                         variant="outline"
-                        className={`text-xs ${isSelected
-                          ? "border-slate-700 dark:border-slate-500 text-slate-800 dark:text-slate-400"
-                          : "border-slate-700 dark:border-slate-300 text-slate-800 dark:text-slate-300"
-                          }`}
+                        className={`text-xs ${isSelected ? "border-slate-700 dark:border-slate-500 text-slate-800 dark:text-slate-400" : "border-slate-700 dark:border-slate-300 text-slate-800 dark:text-slate-300"}`}
                       >
                         {gejala.kategori}
                       </Badge>
-
                       <p
-                        className={`text-xs leading-relaxed line-clamp-3 ${isDisabled
-                          ? "text-gray-400"
-                          : "text-gray-600 dark:text-gray-400"
-                          }`}
+                        className={`text-xs leading-relaxed line-clamp-3 ${isDisabled ? "text-gray-400" : "text-gray-600 dark:text-gray-400"}`}
                       >
                         {gejala.deskripsi}
                       </p>
@@ -452,7 +423,7 @@ export default function DiagnosaPage() {
         </div>
       )}
 
-      {filteredGejala.length === 0 && !loadingGejala && !errorGejala && (
+      {filteredGejala.length === 0 && !loadingData && !errorData && (
         <Card>
           <CardContent className="text-center py-12">
             <Search className="h-16 w-16 mx-auto mb-4 text-gray-300" />
@@ -468,14 +439,14 @@ export default function DiagnosaPage() {
       )}
 
       {/* Tombol Kirim */}
-      <div className="sticky bottom-4 border-1 border-gray-500 dark:border-gray-600 rounded-lg shadow-lg p-2 bg-gray-200 dark:bg-zinc-950 md:w-full mx-auto"> {/* Changed md:w-xl to md:w-full */}
+      <div className="sticky bottom-4 border-1 border-gray-500 dark:border-gray-600 rounded-lg shadow-lg p-2 bg-gray-200 dark:bg-zinc-950 md:w-full mx-auto">
         <div className="flex items-center w-full justify-between">
           <div className="text-sm text-gray-600 flex flex-col items-start justify-center">
             {selectedGejala.length > 0 && (
               <div className="flex gap-1 flex-wrap">
-                {selectedGejala.slice(0, 5).map((kode) => (
-                  <Badge key={kode} variant="secondary" className="text-xs">
-                    {kode}
+                {selectedGejala.slice(0, 5).map((gejala) => (
+                  <Badge key={gejala.kode} variant="secondary" className="text-xs">
+                    {gejala.kode}
                   </Badge>
                 ))}
                 {selectedGejala.length > 5 && (

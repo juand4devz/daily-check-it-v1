@@ -1,54 +1,10 @@
-// app/api/diagnose/route.ts
+// /app/api/diagnose/route.ts
 import { type NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase/firebase-admin"; // Pastikan path ini benar
+import { auth } from "../../../../auth";
+import { getAllKerusakan } from "@/lib/firebase/diagnose-service";
+import { Kerusakan, Gejala, DiagnosisResult, MassFunction } from "@/types/diagnose";
 
-// --- Interfaces ---
-interface MassFunction {
-  [hypothesis: string]: number;
-}
-
-interface Gejala {
-  kode: string;
-  nama: string;
-  deskripsi: string;
-  kategori: string;
-  perangkat: string[];
-  mass_function: Record<string, number>;
-  gambar: string;
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface Kerusakan {
-  kode: string;
-  nama: string;
-  deskripsi: string;
-  tingkat_kerusakan: string;
-  estimasi_biaya: string;
-  waktu_perbaikan: string;
-  prior_probability: number;
-  solusi: string;
-  gejala_terkait: string[];
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-interface DiagnosisResult {
-  kode: string;
-  nama: string;
-  belief: number;
-  plausibility: number;
-  uncertainty: number;
-  solusi: string;
-  tingkat_kerusakan?: string;
-  estimasi_biaya?: string;
-  waktu_perbaikan?: string;
-  confidence_level: string;
-  contributing_symptoms: string[];
-  mass_assignments: { [key: string]: number };
-}
-
-// --- Helper Functions ---
+// --- Helper Functions (Rumus Dempster-Shafer) ---
 function normalizeMassFunction(massFunction: MassFunction): MassFunction {
   const normalized: MassFunction = {};
   let total = 0;
@@ -158,27 +114,6 @@ function getConfidenceLevel(belief: number): string {
   return "Sangat Rendah";
 }
 
-async function getKerusakanList(): Promise<Kerusakan[]> {
-  const snapshot = await adminDb.collection("kerusakan").get();
-  const kerusakanList: Kerusakan[] = snapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      kode: data.kode as string,
-      nama: data.nama as string,
-      deskripsi: data.deskripsi as string,
-      tingkat_kerusakan: data.tingkat_kerusakan as string,
-      estimasi_biaya: data.estimasi_biaya as string,
-      waktu_perbaikan: data.waktu_perbaikan as string,
-      prior_probability: data.prior_probability as number,
-      solusi: data.solusi as string,
-      gejala_terkait: (data.gejala_terkait as string[]) || [],
-      createdAt: (data.createdAt as string) || undefined,
-      updatedAt: (data.updatedAt as string) || undefined,
-    };
-  });
-  return kerusakanList;
-}
-
 function diagnoseWithDempsterShafer(
   selectedSymptomCodes: string[],
   deviceType: string | undefined,
@@ -255,13 +190,17 @@ function diagnoseWithDempsterShafer(
 
 // --- POST Request Handler ---
 export async function POST(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ message: "Unauthorized: User not authenticated." }, { status: 401 });
+  }
+
   try {
     const body: { gejala: string[]; perangkat?: string; gejalaList: Gejala[] } = await request.json();
     const { gejala: selectedSymptomCodes, perangkat, gejalaList: gejalaListClient } = body;
 
-    const kerusakanList = await getKerusakanList();
+    const kerusakanList = await getAllKerusakan();
 
-    // Validasi input
     if (!selectedSymptomCodes || !Array.isArray(selectedSymptomCodes) || selectedSymptomCodes.length === 0) {
       return NextResponse.json({ error: "Gejala harus berupa array dan tidak boleh kosong." }, { status: 400 });
     }
@@ -285,18 +224,16 @@ export async function POST(request: NextRequest) {
     const topResult = results[0];
     const accuracy = topResult ? Math.min(100, Math.round(topResult.belief * 100)) : 0;
 
-    // --- Sertakan detail gejala yang dipilih ke respons ---
     const selectedSymptomsDetailsFull: Gejala[] = validSymptoms.map(kode => {
       const gejala = gejalaListClient.find(g => g.kode === kode);
-      // Mengembalikan objek gejala lengkap, atau objek placeholder jika tidak ditemukan
       return gejala || {
         kode: kode,
-        nama: `Gejala ${kode}`, // Placeholder nama
-        deskripsi: `Detail gejala ${kode} tidak tersedia.`, // Placeholder deskripsi
+        nama: `Gejala ${kode}`,
+        deskripsi: `Detail gejala ${kode} tidak tersedia.`,
         kategori: "Unknown",
         perangkat: [],
         mass_function: {},
-        gambar: "", // Placeholder gambar
+        gambar: "",
       };
     });
 
@@ -315,8 +252,8 @@ export async function POST(request: NextRequest) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     return NextResponse.json({
-      input: selectedSymptomCodes, // Tetap kirim hanya kode input
-      selectedGejalaDetails: selectedSymptomsDetailsFull, // <--- DETAIL LENGKAP GEJALA YANG DIPILIH
+      input: selectedSymptomCodes,
+      selectedGejalaDetails: selectedSymptomsDetailsFull,
       device_type: perangkat || "Tidak ditentukan",
       result: results,
       analysis: {
@@ -338,23 +275,27 @@ export async function POST(request: NextRequest) {
     });
   } catch (caughtError: unknown) {
     console.error("Terjadi kesalahan saat memproses diagnosa:", caughtError);
-    let errorMessage = "Terjadi kesalahan saat memproses diagnosa.";
-    if (caughtError instanceof Error) {
-      errorMessage = caughtError.message;
-    }
+    const errorMessage = "Terjadi kesalahan saat memproses diagnosa.";
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
 // --- GET Request Handler (for initial info) ---
 export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ status: false, statusCode: 401, message: "Unauthorized: User not authenticated." }, { status: 401 });
+  }
+
   try {
-    const kerusakanList = await getKerusakanList();
+    const kerusakanList = await getAllKerusakan();
 
     const maxSymptoms = 5;
     const availableDevices = ["Komputer", "Laptop"];
 
     return NextResponse.json({
+      status: true,
+      statusCode: 200,
       message: "Enhanced Diagnosa API menggunakan Dempster-Shafer Theory",
       usage: "POST /api/diagnosa dengan body { gejala: string[], perangkat?: string, gejalaList: Gejala[] }",
       algorithm: "Enhanced Dempster-Shafer Theory with Conflict Resolution",
@@ -376,10 +317,7 @@ export async function GET() {
     });
   } catch (caughtError: unknown) {
     console.error("Terjadi kesalahan saat mengambil data untuk request GET:", caughtError);
-    let errorMessage = "Terjadi kesalahan saat mengambil data.";
-    if (caughtError instanceof Error) {
-      errorMessage = caughtError.message;
-    }
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    const errorMessage = "Terjadi kesalahan saat mengambil data.";
+    return NextResponse.json({ status: false, statusCode: 500, message: errorMessage }, { status: 500 });
   }
 }

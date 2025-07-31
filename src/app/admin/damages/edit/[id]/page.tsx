@@ -1,177 +1,102 @@
 // /admin/damages/edit/[id]/page.tsx
-"use client"
-import { useState, useEffect, useCallback } from "react"
-import { useRouter, useParams } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Slider } from "@/components/ui/slider"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, Save, X, Eye, Loader2 } from "lucide-react"
-import { toast } from "sonner"
-import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
-import type { Kerusakan } from "@/types" // Use the updated Kerusakan type
+"use client";
 
-const tingkatKerusakanOptions: Array<Kerusakan["tingkat_kerusakan"]> = ["Ringan", "Sedang", "Berat"]
-// You will likely need to fetch these from your /api/gejala route eventually
-const gejalaOptions = Array.from({ length: 25 }, (_, i) => `G${i + 1}`) // Placeholder for now
+import { useState, useEffect, useCallback } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Loader2, ArrowLeft, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
+import { Kerusakan, Gejala, ApiResponse } from "@/types/diagnose";
+import { DamageForm } from "@/components/admin/DamageForm";
 
 export default function EditKerusakanPage() {
-    const router = useRouter()
-    const params = useParams()
-    const [isLoading, setIsLoading] = useState(true) // Set to true for initial data fetch
-    const [formData, setFormData] = useState<Kerusakan>({
-        id: "", // Initialize with empty string, will be populated from fetched data
-        kode: "",
-        nama: "",
-        deskripsi: "",
-        tingkat_kerusakan: "Ringan",
-        estimasi_biaya: "",
-        waktu_perbaikan: "",
-        prior_probability: 0.1,
-        solusi: "",
-        gejala_terkait: [],
-    })
+    const router = useRouter();
+    const params = useParams();
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [kerusakanData, setKerusakanData] = useState<Kerusakan | null>(null);
+    const [gejalaList, setGejalaList] = useState<Gejala[]>([]);
+    const [error, setError] = useState<string | null>(null);
 
-    // --- Fetch Kerusakan Data for Editing ---
+    const loadInitialData = useCallback(async () => {
+        const kerusakanId = params.id as string;
+        if (!kerusakanId) {
+            router.push("/admin/damages");
+            return;
+        }
+
+        setIsLoading(true);
+        setError(null);
+        try {
+            const [kerusakanResponse, gejalaResponse] = await Promise.all([
+                fetch(`/api/diagnose/damages/${kerusakanId}`),
+                fetch("/api/diagnose/symptoms"),
+            ]);
+
+            const kerusakanData: ApiResponse<Kerusakan> = await kerusakanResponse.json();
+            const gejalaData: ApiResponse<Gejala[]> = await gejalaResponse.json();
+
+            if (!kerusakanResponse.ok || !kerusakanData.status) {
+                throw new Error(kerusakanData.message || `Gagal memuat kerusakan: ${kerusakanResponse.status}`);
+            }
+            if (!gejalaResponse.ok || !gejalaData.status) {
+                throw new Error(gejalaData.message || `Gagal memuat daftar gejala: ${gejalaResponse.status}`);
+            }
+
+            setKerusakanData(kerusakanData.data || null);
+            setGejalaList(gejalaData.data || []);
+            toast.success("Data kerusakan berhasil dimuat.");
+        } catch (caughtError: unknown) {
+            console.error("Error loading data:", caughtError);
+            let errorMessage = "Gagal memuat data kerusakan.";
+            if (caughtError instanceof Error) {
+                errorMessage = caughtError.message;
+            }
+            toast.error(errorMessage);
+            setError(errorMessage);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [params.id, router]);
+
     useEffect(() => {
-        const fetchKerusakanToEdit = async () => {
-            const kerusakanId = params.id as string // This is the Firestore document ID
-            if (!kerusakanId) {
-                toast.error("ID kerusakan tidak valid.")
-                router.push("/admin/damages")
-                return
+        loadInitialData();
+    }, [loadInitialData]);
+
+    const handleSave = async (data: Omit<Kerusakan, 'id'>, id?: string): Promise<void> => {
+        if (!id) {
+            toast.error("ID kerusakan tidak valid.");
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            const response = await fetch(`/api/diagnose/damages/${id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            });
+
+            const responseData: ApiResponse<any> = await response.json();
+            if (!response.ok || !responseData.status) {
+                throw new Error(responseData.message || `Gagal mengupdate kerusakan: ${response.status}`);
             }
 
-            setIsLoading(true)
-            try {
-                // Fetch single kerusakan by its Firestore document ID
-                const response = await fetch(`/api/damages/${kerusakanId}`)
-                if (!response.ok) {
-                    const errorText = await response.text()
-                    throw new Error(`Gagal memuat kerusakan: ${response.status} ${errorText}`)
-                }
-                const fetchedKerusakan: Kerusakan = await response.json()
-
-                setFormData({
-                    id: fetchedKerusakan.id, // Set the ID from fetched data
-                    kode: fetchedKerusakan.kode,
-                    nama: fetchedKerusakan.nama || "",
-                    deskripsi: fetchedKerusakan.deskripsi || "",
-                    tingkat_kerusakan: fetchedKerusakan.tingkat_kerusakan || "Ringan",
-                    estimasi_biaya: fetchedKerusakan.estimasi_biaya || "",
-                    waktu_perbaikan: fetchedKerusakan.waktu_perbaikan || "",
-                    prior_probability: fetchedKerusakan.prior_probability || 0.1,
-                    solusi: fetchedKerusakan.solusi || "",
-                    gejala_terkait: Array.isArray(fetchedKerusakan.gejala_terkait) ? fetchedKerusakan.gejala_terkait : [],
-                })
-                toast.success(`Data kerusakan '${fetchedKerusakan.kode}' berhasil dimuat.`)
-            } catch (caughtError: unknown) {
-                console.error("Error loading kerusakan data:", caughtError)
-                let errorMessage = "Gagal memuat data kerusakan."
-                if (caughtError instanceof Error) {
-                    errorMessage = caughtError.message
-                }
-                toast.error(errorMessage)
-                router.push("/admin/damages") // Redirect if data load fails
-            } finally {
-                setIsLoading(false)
+            toast.success("Kerusakan berhasil diupdate.");
+            router.push("/admin/damages");
+        } catch (caughtError: unknown) {
+            console.error("Error saving:", caughtError);
+            let errorMessage = "Terjadi kesalahan saat menyimpan data.";
+            if (caughtError instanceof Error) {
+                errorMessage = caughtError.message;
             }
+            toast.error(errorMessage);
+        } finally {
+            setIsSubmitting(false);
         }
+    };
 
-        fetchKerusakanToEdit()
-    }, [params.id, router]) // Dependency on params.id
-
-    const toggleGejala = useCallback((gejalaKode: string): void => {
-        setFormData((prev) => ({
-            ...prev,
-            gejala_terkait: prev.gejala_terkait.includes(gejalaKode)
-                ? prev.gejala_terkait.filter((g) => g !== gejalaKode)
-                : [...prev.gejala_terkait, gejalaKode],
-        }))
-    }, [])
-
-    const validateForm = useCallback((): boolean => {
-        if (!formData.kode.trim() || !formData.nama.trim() || !formData.deskripsi.trim()) {
-            toast.error("Mohon lengkapi semua field yang wajib diisi.")
-            return false
-        }
-
-        if (formData.prior_probability <= 0 || formData.prior_probability > 0.5) {
-            toast.error("Prior probability harus antara 0.01 dan 0.50.")
-            return false
-        }
-
-        return true
-    }, [formData])
-
-    const handleSave = async (): Promise<void> => {
-        if (!validateForm()) return
-
-        toast("Konfirmasi Perubahan", {
-            description: "Simpan perubahan data kerusakan?",
-            action: {
-                label: "Simpan",
-                onClick: async () => {
-                    setIsLoading(true)
-                    try {
-                        const updatedKerusakan: Omit<Kerusakan, 'id'> = { // Do NOT send 'id' in the body
-                            kode: formData.kode, // Keep original kode
-                            nama: formData.nama,
-                            deskripsi: formData.deskripsi,
-                            tingkat_kerusakan: formData.tingkat_kerusakan,
-                            estimasi_biaya: formData.estimasi_biaya,
-                            waktu_perbaikan: formData.waktu_perbaikan,
-                            prior_probability: formData.prior_probability,
-                            solusi: formData.solusi,
-                            gejala_terkait: formData.gejala_terkait,
-                        }
-
-                        // Use formData.id (the Firestore document ID) in the URL for the PUT request
-                        const response = await fetch(`/api/damages/${formData.id}`, {
-                            method: "PUT",
-                            headers: {
-                                "Content-Type": "application/json",
-                            },
-                            body: JSON.stringify(updatedKerusakan),
-                        })
-
-                        if (!response.ok) {
-                            const errorData: { error?: string } = await response.json()
-                            throw new Error(errorData.error || `Gagal mengupdate kerusakan: ${response.status}`)
-                        }
-
-                        toast.success("Kerusakan berhasil diupdate.")
-                        router.push("/admin/damages")
-                    } catch (caughtError: unknown) {
-                        console.error("Error saving:", caughtError)
-                        let errorMessage = "Terjadi kesalahan saat menyimpan data."
-                        if (caughtError instanceof Error) {
-                            errorMessage = caughtError.message
-                        }
-                        toast.error(errorMessage)
-                    } finally {
-                        setIsLoading(false)
-                    }
-                },
-            },
-            cancel: {
-                label: "Batal",
-                onClick: () => toast.dismiss(),
-            },
-        })
-    }
-
-    const handleInputChange = useCallback(<K extends keyof Omit<Kerusakan, 'id'>>(field: K, value: Omit<Kerusakan, 'id'>[K]): void => {
-        setFormData((prev) => ({ ...prev, [field]: value }))
-    }, [])
-
-    if (isLoading && formData.id === "") { // Show loading when initial data is being fetched
+    if (isLoading) {
         return (
             <div className="container mx-auto px-4 py-8 max-w-4xl">
                 <div className="animate-pulse space-y-6">
@@ -183,221 +108,34 @@ export default function EditKerusakanPage() {
                     </div>
                 </div>
             </div>
-        )
+        );
+    }
+
+    if (error || !kerusakanData) {
+        return (
+            <div className="container mx-auto px-4 py-8 max-w-4xl">
+                <div className="text-center p-8">
+                    <AlertTriangle className="mx-auto h-12 w-12 text-destructive" />
+                    <h2 className="mt-2 text-lg font-semibold">Gagal Memuat Data Kerusakan</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">{error}</p>
+                    <Button className="mt-4" onClick={() => router.push("/admin/damages")}>
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        Kembali ke Daftar Kerusakan
+                    </Button>
+                </div>
+            </div>
+        );
     }
 
     return (
-        <div className="container mx-auto px-4 py-8 max-w-6xl">
-            <div className="mb-6">
-                <Button variant="outline" onClick={() => router.back()} className="mb-4">
-                    <ArrowLeft className="mr-2 h-4 w-4" />
-                    Kembali
-                </Button>
-                <h1 className="text-3xl font-bold">Edit Kerusakan</h1>
-                <p className="text-gray-600">Ubah informasi kerusakan dan atur probabilitas prior</p>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Basic Information */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Informasi Dasar</CardTitle>
-                        <CardDescription>Data utama kerusakan</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="kode">Kode Kerusakan *</Label>
-                            <Input
-                                id="kode"
-                                value={formData.kode}
-                                onChange={(e) => handleInputChange("kode", e.target.value)}
-                                placeholder="KK1, KK2, dst..."
-                                disabled // Kode tidak bisa diubah setelah dibuat
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="nama">Nama Kerusakan *</Label>
-                            <Input
-                                id="nama"
-                                value={formData.nama}
-                                onChange={(e) => handleInputChange("nama", e.target.value)}
-                                placeholder="Nama kerusakan yang mudah dipahami"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="deskripsi">Deskripsi *</Label>
-                            <Textarea
-                                id="deskripsi"
-                                value={formData.deskripsi}
-                                onChange={(e) => handleInputChange("deskripsi", e.target.value)}
-                                placeholder="Penjelasan detail tentang kerusakan"
-                                rows={4}
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="tingkat">Tingkat Kerusakan</Label>
-                            <Select
-                                value={formData.tingkat_kerusakan}
-                                onValueChange={(value: Kerusakan["tingkat_kerusakan"]) => handleInputChange("tingkat_kerusakan", value)}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {tingkatKerusakanOptions.map((tingkat) => (
-                                        <SelectItem key={tingkat} value={tingkat}>
-                                            {tingkat}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="biaya">Estimasi Biaya</Label>
-                                <Input
-                                    id="biaya"
-                                    value={formData.estimasi_biaya}
-                                    onChange={(e) => handleInputChange("estimasi_biaya", e.target.value)}
-                                    placeholder="Rp 100.000 - Rp 500.000"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="waktu">Waktu Perbaikan</Label>
-                                <Input
-                                    id="waktu"
-                                    value={formData.waktu_perbaikan}
-                                    onChange={(e) => handleInputChange("waktu_perbaikan", e.target.value)}
-                                    placeholder="1-3 hari"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                                <Label>Prior Probability: {formData.prior_probability.toFixed(2)}</Label>
-                                <Badge variant="outline">{(formData.prior_probability * 100).toFixed(0)}%</Badge>
-                            </div>
-                            <Slider
-                                value={[formData.prior_probability]}
-                                onValueChange={([value]) => handleInputChange("prior_probability", value)}
-                                min={0.01}
-                                max={0.5}
-                                step={0.01}
-                                className="w-full"
-                            />
-                            <p className="text-xs text-gray-500">Probabilitas awal kerusakan ini terjadi (0.01 - 0.50)</p>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Advanced Configuration */}
-                <div className="space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Gejala Terkait</CardTitle>
-                            <CardDescription>Pilih gejala yang berkaitan dengan kerusakan ini</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto p-2 border rounded-lg">
-                                {gejalaOptions.map((gejala) => (
-                                    <Button
-                                        key={gejala}
-                                        variant={formData.gejala_terkait.includes(gejala) ? "default" : "outline"}
-                                        size="sm"
-                                        onClick={() => toggleGejala(gejala)}
-                                    >
-                                        {gejala}
-                                    </Button>
-                                ))}
-                            </div>
-                            <div className="mt-4">
-                                <p className="text-sm text-muted-foreground mb-2">
-                                    Gejala terpilih ({formData.gejala_terkait.length}):
-                                </p>
-                                <div className="flex flex-wrap gap-1">
-                                    {formData.gejala_terkait.map((gejala) => (
-                                        <Badge key={gejala} variant="secondary" className="text-xs">
-                                            {gejala}
-                                            <button
-                                                type="button"
-                                                onClick={() => toggleGejala(gejala)}
-                                                className="ml-1 hover:text-destructive"
-                                            >
-                                                <X className="h-3 w-3" />
-                                            </button>
-                                        </Badge>
-                                    ))}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Solusi Perbaikan</CardTitle>
-                            <CardDescription>Tulis solusi dalam format Markdown</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <Tabs defaultValue="write" className="w-full">
-                                <TabsList className="grid w-full grid-cols-2">
-                                    <TabsTrigger value="write">Tulis</TabsTrigger>
-                                    <TabsTrigger value="preview">
-                                        <Eye className="mr-2 h-4 w-4" />
-                                        Preview
-                                    </TabsTrigger>
-                                </TabsList>
-
-                                <TabsContent value="write" className="mt-4">
-                                    <Textarea
-                                        value={formData.solusi}
-                                        onChange={(e) => handleInputChange("solusi", e.target.value)}
-                                        placeholder="Tulis solusi dalam format Markdown..."
-                                        rows={12}
-                                        className="min-h-[300px] font-mono text-sm"
-                                    />
-                                    <p className="text-xs text-gray-500 mt-2">Gunakan format Markdown untuk formatting yang lebih baik</p>
-                                </TabsContent>
-
-                                <TabsContent value="preview" className="mt-4">
-                                    <div className="min-h-[300px] p-4 border rounded-lg bg-muted/30">
-                                        {formData.solusi.trim() ? (
-                                            <div className="prose prose-sm max-w-none dark:prose-invert">
-                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{formData.solusi}</ReactMarkdown>
-                                            </div>
-                                        ) : (
-                                            <p className="text-muted-foreground italic">Tidak ada konten untuk di-preview</p>
-                                        )}
-                                    </div>
-                                </TabsContent>
-                            </Tabs>
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-4">
-                <Button variant="outline" onClick={() => router.back()} disabled={isLoading}>
-                    Batal
-                </Button>
-                <Button onClick={handleSave} disabled={isLoading}>
-                    {isLoading ? (
-                        <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Menyimpan...
-                        </>
-                    ) : (
-                        <>
-                            <Save className="mr-2 h-4 w-4" />
-                            Update Kerusakan
-                        </>
-                    )}
-                </Button>
-            </div>
-        </div>
-    )
+        <DamageForm
+            initialData={kerusakanData}
+            gejalaList={gejalaList}
+            isSubmitting={isSubmitting}
+            onSave={handleSave}
+            pageTitle={`Edit Kerusakan: ${kerusakanData.nama}`}
+            pageDescription="Ubah informasi kerusakan dan atur probabilitas prior"
+            submitButtonText="Update Kerusakan"
+        />
+    );
 }

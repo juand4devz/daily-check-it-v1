@@ -1,6 +1,6 @@
 // /admin/massscope/page.tsx
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,12 +8,26 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Filter, RefreshCw, Grid3X3, List, Search, Eye, EyeOff } from "lucide-react";
+import { Download, Filter, RefreshCw, Grid3X3, List, Search, Eye, EyeOff, WifiOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-
-import type { Gejala, Kerusakan, CombinedMassFunctionData } from "@/types";
+import Fuse from "fuse.js";
+import { Gejala, Kerusakan, ApiResponse } from "@/types/diagnose";
+import { cn } from "@/lib/utils";
+import Loading from "./loading";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // --- Interfaces ---
+interface CombinedMassFunctionData {
+    gejalaId?: string;
+    gejalaKode: string;
+    gejalaNama: string;
+    kategori: string;
+    kerusakanKode: string;
+    kerusakanNama: string;
+    value: number;
+    uncertainty: number;
+}
+
 interface MatrixData {
     gejalaList: string[]; // List of gejala codes
     kerusakanListFiltered: string[]; // List of kerusakan codes
@@ -27,80 +41,60 @@ interface MassScopeStatistics {
     averageMass: number;
 }
 
-export default function MassFunctionPage() {
+export default function MassScopePage() {
     const [allGejala, setAllGejala] = useState<Gejala[]>([]);
     const [allKerusakan, setAllKerusakan] = useState<Kerusakan[]>([]);
     const [massFunctionData, setMassFunctionData] = useState<CombinedMassFunctionData[]>([]);
-    const [filteredData, setFilteredData] = useState<CombinedMassFunctionData[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedKategori, setSelectedKategori] = useState("all");
     const [selectedKerusakan, setSelectedKerusakan] = useState("all");
     const [isLoading, setIsLoading] = useState(true);
+    const [errorFetching, setErrorFetching] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<"matrix" | "list">("matrix");
     const [showZeroValues, setShowZeroValues] = useState(false);
 
-    // Derived values for filters (dynamic)
-    const categoriesOptions = Array.from(
-        new Set(allGejala.map((g) => g.kategori))
-    ).filter((cat): cat is string => typeof cat === "string");
-
-    const kerusakanFilterOptions = allKerusakan
-        .map((k) => ({ kode: k.kode, nama: k.nama }))
-        .sort((a, b) => {
-            const numA = parseInt(a.kode.replace("KK", "")) || 0;
-            const numB = parseInt(b.kode.replace("KK", "")) || 0;
-            return numA - numB;
-        });
-
-    useEffect(() => {
-        fetchAllData();
-    }, []);
-
-    useEffect(() => {
-        prepareMassFunctionData(allGejala, allKerusakan);
-    }, [allGejala, allKerusakan]);
-
-    useEffect(() => {
-        filterData();
-    }, [massFunctionData, searchQuery, selectedKategori, selectedKerusakan, showZeroValues]);
-
     // --- Data Fetching from API ---
-    const fetchAllData = async (): Promise<void> => {
+    const fetchAllData = useCallback(async (): Promise<void> => {
         setIsLoading(true);
+        setErrorFetching(null);
         try {
             const [gejalaRes, kerusakanRes] = await Promise.all([
-                fetch("/api/gejala"),
-                fetch("/api/damages"),
+                fetch("/api/diagnose/symptoms"),
+                fetch("/api/diagnose/damages"),
             ]);
 
-            if (!gejalaRes.ok) {
-                const errorText = await gejalaRes.text();
-                throw new Error(`Gagal memuat data gejala: ${gejalaRes.status} ${errorText}`);
-            }
-            if (!kerusakanRes.ok) {
-                const errorText = await kerusakanRes.text();
-                throw new Error(`Gagal memuat data kerusakan: ${kerusakanRes.status} ${errorText}`);
-            }
+            const gejalaData: ApiResponse<Gejala[]> = await gejalaRes.json();
+            const kerusakanData: ApiResponse<Kerusakan[]> = await kerusakanRes.json();
 
-            const fetchedGejala: Gejala[] = await gejalaRes.json();
-            const fetchedKerusakan: Kerusakan[] = await kerusakanRes.json();
+            if (!gejalaRes.ok || !gejalaData.status) {
+                throw new Error(gejalaData.message || `Gagal memuat data gejala: ${gejalaRes.status}`);
+            }
+            if (!kerusakanRes.ok || !kerusakanData.status) {
+                throw new Error(kerusakanData.message || `Gagal memuat data kerusakan: ${kerusakanRes.status}`);
+            }
 
             // Ensure fetched data is unique by kode before setting state
-            const uniqueFetchedGejala = Array.from(new Map(fetchedGejala.map(g => [g.kode, g])).values());
-            const uniqueFetchedKerusakan = Array.from(new Map(fetchedKerusakan.map(k => [k.kode, k])).values());
+            const uniqueFetchedGejala = Array.from(new Map((gejalaData.data || []).map(g => [g.kode, g])).values());
+            const uniqueFetchedKerusakan = Array.from(new Map((kerusakanData.data || []).map(k => [k.kode, k])).values());
 
             setAllGejala(uniqueFetchedGejala);
             setAllKerusakan(uniqueFetchedKerusakan);
             toast.success("Data gejala dan kerusakan berhasil dimuat.");
         } catch (error) {
             console.error("Error fetching all data:", error);
-            toast.error(error instanceof Error ? error.message : "Gagal memuat data utama.");
+            const errorMessage = error instanceof Error ? error.message : "Gagal memuat data utama.";
+            toast.error(errorMessage);
+            setErrorFetching(errorMessage);
             setAllGejala([]);
             setAllKerusakan([]);
         } finally {
             setIsLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        fetchAllData();
+    }, [fetchAllData]);
 
     // --- Data Preparation (Combines Gejala & Kerusakan for Mass Function Display) ---
     const prepareMassFunctionData = useCallback((gejalaData: Gejala[], kerusakanData: Kerusakan[]): void => {
@@ -128,41 +122,79 @@ export default function MassFunctionPage() {
             });
         });
         setMassFunctionData(preparedData);
-    },
-        []
-    );
+    }, []);
 
-    // --- Filtering Logic ---
-    const filterData = useCallback((): void => {
-        let filtered = massFunctionData;
+    useEffect(() => {
+        prepareMassFunctionData(allGejala, allKerusakan);
+    }, [allGejala, allKerusakan, prepareMassFunctionData]);
 
-        if (searchQuery) {
-            const query = searchQuery.toLowerCase();
-            filtered = filtered.filter(
-                (item) =>
-                    item.gejalaNama.toLowerCase().includes(query) ||
-                    item.gejalaKode.toLowerCase().includes(query) ||
-                    item.kerusakanNama.toLowerCase().includes(query) ||
-                    item.kerusakanKode.toLowerCase().includes(query)
-            );
-        }
+    // --- Filtering Logic with Fuse.js ---
+    const fuse = useMemo(() => {
+        const options = {
+            keys: ['gejalaKode', 'gejalaNama', 'kerusakanKode', 'kerusakanNama'],
+            threshold: 0.3,
+        };
+        return new Fuse(massFunctionData, options);
+    }, [massFunctionData]);
 
-        if (selectedKategori !== "all") {
-            filtered = filtered.filter((item) => item.kategori === selectedKategori);
-        }
+    const filteredData = useMemo(() => {
+        const searchResults = searchQuery.trim() ? fuse.search(searchQuery).map(result => result.item) : massFunctionData;
 
-        if (selectedKerusakan !== "all") {
-            filtered = filtered.filter((item) => item.kerusakanKode === selectedKerusakan);
-        }
+        let filtered = searchResults.filter((item) => {
+            const kategoriMatch = selectedKategori === "all" || item.kategori === selectedKategori;
+            const kerusakanMatch = selectedKerusakan === "all" || item.kerusakanKode === selectedKerusakan;
+            return kategoriMatch && kerusakanMatch;
+        });
 
         if (!showZeroValues) {
             filtered = filtered.filter((item) => item.value > 0);
         }
 
-        setFilteredData(filtered);
-    },
-        [massFunctionData, searchQuery, selectedKategori, selectedKerusakan, showZeroValues]
-    );
+        return filtered;
+    }, [massFunctionData, searchQuery, selectedKategori, selectedKerusakan, showZeroValues, fuse]);
+
+    // --- Derived values for filters (dynamic) ---
+    const categoriesOptions = useMemo(() => {
+        return Array.from(new Set(allGejala.map((g) => g.kategori))).filter((cat): cat is string => typeof cat === "string").sort();
+    }, [allGejala]);
+
+    const kerusakanFilterOptions = useMemo(() => {
+        return allKerusakan
+            .map((k) => ({ kode: k.kode, nama: k.nama }))
+            .sort((a, b) => {
+                const numA = parseInt(a.kode.replace("KK", "")) || 0;
+                const numB = parseInt(b.kode.replace("KK", "")) || 0;
+                return numA - numB;
+            });
+    }, [allKerusakan]);
+
+    // --- Calculate Mass Scope Statistics ---
+    const calculateStatistics = useCallback((): MassScopeStatistics => {
+        const totalGejala = new Set(filteredData.map((item) => item.gejalaKode)).size;
+        const totalKerusakan = new Set(filteredData.map((item) => item.kerusakanKode)).size;
+        const totalRelations = filteredData.length;
+
+        let sumOfMassValues = 0;
+        let countOfMassValues = 0;
+
+        filteredData.forEach((item) => {
+            if (showZeroValues || item.value > 0) {
+                sumOfMassValues += item.value;
+                countOfMassValues++;
+            }
+        });
+
+        const averageMass = countOfMassValues > 0 ? sumOfMassValues / countOfMassValues : 0;
+
+        return {
+            totalGejala,
+            totalKerusakan,
+            totalRelations,
+            averageMass,
+        };
+    }, [filteredData, showZeroValues]);
+
+    const stats = calculateStatistics();
 
     // --- Export Data to CSV ---
     const exportData = (): void => {
@@ -193,10 +225,10 @@ export default function MassFunctionPage() {
         document.body.appendChild(link);
         link.click();
         URL.revokeObjectURL(url);
-        toast.success("Data berhasil diekspor");
+        document.body.removeChild(link);
+        toast.success("Data berhasil diekspor.");
     };
 
-    // --- Utility Functions for Styling ---
     const getValueColor = (value: number): string => {
         if (value >= 0.7) return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
         if (value >= 0.4) return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
@@ -214,8 +246,7 @@ export default function MassFunctionPage() {
     };
 
     // --- Create Matrix Data ---
-    const createMatrixData = useCallback((): MatrixData => {
-        // Ensure unique codes are sorted consistently
+    const createMatrixData = useMemo((): MatrixData => {
         const uniqueGejalaCodes = Array.from(new Set(filteredData.map((item) => item.gejalaKode))).sort((a, b) => {
             const numA = parseInt(a.replace("G", "")) || 0;
             const numB = parseInt(b.replace("G", "")) || 0;
@@ -239,49 +270,23 @@ export default function MassFunctionPage() {
         });
 
         return { gejalaList: uniqueGejalaCodes, kerusakanListFiltered: uniqueKerusakanCodes, matrix };
-    },
-        [filteredData]
-    );
+    }, [filteredData]);
 
-    const { gejalaList, kerusakanListFiltered, matrix } = createMatrixData();
+    const { gejalaList: matrixGejalaList, kerusakanListFiltered, matrix } = createMatrixData;
 
-    // --- Calculate Mass Scope Statistics ---
-    const calculateStatistics = useCallback((): MassScopeStatistics => {
-        const totalGejala = new Set(filteredData.map((item) => item.gejalaKode)).size;
-        const totalKerusakan = new Set(filteredData.map((item) => item.kerusakanKode)).size;
-        const totalRelations = filteredData.length;
-
-        let sumOfMassValues = 0;
-        let countOfMassValues = 0;
-
-        filteredData.forEach((item) => {
-            if (showZeroValues || item.value > 0) {
-                sumOfMassValues += item.value;
-                countOfMassValues++;
-            }
-        });
-
-        const averageMass = countOfMassValues > 0 ? sumOfMassValues / countOfMassValues : 0;
-
-        return {
-            totalGejala,
-            totalKerusakan,
-            totalRelations,
-            averageMass,
-        };
-    },
-        [filteredData, showZeroValues]
-    );
-
-    const stats = calculateStatistics();
 
     if (isLoading) {
+        return <Loading />;
+    }
+
+    if (errorFetching) {
         return (
             <div className="container mx-auto px-4 py-8">
-                <div className="text-center animate-pulse">
-                    <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-500" />
-                    <p className="text-muted-foreground">Memuat data mass function...</p>
-                </div>
+                <Alert variant="destructive" className="mb-4">
+                    <WifiOff className="h-4 w-4" />
+                    <AlertTitle>Kesalahan Data!</AlertTitle>
+                    <AlertDescription>{errorFetching}</AlertDescription>
+                </Alert>
             </div>
         );
     }
@@ -328,8 +333,7 @@ export default function MassFunctionPage() {
                 </Card>
             </div>
 
-
-            {/* Filters & Export (always visible, responsive layout) */}
+            {/* Filters & Export */}
             <Card className="mb-2 sm:mb-4">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg">
@@ -356,7 +360,7 @@ export default function MassFunctionPage() {
                             <label htmlFor="categoryFilter" className="text-sm font-medium mb-2 block">Kategori Gejala</label>
                             <Select value={selectedKategori} onValueChange={setSelectedKategori}>
                                 <SelectTrigger id="categoryFilter" className="w-full">
-                                    <SelectValue />
+                                    <SelectValue placeholder="Semua Kategori" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">Semua Kategori</SelectItem>
@@ -372,7 +376,7 @@ export default function MassFunctionPage() {
                             <label htmlFor="kerusakanFilter" className="text-sm font-medium mb-2 block">Kerusakan</label>
                             <Select value={selectedKerusakan} onValueChange={setSelectedKerusakan}>
                                 <SelectTrigger id="kerusakanFilter" className="w-full">
-                                    <SelectValue />
+                                    <SelectValue placeholder="Semua Kerusakan" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">Semua Kerusakan</SelectItem>
@@ -440,7 +444,6 @@ export default function MassFunctionPage() {
                                                 {/* Kerusakan headers - rotate and adapt width */}
                                                 {kerusakanListFiltered.map((kerusakanKode) => {
                                                     const kerusakan = allKerusakan.find((k) => k.kode === kerusakanKode);
-                                                    // Use kerusakanKode as key here, it should be unique by design
                                                     return (
                                                         <th key={kerusakanKode} className="text-center min-w-[70px] sm:min-w-[80px] md:min-w-[100px] p-1 sm:p-2 align-bottom">
                                                             <div
@@ -455,14 +458,14 @@ export default function MassFunctionPage() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {gejalaList.length === 0 && (kerusakanListFiltered.length === 0 || !showZeroValues) ? (
+                                            {matrixGejalaList.length === 0 ? (
                                                 <tr>
                                                     <td colSpan={kerusakanListFiltered.length + 1} className="text-center py-8 text-muted-foreground text-sm">
                                                         Tidak ada data mass function yang sesuai dengan filter.
                                                     </td>
                                                 </tr>
                                             ) : (
-                                                gejalaList.map((gejalaKode) => {
+                                                matrixGejalaList.map((gejalaKode) => {
                                                     const gejalaInfo = allGejala.find((g) => g.kode === gejalaKode);
                                                     return (
                                                         <tr key={gejalaKode} className="hover:bg-muted/50">
@@ -487,14 +490,10 @@ export default function MassFunctionPage() {
                                                             {kerusakanListFiltered.map((kerusakanKodeCol) => {
                                                                 const value = matrix[gejalaKode]?.[kerusakanKodeCol] || 0;
                                                                 const shouldShow = showZeroValues || value > 0;
+                                                                const kerusakanNama = allKerusakan.find((k) => k.kode === kerusakanKodeCol)?.nama || kerusakanKodeCol;
 
-                                                                // The key for this cell should be unique within its parent <tr>.
-                                                                // A combination of gejalaKode and kerusakanKodeCol is robust.
                                                                 return (
-                                                                    <td
-                                                                        key={`${gejalaKode}-${kerusakanKodeCol}`}
-                                                                        className="text-center p-1 sm:p-2 min-w-[70px] sm:min-w-[80px] md:min-w-[100px] align-middle"
-                                                                    >
+                                                                    <td key={`${gejalaKode}-${kerusakanKodeCol}`} className="text-center p-1 sm:p-2 min-w-[70px] sm:min-w-[80px] md:min-w-[100px] align-middle">
                                                                         {shouldShow ? (
                                                                             <div
                                                                                 className="w-full h-7 sm:h-8 md:h-10 flex items-center justify-center rounded text-[0.6rem] sm:text-xs font-mono font-bold transition-all hover:scale-105 cursor-pointer"
@@ -502,7 +501,7 @@ export default function MassFunctionPage() {
                                                                                     backgroundColor: getCellBackgroundColor(value),
                                                                                     color: value > 0.5 ? "white" : "black",
                                                                                 }}
-                                                                                title={`${gejalaInfo?.nama || gejalaKode} → ${allKerusakan.find((k) => k.kode === kerusakanKodeCol)?.nama || kerusakanKodeCol}: ${value.toFixed(3)}`}
+                                                                                title={`${gejalaInfo?.nama || gejalaKode} → ${kerusakanNama}: ${value.toFixed(3)}`}
                                                                             >
                                                                                 {value.toFixed(2)}
                                                                             </div>
@@ -538,10 +537,10 @@ export default function MassFunctionPage() {
                                     <table className="w-full caption-bottom text-sm relative min-w-[700px] md:min-w-full">
                                         <thead className="[&_th]:sticky [&_th]:top-0 [&_th]:z-10 [&_th]:bg-background/95 [&_th]:backdrop-blur [&_th]:supports-[backdrop-filter]:bg-background/60">
                                             <tr>
-                                                <th className="w-20 sm:w-24 text-left p-2 sm:p-4">Kode Gejala</th>
+                                                <th className="w-20 sm:w-24 text-left p-2 sm:p-4">Gejala Kode</th>
                                                 <th className="hidden sm:table-cell w-32 sm:w-40 text-left p-2 sm:p-4">Nama Gejala</th>
                                                 <th className="w-20 sm:w-24 text-left p-2 sm:p-4">Kategori</th>
-                                                <th className="w-20 sm:w-24 text-left p-2 sm:p-4">Kode Kerusakan</th>
+                                                <th className="w-20 sm:w-24 text-left p-2 sm:p-4">Kerusakan Kode</th>
                                                 <th className="hidden sm:table-cell w-32 sm:w-40 text-left p-2 sm:p-4">Nama Kerusakan</th>
                                                 <th className="w-20 sm:w-24 text-left p-2 sm:p-4">Mass Value</th>
                                                 <th className="hidden lg:table-cell w-20 text-left p-2 sm:p-4">Uncertainty</th>
@@ -550,16 +549,15 @@ export default function MassFunctionPage() {
                                         <tbody>
                                             {filteredData.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={7} className="text-center py-8 text-muted-foreground">
+                                                    <td colSpan={7} className="text-center py-8 text-muted-foreground text-sm">
                                                         Tidak ada data yang sesuai dengan filter
                                                     </td>
                                                 </tr>
                                             ) : (
                                                 filteredData
                                                     .sort((a, b) => b.value - a.value)
-                                                    // Ensure a unique key for each row in the List View
                                                     .map((item, index) => (
-                                                        <tr key={`${item.gejalaKode}-${item.kerusakanKode}-${index}`} className="hover:bg-muted/50">
+                                                        <tr key={`${item.gejalaId}-${item.kerusakanKode}-${index}`} className="hover:bg-muted/50">
                                                             <td className="p-2 sm:p-4">
                                                                 <Badge variant="outline" className="text-xs">
                                                                     {item.gejalaKode}
@@ -571,9 +569,7 @@ export default function MassFunctionPage() {
                                                                 </div>
                                                             </td>
                                                             <td className="p-2 sm:p-4">
-                                                                <Badge variant="secondary" className="text-xs">
-                                                                    {item.kategori}
-                                                                </Badge>
+                                                                <Badge variant="secondary" className="text-xs">{item.kategori}</Badge>
                                                             </td>
                                                             <td className="p-2 sm:p-4">
                                                                 <Badge variant="outline" className="text-xs">

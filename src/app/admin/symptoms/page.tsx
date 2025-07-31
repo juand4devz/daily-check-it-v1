@@ -1,8 +1,8 @@
 // /admin/symptoms/page.tsx
 "use client";
-import { useState, useEffect, useRef } from "react";
-import type React from "react";
-
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import Fuse from "fuse.js";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,33 +10,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Edit, Trash2, Download, Upload, Search, RefreshCw, Loader2, WifiOff } from "lucide-react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import type { Gejala } from "@/types"; // Make sure your types.ts is accurate and includes 'id'
+import type { Gejala, ApiResponse } from "@/types/diagnose";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { cn } from "@/lib/utils";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 // --- Constants ---
 const categories = [
-  "Power",
-  "Display",
-  "Hardware",
-  "System",
-  "Performance",
-  "Cooling",
-  "Storage",
-  "BIOS",
-  "Port",
-  "Network",
-  "Audio",
-  "Input",
-  "Camera",
-  "Battery",
-  "Graphics",
-  "Software",
-  "OS",
-  "Security",
-  "Peripheral",
+  "Power", "Display", "Hardware", "System", "Performance", "Cooling",
+  "Storage", "BIOS", "Port", "Network", "Audio", "Input",
+  "Camera", "Battery", "Graphics", "Software", "OS", "Security", "Peripheral",
 ];
+const devices = ["komputer", "laptop"];
 
 // --- Interfaces ---
 interface GejalaStatistics {
@@ -46,9 +32,8 @@ interface GejalaStatistics {
   totalMassFunctions: number;
 }
 
-// Interface for the expected data structure for import (consistent with API)
 interface ImportGejalaItemClient {
-  id?: string; // Optional ID for existing documents
+  id?: string;
   kode: string;
   nama: string;
   deskripsi?: string;
@@ -61,44 +46,34 @@ interface ImportGejalaItemClient {
 // --- Main Component ---
 export default function GejalaPage() {
   const [gejalaList, setGejalaList] = useState<Gejala[]>([]);
-  const [filteredData, setFilteredData] = useState<Gejala[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(""); // State untuk input pencarian
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterDevice, setFilterDevice] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
-  const [isImporting, setIsImporting] = useState(false); // For file processing
-  const [isSendingImport, setIsSendingImport] = useState(false); // For API call
+  const [isImporting, setIsImporting] = useState(false);
+  const [isSendingImport, setIsSendingImport] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const [errorFetching, setErrorFetching] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    filterData();
-  }, [gejalaList, searchQuery, filterCategory, filterDevice]);
-
-  // --- Data Loading from API ---
-  const loadData = async (): Promise<void> => {
+  const loadData = useCallback(async (): Promise<void> => {
     try {
       setIsLoading(true);
       setErrorFetching(null);
 
-      const response = await fetch("/api/gejala");
-      if (!response.ok) {
-        const errorDetail = await response.text();
-        throw new Error(`Gagal memuat data gejala: ${response.status} ${errorDetail}`);
-      }
-      const fetchedData: Gejala[] = await response.json();
+      const response = await fetch("/api/diagnose/symptoms");
+      const responseData: ApiResponse<Gejala[]> = await response.json();
 
+      if (!response.ok || !responseData.status) {
+        throw new Error(responseData.message || `Gagal memuat data gejala: ${response.status}`);
+      }
+
+      const fetchedData = responseData.data || [];
       const sortedData = fetchedData.sort((a, b) => {
         const numA = parseInt(a.kode.replace('G', '')) || 0;
         const numB = parseInt(b.kode.replace('G', '')) || 0;
         return numA - numB;
       });
-
       setGejalaList(sortedData);
       toast.success("Data gejala berhasil dimuat.");
     } catch (caughtError: unknown) {
@@ -113,38 +88,34 @@ export default function GejalaPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  // --- Filtering Logic ---
-  const filterData = (): void => {
-    let filtered = gejalaList;
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (item) =>
-          item.nama.toLowerCase().includes(query) ||
-          item.kode.toLowerCase().includes(query) ||
-          item.kategori.toLowerCase().includes(query) ||
-          item.deskripsi.toLowerCase().includes(query)
-      );
-    }
+  const fuse = useMemo(() => {
+    const options = {
+      keys: ['kode', 'nama', 'deskripsi', 'kategori', 'perangkat'],
+      threshold: 0.3,
+    };
+    return new Fuse(gejalaList, options);
+  }, [gejalaList]);
 
-    if (filterCategory !== "all") {
-      filtered = filtered.filter((item) => item.kategori === filterCategory);
-    }
+  const filteredData = useMemo(() => {
+    const searchResults = searchQuery.trim() ? fuse.search(searchQuery).map(result => result.item) : gejalaList;
 
-    if (filterDevice !== "all") {
-      filtered = filtered.filter((item) => item.perangkat.includes(filterDevice));
-    }
+    return searchResults.filter(item => {
+      const categoryMatch = filterCategory === "all" || item.kategori === filterCategory;
+      const deviceMatch = filterDevice === "all" || item.perangkat.includes(filterDevice);
+      return categoryMatch && deviceMatch;
+    });
+  }, [gejalaList, searchQuery, filterCategory, filterDevice, fuse]);
 
-    setFilteredData(filtered);
-  };
 
-  // --- Action Handlers ---
-  const handleEdit = (gejala: Gejala): void => {
-    router.push(`/admin/symptoms/edit/${gejala.id}`); // Correctly uses gejala.id
-  };
+  const handleEdit = useCallback((gejala: Gejala): void => {
+    router.push(`/admin/symptoms/edit/${gejala.id}`);
+  }, [router]);
 
   const handleDelete = async (id: string, namaGejala: string): Promise<void> => {
     toast("Konfirmasi Hapus", {
@@ -153,13 +124,13 @@ export default function GejalaPage() {
         label: "Hapus",
         onClick: async () => {
           try {
-            const response = await fetch(`/api/gejala/${id}`, {
+            const response = await fetch(`/api/diagnose/symptoms/${id}`, {
               method: "DELETE",
             });
 
-            if (!response.ok) {
-              const errorDetail = await response.text();
-              throw new Error(`Gagal menghapus gejala: ${response.status} ${errorDetail}`);
+            const responseData: ApiResponse<any> = await response.json();
+            if (!response.ok || !responseData.status) {
+              throw new Error(responseData.message || `Gagal menghapus gejala: ${response.status}`);
             }
 
             await loadData();
@@ -221,7 +192,7 @@ export default function GejalaPage() {
     }
 
     try {
-      setIsImporting(true); // Indicate file processing
+      setIsImporting(true);
       const text = await file.text();
       const importedData: unknown = JSON.parse(text);
 
@@ -230,7 +201,6 @@ export default function GejalaPage() {
         return;
       }
 
-      // Validate data structure and prepare for import
       const preparedData: ImportGejalaItemClient[] = [];
       const validationErrors: string[] = [];
 
@@ -240,12 +210,10 @@ export default function GejalaPage() {
           return;
         }
 
-        const gejalaItem = item as Partial<Gejala>; // Cast to Partial for safer access
-
-        const id = typeof gejalaItem.id === 'string' && gejalaItem.id.trim() !== '' ? gejalaItem.id : undefined;
+        const gejalaItem = item as Partial<Gejala>;
 
         if (typeof gejalaItem.kode !== 'string' || !gejalaItem.kode.trim()) {
-          validationErrors.push(`Baris ${index + 1} (ID: ${id || 'N/A'}): 'kode' tidak valid atau kosong.`);
+          validationErrors.push(`Baris ${index + 1} (ID: ${gejalaItem.id || 'N/A'}): 'kode' tidak valid atau kosong.`);
           return;
         }
         if (typeof gejalaItem.nama !== 'string' || !gejalaItem.nama.trim()) {
@@ -253,7 +221,6 @@ export default function GejalaPage() {
           return;
         }
 
-        // Further validation for expected types and defaults
         const massFunction: Record<string, number> = {};
         if (typeof gejalaItem.mass_function === 'object' && gejalaItem.mass_function !== null) {
           Object.entries(gejalaItem.mass_function).forEach(([key, value]) => {
@@ -263,11 +230,11 @@ export default function GejalaPage() {
           });
         }
         if (Object.keys(massFunction).length === 0) {
-          massFunction.uncertainty = 0.1; // Default if empty or invalid
+          massFunction.uncertainty = 0.1;
         }
 
         preparedData.push({
-          id: id,
+          id: gejalaItem.id,
           kode: gejalaItem.kode,
           nama: gejalaItem.nama,
           deskripsi: typeof gejalaItem.deskripsi === 'string' ? gejalaItem.deskripsi : "",
@@ -288,24 +255,23 @@ export default function GejalaPage() {
         return;
       }
 
-      // Show toast for replacement confirmation
       toast("Konfirmasi Impor Data", {
         description: `Ditemukan ${preparedData.length} entri gejala valid dalam file. Pilih tindakan:`,
         action: {
           label: "Hanya Tambah Baru",
           onClick: async () => {
-            toast.dismiss(); // Dismiss the confirmation toast
-            await sendImportData(preparedData, false); // No replace
+            toast.dismiss();
+            await sendImportData(preparedData, false);
           },
         },
-        cancel: { // Renamed from 'cancel' to 'secondary action' to be more explicit
+        cancel: {
           label: "Ganti & Tambah",
           onClick: async () => {
-            toast.dismiss(); // Dismiss the confirmation toast
-            await sendImportData(preparedData, true); // Replace existing
+            toast.dismiss();
+            await sendImportData(preparedData, true);
           },
         },
-        duration: Infinity, // Keep toast open until action is taken
+        duration: Infinity,
       });
 
     } catch (caughtError: unknown) {
@@ -316,63 +282,54 @@ export default function GejalaPage() {
       }
       toast.error(errorMessage);
     } finally {
-      setIsImporting(false); // File processing finished
+      setIsImporting(false);
       if (fileInputRef.current) {
-        fileInputRef.current.value = ""; // Clear file input
+        fileInputRef.current.value = "";
       }
     }
   };
 
-  // New function to send data to the import API
   const sendImportData = async (
     data: ImportGejalaItemClient[],
     replaceExisting: boolean
   ): Promise<void> => {
-    setIsSendingImport(true); // Use a loading state for the actual API call
+    setIsSendingImport(true);
     try {
-      const response = await fetch("/api/import-data/gejala", { // Use the new dedicated import API
+      const response = await fetch("/api/import-data/symptoms", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          data,
-          replaceExisting,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data, replaceExisting }),
       });
 
-      const result = await response.json();
+      const result: ApiResponse<{
+        importedCount: number;
+        replacedCount: number;
+        skippedCount: number;
+        warnings: string[];
+        errors: string[];
+      }> = await response.json();
 
       if (!response.ok) {
-        // If backend returns status 202 (partial success/warnings), don't throw error
-        if (response.status === 202 && (result.warnings?.length > 0 || result.errors?.length > 0)) {
+        if (response.status === 202) {
           toast.warning(result.message || "Import selesai dengan peringatan.");
           if (result.errors && result.errors.length > 0) {
-            toast.error(`Terdapat ${result.errors.length} kesalahan. Lihat konsol.`);
             console.error("Import Errors:", result.errors);
           }
           if (result.warnings && result.warnings.length > 0) {
-            toast.info(`Terdapat ${result.warnings.length} peringatan. Lihat konsol.`);
             console.warn("Import Warnings:", result.warnings);
           }
         } else {
-          throw new Error(result.error || `Gagal melakukan import: ${response.status}`);
+          throw new Error(result.message || `Gagal melakukan import: ${response.status}`);
         }
       } else {
         toast.success(result.message || "Data berhasil diimpor.");
       }
 
-      // Always show summary toast if available
-      if (result.importedCount > 0) {
-        toast.info(`${result.importedCount} data baru ditambahkan.`);
+      if (result.data) {
+        toast.info(`${result.data.importedCount} data baru, ${result.data.replacedCount} diganti, ${result.data.skippedCount} dilewati.`);
       }
-      if (result.replacedCount > 0) {
-        toast.info(`${result.replacedCount} data diganti.`);
-      }
-      if (result.skippedCount > 0) {
-        toast.info(`${result.skippedCount} data dilewati.`);
-      }
-      await loadData(); // Reload data after successful import (or partial success with warnings)
+
+      await loadData();
     } catch (caughtError: unknown) {
       console.error("Terjadi kesalahan saat mengirim data impor:", caughtError);
       let errorMessage = "Gagal mengimpor data ke database.";
@@ -427,7 +384,7 @@ export default function GejalaPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={handleImport} disabled={isImporting || isSendingImport}>
+          <Button variant="outline" onClick={handleImport} disabled={isLoading || isImporting || isSendingImport}>
             {isImporting || isSendingImport ? (
               <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
             ) : (
@@ -435,11 +392,11 @@ export default function GejalaPage() {
             )}
             Import
           </Button>
-          <Button variant="outline" onClick={handleExport}>
+          <Button variant="outline" onClick={handleExport} disabled={isLoading}>
             <Download className="mr-2 h-4 w-4" />
             Export
           </Button>
-          <Button onClick={() => router.push("/admin/symptoms/add")}>
+          <Button onClick={() => router.push("/admin/symptoms/add")} disabled={isLoading}>
             <Plus className="mr-2 h-4 w-4" />
             Tambah Gejala
           </Button>
@@ -481,7 +438,7 @@ export default function GejalaPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Komputer</p>
-                <p className="text-2xl font-bold text-purple-600">{stats.byDevice.computer || 0}</p>
+                <p className="text-2xl font-bold text-purple-600">{stats.byDevice.komputer || 0}</p>
               </div>
               <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
                 <div className="h-4 w-4 rounded-full bg-purple-600"></div>
@@ -537,8 +494,11 @@ export default function GejalaPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Semua Perangkat</SelectItem>
-                <SelectItem value="computer">Komputer</SelectItem>
-                <SelectItem value="laptop">Laptop</SelectItem>
+                {devices.map((device) => (
+                  <SelectItem key={device} value={device}>
+                    {device === 'komputer' ? 'Komputer' : 'Laptop'}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -555,16 +515,10 @@ export default function GejalaPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading || isSendingImport ? ( // Include isSendingImport in loading state
+          {isLoading || isSendingImport ? (
             <div className="flex justify-center items-center h-48">
               <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
             </div>
-          ) : errorFetching ? (
-            <Alert variant="destructive" className="mb-4">
-              <WifiOff className="h-4 w-4" />
-              <AlertTitle>Kesalahan Data!</AlertTitle>
-              <AlertDescription>{errorFetching}</AlertDescription>
-            </Alert>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -613,7 +567,7 @@ export default function GejalaPage() {
                             <div className="flex gap-1">
                               {gejala.perangkat.map((device: string) => (
                                 <Badge key={device} variant="outline" className="text-xs">
-                                  {device === "computer" ? "PC" : "Laptop"}
+                                  {device === 'komputer' ? 'PC' : 'Laptop'}
                                 </Badge>
                               ))}
                             </div>
@@ -622,37 +576,39 @@ export default function GejalaPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <div className="space-y-1">
-                            {Object.entries(gejala.mass_function)
-                              .filter(([key]: [string, number]) => key !== "uncertainty")
-                              .slice(0, 2)
-                              .map(([key, value]: [string, number]) => (
-                                <div key={key} className="flex justify-between text-xs">
-                                  <span className="font-mono">{key}:</span>
-                                  <span className="font-mono font-medium">{Number(value).toFixed(2)}</span>
+                          <Accordion type="single" collapsible className="w-[180px]">
+                            <AccordionItem value="mass-function">
+                              <AccordionTrigger className="p-0">
+                                <span className="text-xs font-mono">
+                                  {Object.keys(gejala.mass_function).filter(k => k !== 'uncertainty').length} entri
+                                </span>
+                              </AccordionTrigger>
+                              <AccordionContent>
+                                {Object.entries(gejala.mass_function)
+                                  .filter(([key]: [string, number]) => key !== "uncertainty")
+                                  .map(([key, value]: [string, number]) => (
+                                    <div key={key} className="flex justify-between text-xs mt-1">
+                                      <span className="font-mono">{key}:</span>
+                                      <span className="font-mono font-medium">{Number(value).toFixed(2)}</span>
+                                    </div>
+                                  ))}
+                                <div className="flex justify-between text-xs mt-1">
+                                  <span className="font-mono">uncertainty:</span>
+                                  <span className="font-mono font-medium">{Number(gejala.mass_function.uncertainty || 0).toFixed(2)}</span>
                                 </div>
-                              ))}
-                            {Object.keys(gejala.mass_function).length > 3 && (
-                              <p className="text-xs text-muted-foreground">
-                                +{Object.keys(gejala.mass_function).length - 3} lainnya
-                              </p>
-                            )}
-                          </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                          </Accordion>
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEdit(gejala)}
-                              className="h-8 w-8 p-0"
-                            >
+                            <Button variant="ghost" size="sm" onClick={() => handleEdit(gejala)} className="h-8 w-8 p-0">
                               <Edit className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDelete(gejala.id, gejala.nama)}
+                              onClick={() => gejala.id && handleDelete(gejala.id, gejala.nama)}
                               className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                             >
                               <Trash2 className="h-4 w-4" />

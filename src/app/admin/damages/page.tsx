@@ -1,18 +1,17 @@
 // /admin/damages/page.tsx
 "use client";
-import { useState, useEffect, useRef } from "react";
-import type React from "react";
-
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import Fuse from "fuse.js";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit, Trash2, DollarSign, Clock, AlertTriangle, Download, Upload, Search, RefreshCw, Loader2 } from "lucide-react";
+import { Plus, Edit, Trash2, DollarSign, Clock, AlertTriangle, Download, Upload, Search, RefreshCw, Loader2, WifiOff } from "lucide-react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
-import type { Kerusakan } from "@/types";
+import type { Kerusakan, ApiResponse } from "@/types/diagnose";
 
 const tingkatKerusakanOptions: Array<Kerusakan["tingkat_kerusakan"]> = ["Ringan", "Sedang", "Berat"];
 
@@ -22,9 +21,8 @@ interface KerusakanStatistics {
     avgProbability: number;
 }
 
-// Interface for the expected data structure for import (consistent with API)
 interface ImportKerusakanItemClient {
-    id?: string; // Optional ID for existing documents
+    id?: string;
     kode: string;
     nama: string;
     deskripsi?: string;
@@ -38,39 +36,30 @@ interface ImportKerusakanItemClient {
 
 export default function KerusakanPage() {
     const [kerusakanList, setKerusakanList] = useState<Kerusakan[]>([]);
-    const [filteredData, setFilteredData] = useState<Kerusakan[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [filterTingkat, setFilterTingkat] = useState<string>("all");
     const [isLoading, setIsLoading] = useState(true);
-    const [isImporting, setIsImporting] = useState(false); // For file processing
-    const [isSendingImport, setIsSendingImport] = useState(false); // For API call
+    const [isImporting, setIsImporting] = useState(false);
+    const [isSendingImport, setIsSendingImport] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const router = useRouter();
 
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    useEffect(() => {
-        filterData();
-    }, [kerusakanList, searchQuery, filterTingkat]);
-
-    const loadData = async (): Promise<void> => {
+    const loadData = useCallback(async (): Promise<void> => {
         try {
             setIsLoading(true);
-            const response = await fetch("/api/damages");
-            if (!response.ok) {
-                const errorDetail = await response.text();
-                throw new Error(`Gagal memuat data kerusakan: ${response.status} ${errorDetail}`);
-            }
-            const fetchedData: Kerusakan[] = await response.json();
+            const response = await fetch("/api/diagnose/damages");
+            const responseData: ApiResponse<Kerusakan[]> = await response.json();
 
+            if (!response.ok || !responseData.status) {
+                throw new Error(responseData.message || `Gagal memuat data kerusakan: ${response.status}`);
+            }
+
+            const fetchedData = responseData.data || [];
             const sortedData = fetchedData.sort((a, b) => {
                 const numA = parseInt(a.kode.replace('KK', '')) || 0;
                 const numB = parseInt(b.kode.replace('KK', '')) || 0;
                 return numA - numB;
             });
-
             setKerusakanList(sortedData);
             toast.success("Data kerusakan berhasil dimuat.");
         } catch (error) {
@@ -80,31 +69,33 @@ export default function KerusakanPage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, []);
 
-    const filterData = (): void => {
-        let filtered = kerusakanList;
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
-        if (searchQuery.trim()) {
-            const query = searchQuery.toLowerCase();
-            filtered = filtered.filter(
-                (item) =>
-                    item.nama.toLowerCase().includes(query) ||
-                    item.kode.toLowerCase().includes(query) ||
-                    item.deskripsi.toLowerCase().includes(query)
-            );
-        }
+    // Menggunakan Fuse.js untuk pencarian
+    const fuse = useMemo(() => {
+        const options = {
+            keys: ['kode', 'nama', 'deskripsi', 'tingkat_kerusakan'],
+            threshold: 0.3,
+        };
+        return new Fuse(kerusakanList, options);
+    }, [kerusakanList]);
+
+    const filteredData = useMemo(() => {
+        const searchResults = searchQuery.trim() ? fuse.search(searchQuery).map(result => result.item) : kerusakanList;
 
         if (filterTingkat !== "all") {
-            filtered = filtered.filter((item) => item.tingkat_kerusakan === filterTingkat);
+            return searchResults.filter(item => item.tingkat_kerusakan === filterTingkat);
         }
+        return searchResults;
+    }, [kerusakanList, searchQuery, filterTingkat, fuse]);
 
-        setFilteredData(filtered);
-    };
-
-    const handleEdit = (kerusakan: Kerusakan): void => {
+    const handleEdit = useCallback((kerusakan: Kerusakan): void => {
         router.push(`/admin/damages/edit/${kerusakan.id}`);
-    };
+    }, [router]);
 
     const handleDelete = async (id: string, namaKerusakan: string): Promise<void> => {
         toast("Konfirmasi Hapus", {
@@ -113,13 +104,13 @@ export default function KerusakanPage() {
                 label: "Hapus",
                 onClick: async () => {
                     try {
-                        const response = await fetch(`/api/damages/${id}`, {
+                        const response = await fetch(`/api/diagnose/damages/${id}`, {
                             method: "DELETE",
                         });
 
-                        if (!response.ok) {
-                            const errorDetail = await response.text();
-                            throw new Error(`Gagal menghapus kerusakan: ${response.status} ${errorDetail}`);
+                        const responseData: ApiResponse<any> = await response.json();
+                        if (!response.ok || !responseData.status) {
+                            throw new Error(responseData.message || `Gagal menghapus kerusakan: ${response.status}`);
                         }
 
                         await loadData();
@@ -186,7 +177,6 @@ export default function KerusakanPage() {
                 return;
             }
 
-            // Validate data structure and prepare for import
             const preparedData: ImportKerusakanItemClient[] = [];
             const validationErrors: string[] = [];
 
@@ -196,12 +186,10 @@ export default function KerusakanPage() {
                     return;
                 }
 
-                const kerusakanItem = item as Partial<Kerusakan>; // Cast to Partial for safer access
-
-                const id = typeof kerusakanItem.id === 'string' && kerusakanItem.id.trim() !== '' ? kerusakanItem.id : undefined;
+                const kerusakanItem = item as Partial<Kerusakan>;
 
                 if (typeof kerusakanItem.kode !== 'string' || !kerusakanItem.kode.trim()) {
-                    validationErrors.push(`Baris ${index + 1} (ID: ${id || 'N/A'}): 'kode' tidak valid atau kosong.`);
+                    validationErrors.push(`Baris ${index + 1} (ID: ${kerusakanItem.id || 'N/A'}): 'kode' tidak valid atau kosong.`);
                     return;
                 }
                 if (typeof kerusakanItem.nama !== 'string' || !kerusakanItem.nama.trim()) {
@@ -209,22 +197,21 @@ export default function KerusakanPage() {
                     return;
                 }
 
-                // Further validation for specific types and defaults
                 const tingkat: Kerusakan["tingkat_kerusakan"] =
                     (typeof kerusakanItem.tingkat_kerusakan === 'string' &&
                         tingkatKerusakanOptions.includes(kerusakanItem.tingkat_kerusakan as Kerusakan["tingkat_kerusakan"]))
                         ? (kerusakanItem.tingkat_kerusakan as Kerusakan["tingkat_kerusakan"])
-                        : "Ringan"; // Default if invalid
+                        : "Ringan";
 
                 const priorProb: number =
                     (typeof kerusakanItem.prior_probability === 'number' &&
-                        kerusakanItem.prior_probability >= 0 && // Allow 0
-                        kerusakanItem.prior_probability <= 1) // Probability can be up to 1
+                        kerusakanItem.prior_probability >= 0 &&
+                        kerusakanItem.prior_probability <= 1)
                         ? kerusakanItem.prior_probability
-                        : 0.1; // Default if invalid
+                        : 0.1;
 
                 preparedData.push({
-                    id: id,
+                    id: kerusakanItem.id,
                     kode: kerusakanItem.kode,
                     nama: kerusakanItem.nama,
                     deskripsi: typeof kerusakanItem.deskripsi === 'string' ? kerusakanItem.deskripsi : "",
@@ -247,21 +234,20 @@ export default function KerusakanPage() {
                 return;
             }
 
-            // Show toast for replacement confirmation
             toast("Konfirmasi Impor Data", {
                 description: `Ditemukan ${preparedData.length} entri kerusakan valid dalam file. Pilih tindakan:`,
                 action: {
                     label: "Hanya Tambah Baru",
                     onClick: async () => {
                         toast.dismiss();
-                        await sendImportData(preparedData, false); // No replace
+                        await sendImportData(preparedData, false);
                     },
                 },
-                cancel: { // Renamed from 'cancel' to 'secondary action' to be more explicit
+                cancel: {
                     label: "Ganti & Tambah",
                     onClick: async () => {
                         toast.dismiss();
-                        await sendImportData(preparedData, true); // Replace existing
+                        await sendImportData(preparedData, true);
                     },
                 },
                 duration: Infinity,
@@ -282,55 +268,46 @@ export default function KerusakanPage() {
         }
     };
 
-    // New function to send data to the import API
     const sendImportData = async (
         data: ImportKerusakanItemClient[],
         replaceExisting: boolean
     ): Promise<void> => {
         setIsSendingImport(true);
         try {
-            const response = await fetch("/api/import-data/kerusakan", { // Use the new dedicated import API
+            const response = await fetch("/api/import-data/damages", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    data,
-                    replaceExisting,
-                }),
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ data, replaceExisting }),
             });
 
-            const result = await response.json();
+            const result: ApiResponse<{
+                importedCount: number;
+                replacedCount: number;
+                skippedCount: number;
+                warnings: string[];
+                errors: string[];
+            }> = await response.json();
 
             if (!response.ok) {
-                // If backend returns status 202 (partial success/warnings), don't throw error
-                if (response.status === 202 && (result.warnings?.length > 0 || result.errors?.length > 0)) {
+                if (response.status === 202) {
                     toast.warning(result.message || "Import selesai dengan peringatan.");
                     if (result.errors && result.errors.length > 0) {
-                        toast.error(`Terdapat ${result.errors.length} kesalahan. Lihat konsol.`);
                         console.error("Import Errors:", result.errors);
                     }
                     if (result.warnings && result.warnings.length > 0) {
-                        toast.info(`Terdapat ${result.warnings.length} peringatan. Lihat konsol.`);
                         console.warn("Import Warnings:", result.warnings);
                     }
                 } else {
-                    throw new Error(result.error || `Gagal melakukan import: ${response.status}`);
+                    throw new Error(result.message || `Gagal melakukan import: ${response.status}`);
                 }
             } else {
                 toast.success(result.message || "Data berhasil diimpor.");
             }
 
-            // Always show summary toast if available
-            if (result.importedCount > 0) {
-                toast.info(`${result.importedCount} data baru ditambahkan.`);
+            if (result.data) {
+                toast.info(`${result.data.importedCount} data baru, ${result.data.replacedCount} diganti, ${result.data.skippedCount} dilewati.`);
             }
-            if (result.replacedCount > 0) {
-                toast.info(`${result.replacedCount} data diganti.`);
-            }
-            if (result.skippedCount > 0) {
-                toast.info(`${result.skippedCount} data dilewati.`);
-            }
+
             await loadData();
         } catch (caughtError: unknown) {
             console.error("Terjadi kesalahan saat mengirim data impor:", caughtError);
@@ -605,7 +582,7 @@ export default function KerusakanPage() {
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            onClick={() => handleDelete(item.id, item.nama)}
+                                                            onClick={() => item.id && handleDelete(item.id, item.nama)}
                                                             className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                                                         >
                                                             <Trash2 className="h-4 w-4" />
