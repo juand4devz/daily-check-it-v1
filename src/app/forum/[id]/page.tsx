@@ -1,4 +1,4 @@
-// /forum/[id]/page.tsx
+// /app/forum/[id]/page.tsx
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   BookOpenText,
   Loader2,
+  Edit as EditIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -47,8 +48,8 @@ import { PostHeaderSkeleton, PostContentSkeleton, CommentSkeleton } from "@/comp
 import { PostThumbnail } from "@/components/forum/PostThumbnail";
 import { PostStats } from "@/components/forum/PostStats";
 import { QuickActions } from "@/components/forum/QuickActions";
-import { RelatedPosts } from "@/components/forum/RelatedPosts";
 import { PostActionsPopover } from "@/components/forum/PostActionsPopover";
+import { ForumPostEditDialog } from "@/components/forum/ForumPostEditDialog";
 
 import { UserState, useUserState } from "@/lib/utils/useUserState";
 import { buildReplyTree, flattenReplies } from "@/lib/utils/forum-utils";
@@ -58,6 +59,7 @@ import { collection, query, where, orderBy, onSnapshot, doc } from "firebase/fir
 
 import { upload, ImageKitAbortError, ImageKitInvalidRequestError, ImageKitServerError, ImageKitUploadNetworkError } from "@imagekit/next";
 import { Progress } from "@/components/ui/progress";
+import { RelatedPosts } from "@/components/forum/RelatedPosts";
 
 interface UploadedFileState {
   file: File | null;
@@ -68,16 +70,7 @@ interface UploadedFileState {
   error: string | null;
 }
 
-// Interface untuk komponen yang diimpor (jika belum ada di file komponen aslinya)
-interface PostActionsPopoverProps {
-  post: ForumPost;
-  isBookmarked: boolean;
-  isPostAuthor: boolean;
-  onAction: (action: string) => Promise<void>;
-  isAdmin: boolean;
-  isLoggedIn: boolean;
-}
-
+// Interface MarkdownEditorProps - ini harus konsisten dengan definisi di markdown-editor.tsx
 interface MarkdownEditorProps {
   textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
   value: string;
@@ -100,6 +93,14 @@ interface MarkdownEditorProps {
   className?: string;
   allAvailableMentions?: { id: string; username: string }[];
   showMediaInput?: boolean;
+  onPaste?: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
+  onDrop?: (e: React.DragEvent<HTMLTextAreaElement>) => void;
+  onDragOver?: (e: React.DragEvent<HTMLTextAreaElement>) => void;
+  onDragLeave?: (e: React.DragEvent<HTMLTextAreaElement>) => void;
+  isDragOver?: boolean;
+  disableMediaPreviewInWriteTab?: boolean;
+  showMediaPreviewInPreviewTab?: boolean;
+  showMediaInsertActions?: boolean;
 }
 
 interface MediaViewerProps {
@@ -141,6 +142,10 @@ export default function ForumDetailPage() {
   const isPostAuthor = post?.authorId === userId;
   const isLiked = post ? (userState.postLikes?.[post.id] === true) : false;
   const isBookmarked = post ? (userState.bookmarks?.includes(post.id) === true) : false;
+
+  const handleEditPostSuccess = useCallback((updatedPostId: string) => {
+    toast.success("Postingan berhasil diperbarui.");
+  }, []);
 
   const mainCommentMediaPreviews = useMemo(() => {
     if (!mainCommentUploadState.file && !mainCommentUploadState.uploadedData) return [];
@@ -462,12 +467,10 @@ export default function ForumDetailPage() {
         return;
       }
 
-      // Check if there are any pending uploads from the main comment editor
       if (!parentId && mainCommentUploadState.uploading) {
         toast.error("Tunggu! Ada media yang masih diunggah. Harap tunggu hingga upload selesai.");
         return;
       }
-      // Check for failed uploads from the main comment editor
       if (!parentId && mainCommentUploadState.file && !mainCommentUploadState.uploadedData && !mainCommentUploadState.uploading) {
         toast.error("Ada media yang gagal diunggah. Harap hapus atau coba unggah ulang.");
         return;
@@ -707,8 +710,6 @@ export default function ForumDetailPage() {
     }
   }, [post, userId, userState.bookmarks, updateUserState, router]);
 
-  // handleReaction kini menerima newReactionKey (yang mungkin null)
-  // dan oldReactionKey untuk membantu backend memproses penggantian/penghapusan.
   const handleReaction = useCallback(
     async (replyId: string, newReactionKey: EmojiReactionKey | null, oldReactionKey: EmojiReactionKey | null) => {
       if (!userId || !post) {
@@ -717,19 +718,16 @@ export default function ForumDetailPage() {
         return;
       }
 
-      // Optimistic UI update
       setReplies((prev) =>
         buildReplyTree(
           flattenReplies(prev).map((r: ForumReply) => {
             if (r.id === replyId) {
               const updatedReactions = { ...r.reactions };
 
-              // Hapus pengguna dari reaksi lama (jika ada)
               if (oldReactionKey && updatedReactions[oldReactionKey]) {
                 updatedReactions[oldReactionKey] = updatedReactions[oldReactionKey].filter(id => id !== userId);
               }
 
-              // Tambahkan pengguna ke reaksi baru (jika ada dan berbeda dari yang lama)
               if (newReactionKey && newReactionKey !== oldReactionKey) {
                 if (!updatedReactions[newReactionKey]) {
                   updatedReactions[newReactionKey] = [];
@@ -744,12 +742,11 @@ export default function ForumDetailPage() {
         )
       );
 
-      // Perbarui userState dengan reaksi baru (atau null jika un-react)
       updateUserState((prevUserState) => ({
         ...prevUserState,
         reactions: {
           ...(prevUserState.reactions || {}),
-          [replyId]: newReactionKey, // Simpan reaksi tunggal atau null
+          [replyId]: newReactionKey,
         },
       }));
 
@@ -759,14 +756,13 @@ export default function ForumDetailPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             newReactionKey: newReactionKey,
-            oldReactionKey: oldReactionKey // Kirim juga reaksi yang lama untuk backend
+            oldReactionKey: oldReactionKey
           }),
         });
 
         const data = await response.json();
         if (!response.ok || !data.status) {
           toast.error("Gagal memperbarui reaksi", { description: data.message });
-          // Logika rollback UI jika API gagal (Opsional, Firestore listener akan mengoreksi)
         } else {
           toast.success(data.message);
         }
@@ -780,11 +776,12 @@ export default function ForumDetailPage() {
 
   const handleMarkAsSolution = useCallback(
     async (replyId: string, isCurrentlySolution: boolean) => {
-      if (!userId || !post || (post.authorId !== userId && !isAdmin)) {
-        toast.error("Anda tidak memiliki izin untuk menandai solusi.");
+      if (!userId || !post) {
+        toast.error("Anda harus login untuk menandai solusi.");
         return;
       }
 
+      // Optimistic UI update
       setPost(prevPost => {
         if (!prevPost) return null;
         let newSolutionReplyIds = [...(prevPost.solutionReplyIds || [])];
@@ -813,15 +810,21 @@ export default function ForumDetailPage() {
       );
 
       try {
+        // PENTING: Kirim userId dan isPostAuthor (bukan isAdmin) ke API untuk validasi backend
         const response = await fetch(`/api/forum/posts/${post.id}/replies/${replyId}/solution`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ isSolution: !isCurrentlySolution }),
+          body: JSON.stringify({
+            isSolution: !isCurrentlySolution,
+            userId: userId, // User yang melakukan aksi
+            isPostAuthor: post.authorId === userId // Pastikan ini true jika author post
+          }),
         });
 
         const data = await response.json();
         if (!response.ok || !data.status) {
           toast.error("Gagal memperbarui status solusi", { description: data.message });
+          // Revert optimistic UI here if API fails, or rely on Firestore listener
         } else {
           toast.success(data.message);
         }
@@ -830,7 +833,7 @@ export default function ForumDetailPage() {
         toast.error("Gagal memperbarui status solusi.");
       }
     },
-    [userId, post, isAdmin, setPost, setReplies],
+    [userId, post, setPost, setReplies], // Hapus isAdmin dari deps karena tidak lagi digunakan di sini
   );
 
   const [isPostReportDialogOpen, setIsPostReportDialogOpen] = useState(false);
@@ -842,7 +845,7 @@ export default function ForumDetailPage() {
       try {
         switch (action) {
           case "edit":
-            router.push(`/forum/${post.id}/edit`);
+            // Logika edit sudah dipindahkan ke PostActionsPopover yang langsung memicu DialogTrigger
             break;
           case "delete":
             if (confirm("Apakah Anda yakin ingin menghapus post ini?")) {
@@ -862,18 +865,14 @@ export default function ForumDetailPage() {
               toast.error("Anda tidak memiliki izin untuk melakukan aksi ini.");
               return;
             }
-            const updateData: Partial<ForumPost> = {};
-            if (action === "pin") updateData.isPinned = !post.isPinned;
-            if (action === "archive") updateData.isArchived = !post.isArchived;
-
-            const response = await fetch(`/api/forum/posts/${post.id}`, {
+            const response = await fetch(`/api/forum/posts/${post.id}/pin`, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(updateData),
+              body: JSON.stringify({ action: action, status: action === 'pin' ? !post.isPinned : !post.isArchived }),
             });
             const data = await response.json();
             if (response.ok && data.status) {
-              setPost((prev) => (prev ? { ...prev, ...updateData } : null));
+              // setPost((prev) => (prev ? { ...prev, ...updateData } : null)); // Firestore listener akan update
               toast.success(data.message);
             } else {
               toast.error("Gagal melakukan aksi", { description: data.message });
@@ -1098,6 +1097,8 @@ export default function ForumDetailPage() {
                           Pinned
                         </Badge>
                       )}
+                      {/* PostActionsPopover */}
+                      {/* Pastikan post.id tersedia sebelum render ForumPostEditDialog */}
                       <PostActionsPopover
                         post={post}
                         isBookmarked={isBookmarked}
@@ -1206,15 +1207,15 @@ export default function ForumDetailPage() {
                         postId={post?.id || ""}
                         postTitle={post?.title || ""}
                         postAuthorId={post?.authorId || ""}
+                        postType={post?.type} // Teruskan post.type ke ReplyItem
                         onVote={handleVote}
-                        // PENTING: Passing newReactionKey and oldReactionKey
                         onReaction={handleReaction}
                         onMarkAsSolution={handleMarkAsSolution}
                         onCommentAction={handleCommentAction}
                         currentUserId={userId || undefined}
                         isAdmin={isAdmin}
                         currentUserVoteStatus={userState.votes?.[reply.id] || null}
-                        currentUserReaction={userState.reactions?.[reply.id] || null} // Mengirim reaksi tunggal
+                        currentUserReaction={userState.reactions?.[reply.id] || null}
                         onSubmitReply={handleSubmitReply}
                         isSubmittingReply={submittingReply}
                         isNested={false}
@@ -1253,6 +1254,9 @@ export default function ForumDetailPage() {
                         showMediaInput={true}
                         onRemoveMedia={handleRemoveMainMedia}
                         allAvailableMentions={allCommentAuthors}
+                        disableMediaPreviewInWriteTab={false}
+                        showMediaPreviewInPreviewTab={false}
+                        showMediaInsertActions={true}
                       />
                       <div className="flex justify-between text-sm text-gray-500 mt-1">
                         <span>Mendukung Markdown formatting</span>
@@ -1314,6 +1318,15 @@ export default function ForumDetailPage() {
           <RelatedPosts currentPost={post} isLoading={loadingPost} />
         </div>
       </div>
+      {/* Forum Post Edit Dialog */}
+      {post && userId && (isPostAuthor || isAdmin) && ( // Admin bisa edit post, tapi tidak bisa mark solution
+        <ForumPostEditDialog
+          postId={post.id}
+          isPostAuthor={isPostAuthor} // Teruskan isPostAuthor
+          isAdmin={isAdmin} // Teruskan isAdmin
+          onEditSuccess={handleEditPostSuccess}
+        />
+      )}
       <ReportDialog
         isOpen={isPostReportDialogOpen}
         onOpenChange={setIsPostReportDialogOpen}

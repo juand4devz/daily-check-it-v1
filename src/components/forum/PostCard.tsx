@@ -9,13 +9,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+// DropdownMenu imports are handled by PostActionsPopover internally now
+// import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
     MessageSquare,
     Heart,
@@ -49,6 +44,7 @@ import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { ReportDialog } from "@/components/shared/ReportDialog";
 import { UserProfileClickPopover } from "@/components/user/UserProfileClickPopover";
+import { PostActionsPopover } from "@/components/forum/PostActionsPopover"; // Import PostActionsPopover
 
 interface PostCardProps {
     post: ForumPost;
@@ -157,12 +153,25 @@ export function PostCard({
                         }
                     }
                     break;
-                case "edit":
-                    router.push(`/forum/${post.id}/edit`);
-                    break;
                 case "pin":
                 case "archive":
-                    onPostAction?.(post.id, action);
+                    // Aksi pin/archive sekarang memanggil API
+                    if (!isAdmin) { // Double check admin role
+                        toast.error("Anda tidak memiliki izin untuk melakukan aksi ini.");
+                        return;
+                    }
+                    const response = await fetch(`/api/forum/posts/${post.id}/pin`, { // Panggil API baru
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: action, status: action === 'pin' ? !post.isPinned : !post.isArchived }),
+                    });
+                    const data = await response.json();
+                    if (response.ok && data.status) {
+                        toast.success(data.message);
+                        onPostAction?.(post.id, action); // Beri tahu parent (misal halaman listing)
+                    } else {
+                        toast.error("Gagal melakukan aksi", { description: data.message });
+                    }
                     break;
                 case "report":
                     if (!userId) {
@@ -191,40 +200,18 @@ export function PostCard({
     const fullTextContent = `${post.title || ""} ${post.description || ""} ${post.content || ""}`;
     const readingTime = getReadingTime(fullTextContent);
 
-    // PENTING: Fungsi untuk navigasi Card
-    const handleCardNavigation = useCallback(() => {
-        router.push(`/forum/${post.id}`);
-    }, [router, post.id]);
-
-
     return (
         <Card
             key={post.id}
-            className="hover:shadow-lg transition-all duration-300 cursor-pointer group py-0 overflow-hidden"
-            // PENTING: Gunakan onMouseDown/onPointerDown pada Card
-            // Ini akan memicu sebelum onClick anak dan memungkinkan kita menghentikan propagasi
-            onMouseDown={(e) => {
-                // Jangan lakukan stopPropagation() jika klik terjadi pada elemen interaktif
-                // Biarkan event default dan onClick handler elemen interaktif bekerja
-                const targetElement = e.target as HTMLElement;
-                const isInteractiveElement = targetElement.closest(
-                    'button, a, input, select, [role="button"], [role="menuitem"], [role="radio"]'
-                );
-
-                // Jika elemen interaktif TIDAK diklik, maka kita akan menandai ini sebagai klik kartu
-                // dan nanti akan menggunakan onClick pada Card untuk navigasi
-                if (!isInteractiveElement) {
-                    // Tandai bahwa ini adalah klik untuk navigasi kartu
-                    // Kita akan menggunakan ini di onClick default Card
-                } else {
-                    // Jika elemen interaktif diklik, HENTIKAN event agar tidak mencapai Card
-                    e.stopPropagation();
-                }
-            }}
-            onClick={handleCardNavigation} // onClick ini akan dijalankan HANYA jika onMouseDown tidak di-stopPropagation()
+            className="hover:shadow-lg transition-all duration-300 group py-0 overflow-hidden"
+        // Hapus onMouseDown/onClick dari Card utama
         >
             <div>
-                <div className="relative h-48 overflow-hidden">
+                {/* Bagian gambar/thumbnail - sekarang ini yang bisa diklik untuk navigasi */}
+                <div
+                    className="relative h-48 overflow-hidden cursor-pointer"
+                    onClick={() => router.push(`/forum/${post.id}`)} // Pindahkan navigasi ke sini
+                >
                     {post.thumbnail ? (
                         <Image
                             height={500}
@@ -265,92 +252,37 @@ export function PostCard({
                         </Badge>
                     )}
 
-                    <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <DropdownMenu>
-                            {/* PENTING: onClick pada Trigger untuk menghentikan propagasi event klik dari Card */}
-                            <DropdownMenuTrigger asChild onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
-                                <Button type="button" variant="secondary" size="sm" className="h-8 w-8 p-0 bg-black/50 hover:bg-black/70 border-0">
-                                    <MoreHorizontal className="h-4 w-4 text-white" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuItem onSelect={() => handleAction("share-link")}>
-                                    <Copy className="h-4 w-4 mr-2" />
-                                    Salin Link
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => handleAction("share-external")}>
-                                    <ExternalLink className="h-4 w-4 mr-2" />
-                                    Buka di Tab Baru
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => handleAction("bookmark")}>
-                                    {isBookmarked ? (
-                                        <>
-                                            <BookmarkCheck className="h-4 w-4 mr-2" />
-                                            Hapus Bookmark
-                                        </>
-                                    ) : (
-                                        <>
-                                            <BookmarkPlus className="h-4 w-4 mr-2" />
-                                            Bookmark
-                                        </>
-                                    )}
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                {(isAuthor || isAdmin) ? (
-                                    <>
-                                        <DropdownMenuItem onSelect={() => handleAction("edit")}>
-                                            <Edit className="h-4 w-4 mr-2" />
-                                            Edit Post
-                                        </DropdownMenuItem>
-                                        {isAdmin && (
-                                            <DropdownMenuItem onSelect={() => handleAction("pin")}>
-                                                <Pin className="h-4 w-4 mr-2" />
-                                                {post.isPinned ? "Lepas Pin" : "Pin Post"}
-                                            </DropdownMenuItem>
-                                        )}
-                                        {isAdmin && (
-                                            <DropdownMenuItem onSelect={() => handleAction("archive")}>
-                                                <Archive className="h-4 w-4 mr-2" />
-                                                {post.isArchived ? "Buka Arsip" : "Arsipkan"}
-                                            </DropdownMenuItem>
-                                        )}
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem
-                                            onSelect={() => handleAction("delete")}
-                                            className="text-red-600 focus:text-red-600"
-                                        >
-                                            <Trash2 className="h-4 w-4 mr-2" />
-                                            Hapus Post
-                                        </DropdownMenuItem>
-                                    </>
-                                ) : (
-                                    <DropdownMenuItem
-                                        onSelect={() => handleAction("report")}
-                                        className="text-red-600 focus:text-red-600"
-                                    >
-                                        <Flag className="h-4 w-4 mr-2" />
-                                        Laporkan
-                                    </DropdownMenuItem>
-                                )}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                    {/* Popover Aksi: Pastikan event diblokir di dalamnya */}
+                    <div
+                        className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onMouseDown={(e) => e.stopPropagation()} // Ini sangat penting untuk menghentikan klik dari thumbnail/card
+                        onClick={(e) => e.stopPropagation()}     // Ini juga penting untuk menghentikan klik dari thumbnail/card
+                    >
+                        <PostActionsPopover
+                            post={post}
+                            isBookmarked={isBookmarked}
+                            isPostAuthor={isAuthor}
+                            onAction={handleAction}
+                            isAdmin={isAdmin}
+                            isLoggedIn={!!userId}
+                        />
                     </div>
                 </div>
 
-                <CardContent className="p-4">
-                    {/* Menggunakan UserProfileClickPopover untuk memicu profil */}
-                    {/* PENTING: Gunakan onMouseDown dan onClick untuk stopPropagation */}
+                {/* Bagian konten kartu (di luar thumbnail) - klik ini juga untuk navigasi */}
+                <CardContent
+                    className="p-4 cursor-pointer" // Menambahkan cursor-pointer
+                    onClick={() => router.push(`/forum/${post.id}`)} // Pindahkan navigasi ke sini
+                >
                     <UserProfileClickPopover userId={post.authorId}>
                         <div
-                            className="flex items-start gap-3 mb-3 cursor-pointer" // Ini adalah trigger untuk popover
-                            onMouseDown={(e) => e.stopPropagation()} // Hentikan mouse down dari mencapai Card
-                            onClick={(e) => { // Hentikan click dari mencapai Card, dan picu popover
-                                e.stopPropagation();
-                            }}
+                            className="flex items-start gap-3 mb-3 cursor-pointer"
+                            onMouseDown={(e) => e.stopPropagation()} // Pastikan ini menghentikan untuk popover user
+                            onClick={(e) => e.stopPropagation()}     // Pastikan ini menghentikan untuk popover user
                         >
                             <Avatar className="h-8 w-8">
                                 <AvatarImage src={post.authorAvatar || "/placeholder.svg"} />
-                                <AvatarFallback>{post.authorUsername[0]}</AvatarFallback>
+                                <AvatarFallback>{post.authorUsername?.[0] || '?'}</AvatarFallback>
                             </Avatar>
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium">{post.authorUsername}</p>
@@ -378,10 +310,9 @@ export function PostCard({
                                     key={index}
                                     variant="outline"
                                     className="text-xs cursor-pointer hover:bg-blue-100"
-                                    // PENTING: Gunakan onMouseDown dan onClick untuk stopPropagation
-                                    onMouseDown={(e) => e.stopPropagation()}
+                                    onMouseDown={(e) => e.stopPropagation()} // Hentikan propagasi
                                     onClick={(e) => {
-                                        e.stopPropagation();
+                                        e.stopPropagation(); // Hentikan propagasi
                                         onTagClick?.(tag);
                                     }}
                                 >
@@ -403,7 +334,6 @@ export function PostCard({
                                 variant="ghost"
                                 size="sm"
                                 className={cn("h-6 px-2 text-xs", isLiked ? "text-red-500 hover:text-red-600" : "hover:text-red-500")}
-                                // PENTING: Gunakan onMouseDown dan onClick untuk stopPropagation
                                 onMouseDown={(e) => e.stopPropagation()}
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -431,7 +361,6 @@ export function PostCard({
                             variant="ghost"
                             size="sm"
                             className="h-6 px-2 text-xs"
-                            // PENTING: Gunakan onMouseDown dan onClick untuk stopPropagation
                             onMouseDown={(e) => e.stopPropagation()}
                             onClick={(e) => {
                                 e.stopPropagation();
@@ -457,7 +386,6 @@ export function PostCard({
                     animation: shimmer 2s infinite;
                 }
             `}</style>
-            {/* Report Dialog untuk Post */}
             <ReportDialog
                 isOpen={isReportDialogOpen}
                 onOpenChange={setIsReportDialogOpen}

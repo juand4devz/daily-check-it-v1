@@ -1,4 +1,4 @@
-// /components/forum/ForumPostForm.tsx
+// components/forum/ForumPostForm.tsx
 "use client";
 
 import type React from "react";
@@ -20,14 +20,13 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, Plus, Eye, Send, Loader2, AlertCircle, PencilRuler, X, Edit, Link, Copy, Upload, Image as ImageIcon, Video } from "lucide-react"; // Import ikon media
+import { ArrowLeft, Plus, Eye, Send, Loader2, AlertCircle, PencilRuler, X, Edit, Link, Copy, Upload, Image as ImageIcon, Video } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import Image from "next/image";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Tambahkan komponen Resizable dari shadcn/ui
 import {
     ResizableHandle,
     ResizablePanel,
@@ -35,10 +34,7 @@ import {
 } from "@/components/ui/resizable";
 
 import { ThumbnailUpload } from "@/components/forum/thumbnail-upload";
-// Hapus import MarkdownEditor karena akan diganti dengan implementasi inline
-// import { MarkdownEditor } from "@/components/forum/markdown-editor";
-
-import { MediaViewer } from "@/components/forum/media-viewer"; // <--- Import MediaViewer
+import { MediaViewer } from "@/components/forum/media-viewer";
 
 import {
     FORUM_TYPES,
@@ -65,7 +61,7 @@ interface MediaFileTemp {
     progress: number; // Upload progress for this file
     uploadedUrl: string | undefined; // Final ImageKit URL after upload, or undefined if not uploaded/failed
     isNew: boolean; // Flag to indicate if this is a newly added file vs. existing
-    filename?: string; // Tambahkan ini agar bisa digunakan di preview
+    filename?: string; // Add this for consistency in previews
 }
 
 interface DiagnosisData {
@@ -80,7 +76,7 @@ const formSchema = z.object({
     content: z.string().min(20, "Konten minimal 20 karakter").max(5000, "Konten maksimal 5000 karakter"),
     type: z.string().min(1, "Tipe diskusi harus dipilih"),
     category: z.string().min(1, "Kategori harus dipilih"),
-    tags: z.array(z.string().max(20, "Setiap tag maksimal 20 karakter")).max(5, "Maksimal 5 tag dapat ditambahkan").optional(),
+    tags: z.array(z.string().max(50, "Setiap tag maksimal 50 karakter")).max(5, "Maksimal 5 tag dapat ditambahkan").optional(), // Updated max tag length
     thumbnail: z.string().nullable().optional(),
 });
 
@@ -94,7 +90,10 @@ interface ForumPostFormProps {
     isSubmitting: boolean;
     pageTitle: string;
     pageDescription: string;
-    backUrl: string;
+    backUrl?: string; // Made optional for modal usage
+    isModal?: boolean; // NEW PROP: true if used inside a modal (affects UI like sidebar, back button)
+    onClose?: () => void; // NEW PROP: Callback to close modal when used in modal context
+    showRightSidebar?: boolean; // <--- PASTIKAN PROP INI ADA
 }
 
 const MAX_MEDIA_FILES = 5;
@@ -108,6 +107,9 @@ export function ForumPostForm({
     pageTitle,
     pageDescription,
     backUrl,
+    isModal = false,
+    onClose,
+    showRightSidebar = true,
 }: ForumPostFormProps) {
     const { data: session, status } = useSession();
     const userId = session?.user?.id;
@@ -122,7 +124,7 @@ export function ForumPostForm({
     const [isThumbnailUploading, setIsThumbnailUploading] = useState(false);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null); // Tambahkan ref untuk input file
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const form = useForm<FormSchema>({
         resolver: zodResolver(formSchema),
@@ -256,7 +258,7 @@ export function ForumPostForm({
                 reader.onload = () => resolve(reader.result as string);
                 reader.readAsDataURL(file);
             } else {
-                resolve("/placeholder.svg");
+                resolve("/placeholder.svg"); // Fallback for unsupported types
             }
         });
     };
@@ -265,7 +267,7 @@ export function ForumPostForm({
         file: File,
         folder: string,
         filenamePrefix: string,
-        onProgress: (progress: number) => void
+        onProgress: (progress: number) => void // Callback progress
     ): Promise<{ url: string, id: string, type: "image" | "video", filename: string, size: number } | null> => {
         if (!userId) {
             toast.error("Anda harus login untuk mengunggah media.");
@@ -311,7 +313,7 @@ export function ForumPostForm({
                 xhr.upload.onprogress = (event) => {
                     if (event.lengthComputable) {
                         const percent = (event.loaded / event.total) * 100;
-                        onProgress(percent);
+                        onProgress(percent); // Panggil callback progress
                     }
                 };
                 xhr.send(formData);
@@ -324,10 +326,11 @@ export function ForumPostForm({
         }
     }, [userId]);
 
-    const handleThumbnailUpload = useCallback(async (file: File): Promise<string | null> => {
+    // Callback khusus untuk ThumbnailUpload
+    const handleThumbnailUpload = useCallback(async (file: File, onProgressCallback: (p: number) => void): Promise<string | null> => {
         setIsThumbnailUploading(true);
         try {
-            const uploadedResult = await uploadFileToImageKit(file, "forum-thumbnails", "thumbnail", (p) => { });
+            const uploadedResult = await uploadFileToImageKit(file, "forum-thumbnails", "thumbnail", onProgressCallback); // Teruskan onProgressCallback
             if (uploadedResult) {
                 form.setValue("thumbnail", uploadedResult.url, { shouldValidate: true });
                 return uploadedResult.url;
@@ -503,24 +506,24 @@ export function ForumPostForm({
 
         const items = e.clipboardData?.items;
         if (items) {
-            const imageFiles: File[] = [];
+            const mediaClipboardFiles: File[] = [];
             for (let i = 0; i < items.length; i++) {
-                if (items[i].type.indexOf('image') !== -1) {
+                if (items[i].type.startsWith('image/') || items[i].type.startsWith('video/')) {
                     const file = items[i].getAsFile();
                     if (file) {
-                        imageFiles.push(file);
+                        mediaClipboardFiles.push(file);
                     }
                 }
             }
-            if (imageFiles.length > 0) {
+            if (mediaClipboardFiles.length > 0) {
                 e.preventDefault();
-                processAndAddFiles(imageFiles);
+                processAndAddFiles(mediaClipboardFiles);
             }
         }
     }, [isSubmitting, mediaFiles, processAndAddFiles]);
 
 
-    const markdownEditorMediaPreviews = useMemo(() => {
+    const finalMediaPreviewsForTab = useMemo(() => {
         return mediaFiles.map(mf => ({
             id: mf.id,
             url: mf.preview,
@@ -528,47 +531,60 @@ export function ForumPostForm({
             uploading: mf.uploading,
             progress: mf.progress,
             uploadedUrl: mf.uploadedUrl,
+            type: mf.type
+        }));
+    }, [mediaFiles]);
+
+
+    const mediaForMediaViewer = useMemo(() => {
+        return mediaFiles.filter(mf => mf.uploadedUrl).map(mf => ({
+            id: mf.id,
+            url: mf.uploadedUrl!,
+            type: mf.type,
+            filename: mf.filename!,
+            thumbnailUrl: mf.type === 'video' ? `${mf.uploadedUrl!}?tr=f-jpg` : undefined
         }));
     }, [mediaFiles]);
 
 
     const handleSubmit = async (values: FormSchema) => {
-        if (!userId) { // Check for userId outside of this function, as it's a prop for parentOnSubmit
-            toast.error("Anda harus login untuk membuat postingan.");
-            router.push("/login");
+        if (!userId || !username || !avatar) {
+            toast.error("Data pengguna tidak lengkap. Harap refresh atau login ulang.");
+            if (isModal && onClose) {
+                onClose();
+            } else if (!isModal) {
+                router.push("/login");
+            }
             return;
         }
 
         if (mediaFiles.some(mf => mf.uploading)) {
-            toast.error("Tunggu! Ada gambar yang masih diunggah. Harap tunggu hingga semua upload selesai.");
+            toast.error("Tunggu! Ada media yang masih diunggah. Harap tunggu hingga semua upload selesai.");
             return;
         }
         if (mediaFiles.some(mf => mf.uploadedUrl === undefined)) {
-            toast.error("Ada gambar yang gagal diunggah. Harap hapus atau coba unggah ulang sebelum mengirim.");
+            toast.error("Ada media yang gagal diunggah. Harap hapus atau coba unggah ulang sebelum mengirim.");
             return;
         }
 
-        // Collect final uploaded media (both new and existing)
         const finalMediaForSubmission: ForumMedia[] = mediaFiles
-            .filter(mf => mf.uploadedUrl) // Only include successfully uploaded media
+            .filter(mf => mf.uploadedUrl)
             .map(mf => ({
                 id: mf.id,
                 type: mf.type,
-                filename: mf.file?.name || mf.filename || 'unknown', // Use original filename from existing media if available
-                size: mf.file?.size || 0, // Use original size if available
+                filename: mf.filename || mf.file?.name || 'unknown',
+                size: mf.file?.size || 0,
                 url: mf.uploadedUrl!,
                 thumbnailUrl: mf.type === "video" ? `${mf.uploadedUrl!}?tr=f-jpg` : undefined,
             }));
 
         let finalContent = values.content;
-        // Replace temporary markdown placeholders with actual URLs
         finalMediaForSubmission.forEach(mediaItem => {
             const tempMedia = mediaFiles.find(mft => mft.id === mediaItem.id);
             if (tempMedia && tempMedia.markdownPlaceholder && finalContent.includes(tempMedia.markdownPlaceholder)) {
                 finalContent = finalContent.replace(tempMedia.markdownPlaceholder, `![${mediaItem.filename}](${mediaItem.url})`);
             }
         });
-        // Remove any remaining temporary placeholders (e.g., if user deleted them from content)
         finalContent = finalContent.replace(/!\[.*?\]\(uploading:.*?\)/g, '').trim();
 
         const postData: Omit<ForumPost, 'id' | 'createdAt' | 'updatedAt' | 'likes' | 'likedBy' | 'replies' | 'views' | 'isResolved' | 'isPinned' | 'isArchived'> = {
@@ -579,14 +595,17 @@ export function ForumPostForm({
             category: values.category,
             tags: values.tags || [],
             thumbnail: values.thumbnail || null,
-            media: finalMediaForSubmission, // Use the collected final media
+            media: finalMediaForSubmission,
             authorId: userId!,
             authorUsername: username!,
             authorAvatar: avatar || "/placeholder.svg",
         };
 
-        // Pass data and optional postId to the parent's onSubmit handler
         await parentOnSubmit(postData, initialData?.id);
+
+        if (isModal && onClose) {
+            onClose();
+        }
     };
 
     const isAnyMediaUploading = mediaFiles.some(mf => mf.uploading);
@@ -594,7 +613,7 @@ export function ForumPostForm({
 
     if (isLoadingPage || isLoadingInitialData) {
         return (
-            <div className="container mx-auto px-4 py-8 max-w-4xl">
+            <div className={cn("container mx-auto px-4 py-8", isModal ? "max-w-full" : "max-w-4xl")}>
                 <div className="space-y-6">
                     <Skeleton className="h-8 w-64" />
                     <Card>
@@ -614,23 +633,25 @@ export function ForumPostForm({
     }
 
     return (
-        <div className="p-4 mw-full">
-            <div className="flex-col items-center gap-4 mb-8">
-                <Button type="button" variant="ghost" onClick={() => router.back()}>
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Kembali
-                </Button>
-                <div className="mt-4 flex items-center">
-                    <PencilRuler className="h-14 w-14 mr-4" />
-                    <div>
-                        <h1 className="text-3xl font-bold">{pageTitle}</h1>
-                        <p className="text-gray-600">{pageDescription}</p>
+        <div className={cn("p-4", isModal ? "px-0" : "mw-full")}>
+            {!isModal && (
+                <div className="flex-col items-center gap-4 mb-8">
+                    <Button type="button" variant="ghost" onClick={() => router.back()}>
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        Kembali
+                    </Button>
+                    <div className="mt-4 flex items-center">
+                        <PencilRuler className="h-14 w-14 mr-4" />
+                        <div>
+                            <h1 className="text-3xl font-bold">{pageTitle}</h1>
+                            <p className="text-gray-600">{pageDescription}</p>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             {diagnosisData && (
-                <Alert variant="default" className="mt-5 mb-8">
+                <Alert variant="default" className={cn("mt-5 mb-8", isModal && "mx-4")}>
                     <AlertCircle className="h-5 w-5" />
                     <AlertTitle>Data Diagnosa Terdeteksi</AlertTitle>
                     <AlertDescription>
@@ -640,9 +661,9 @@ export function ForumPostForm({
             )}
 
             <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-2 space-y-6">
+                <form onSubmit={form.handleSubmit(handleSubmit)} className={cn("space-y-6", isModal && "px-4")}>
+                    <div className={cn("grid grid-cols-1 gap-6", showRightSidebar ? "lg:grid-cols-3" : "lg:grid-cols-1")}>
+                        <div className={cn("space-y-6", showRightSidebar ? "lg:col-span-2" : "lg:col-span-1")}>
                             <Card>
                                 <CardHeader>
                                     <CardTitle>Informasi Dasar</CardTitle>
@@ -813,6 +834,7 @@ export function ForumPostForm({
                                         name="thumbnail"
                                         render={({ field }) => (
                                             <FormItem>
+                                                <FormLabel>Thumbnail</FormLabel>
                                                 <FormControl>
                                                     <ThumbnailUpload
                                                         value={field.value || null}
@@ -853,11 +875,39 @@ export function ForumPostForm({
                                                 render={({ field }) => (
                                                     <FormItem>
                                                         <FormControl>
-                                                            {/* Implementasi Markdown Editor Inline di sini */}
                                                             <div className="relative border rounded-md overflow-hidden bg-gray-100 dark:bg-zinc-900 flex flex-col">
                                                                 <div className="flex items-center justify-end border-b p-2 flex-shrink-0">
                                                                     <div className="flex items-center gap-2">
-                                                                        {/* Tombol Upload Gambar/Video */}
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            onClick={() => {
+                                                                                const markdownLink = `![Deskripsi Gambar](URL_Gambar_Anda_Di_Sini)\n`;
+                                                                                const currentContent = form.getValues("content") || "";
+                                                                                const cursorPosition = textareaRef.current?.selectionStart || currentContent.length;
+                                                                                const newContent =
+                                                                                    currentContent.substring(0, cursorPosition) +
+                                                                                    markdownLink +
+                                                                                    currentContent.substring(cursorPosition);
+                                                                                form.setValue("content", newContent, { shouldValidate: true });
+
+                                                                                setTimeout(() => {
+                                                                                    if (textareaRef.current) {
+                                                                                        const newCaretPosition = cursorPosition + markdownLink.length - 1;
+                                                                                        textareaRef.current.focus();
+                                                                                        textareaRef.current.setSelectionRange(newCaretPosition - 20, newCaretPosition);
+                                                                                    }
+                                                                                }, 0);
+                                                                                toast.info("Markdown link gambar ditambahkan.");
+                                                                            }}
+                                                                            disabled={isSubmitting || isAnyMediaUploading}
+                                                                            className="h-8 w-8 text-gray-500 hover:text-gray-700"
+                                                                            title="Masukkan link gambar Markdown"
+                                                                        >
+                                                                            <Link className="h-4 w-4" />
+                                                                            <span className="sr-only">Masukkan link gambar Markdown</span>
+                                                                        </Button>
                                                                         <Button
                                                                             type="button"
                                                                             variant="ghost"
@@ -870,13 +920,12 @@ export function ForumPostForm({
                                                                             {isAnyMediaUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                                                                             <span className="sr-only">Upload Gambar/Video</span>
                                                                         </Button>
-                                                                        {/* Input file tersembunyi */}
                                                                         <input
                                                                             type="file"
                                                                             ref={fileInputRef}
                                                                             onChange={(e) => processAndAddFiles(e.target.files)}
                                                                             accept="image/*,video/*"
-                                                                            multiple={true} // Allow multiple for form
+                                                                            multiple={true}
                                                                             className="hidden"
                                                                             disabled={isSubmitting || isAnyMediaUploading || mediaFiles.filter(mf => mf.uploadedUrl || mf.uploading).length >= MAX_MEDIA_FILES}
                                                                         />
@@ -911,19 +960,16 @@ export function ForumPostForm({
                                                     </FormItem>
                                                 )}
                                             />
-                                            {/* Media terlampir di tab 'write', dipindahkan dari bawah editor ke sini */}
                                             {mediaFiles.length > 0 && (
                                                 <div className="mt-4 border-t pt-4">
                                                     <h4 className="font-medium mb-3">Media Terlampir:</h4>
                                                     <ScrollArea className="w-full whitespace-nowrap rounded-md border">
                                                         <div className="flex w-max space-x-4 p-4">
-                                                            {markdownEditorMediaPreviews.map((media) => (
+                                                            {finalMediaPreviewsForTab.map((media) => (
                                                                 <div key={media.id} className="relative group w-[150px] h-[150px] flex-shrink-0">
                                                                     <div className="relative w-full h-full overflow-hidden rounded-md border border-gray-200">
                                                                         {media.type === "image" ? (
                                                                             <Image
-                                                                                height="500"
-                                                                                width="500"
                                                                                 src={media.url}
                                                                                 alt={media.filename}
                                                                                 layout="fill"
@@ -933,7 +979,7 @@ export function ForumPostForm({
                                                                             <video
                                                                                 src={media.url}
                                                                                 className="w-full h-full object-cover"
-                                                                                poster={media.uploadedUrl ? `${media.uploadedUrl}?tr=f-jpg` : undefined} // Gunakan poster untuk video
+                                                                                poster={media.uploadedUrl ? `${media.uploadedUrl}?tr=f-jpg` : undefined}
                                                                                 muted
                                                                                 loop
                                                                             />
@@ -1012,16 +1058,10 @@ export function ForumPostForm({
                                                 )}
                                             </div>
                                             {/* Media terlampir untuk Forum Post Form (di tab 'preview') - Menggunakan MediaViewer */}
-                                            {mediaFiles.length > 0 && (
+                                            {mediaForMediaViewer.length > 0 && (
                                                 <div className="mt-4 border-t pt-4">
                                                     <h4 className="font-medium mb-3">Media Terlampir:</h4>
-                                                    <MediaViewer media={mediaFiles.filter(mf => mf.uploadedUrl).map(mf => ({
-                                                        id: mf.id,
-                                                        url: mf.uploadedUrl!,
-                                                        type: mf.type,
-                                                        filename: mf.filename!,
-                                                        thumbnailUrl: mf.type === 'video' ? `${mf.uploadedUrl!}?tr=f-jpg` : undefined // Buat thumbnail jika video
-                                                    }))} />
+                                                    <MediaViewer media={mediaForMediaViewer} />
                                                 </div>
                                             )}
                                         </TabsContent>
@@ -1030,7 +1070,8 @@ export function ForumPostForm({
                             </Card>
                         </div>
 
-                        <div className="space-y-6 lg:sticky lg:top-8 h-fit">
+                        {/* Right Sidebar */}
+                        <div className={cn("space-y-6 lg:sticky lg:top-8 h-fit", !showRightSidebar && "hidden")}>
                             {selectedType && (
                                 <Card>
                                     <CardHeader>

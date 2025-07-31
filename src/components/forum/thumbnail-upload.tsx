@@ -1,263 +1,285 @@
 // /components/forum/thumbnail-upload.tsx
 "use client";
 
-import type React from "react";
-import { useState, useRef, useCallback } from "react";
+import React, { useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
-import { ImageIcon, Loader2, Check, Camera, FileImage, X, LucideIcon, HelpCircle } from "lucide-react";
 import { toast } from "sonner";
+import { Trash2, Loader2, Upload, Image as ImageIcon, Video, X } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
 
 interface ThumbnailUploadProps {
-    value?: string | null;
+    value: string | null;
     onChange: (url: string | null | undefined) => void;
     disabled?: boolean;
-    onUploadFile: (file: File) => Promise<string | null>;
-    isLoading?: boolean;
-    placeholderIcon?: LucideIcon;
-    placeholderGradient?: string;
+    onUploadFile: (file: File, onProgressCallback: (progress: number) => void) => Promise<string | null>;
+    isLoading: boolean;
+    placeholderIcon: React.ElementType;
+    placeholderGradient: string;
 }
 
 export function ThumbnailUpload({
     value,
     onChange,
-    disabled = false,
+    disabled,
     onUploadFile,
-    isLoading = false,
-    placeholderIcon: PlaceholderIcon = HelpCircle,
-    placeholderGradient = "bg-gradient-to-br from-blue-400 via-purple-500 to-pink-500",
+    isLoading,
+    placeholderIcon: PlaceholderIcon,
+    placeholderGradient,
 }: ThumbnailUploadProps) {
-    const [internalProgress, setInternalProgress] = useState(0);
-    const [dragActive, setDragActive] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const cameraInputRef = useRef<HTMLInputElement>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(value);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [isUploadingInternal, setIsUploadingInternal] = useState(false);
+    const [uploadError, setUploadError] = useState<string | null>(null);
+    const [fileType, setFileType] = useState<"image" | "video" | null>(null);
+    const [isDragOver, setIsDragOver] = useState(false);
 
-    const handleFile = useCallback(
-        async (file: File) => {
-            if (!file.type.startsWith("image/")) {
-                toast.error("File tidak valid", {
-                    description: "Hanya file gambar yang diperbolehkan",
-                });
-                return;
+    // PERBAIKAN: Pindahkan definisi displayIsLoading ke atas,
+    // sebelum digunakan dalam useCallback.
+    const displayIsLoading = isLoading || isUploadingInternal;
+
+    // Sync previewUrl with value from parent if value changes (e.g., initialData load)
+    React.useEffect(() => {
+        setPreviewUrl(value);
+        if (value) {
+            if (value.match(/\.(mp4|mov|webm|ogg)$/i)) {
+                setFileType('video');
+            } else if (value.match(/\.(jpe?g|png|gif|webp|svg)$/i)) {
+                setFileType('image');
+            } else {
+                setFileType(null);
             }
+        } else {
+            setFileType(null);
+        }
+    }, [value]);
 
-            if (file.size > 5 * 1024 * 1024) {
-                toast.error("File terlalu besar", {
-                    description: "Ukuran file maksimal 5MB",
-                });
-                return;
+    const handleFileProcessing = useCallback(async (file: File) => {
+        // Reset previous states
+        setUploadError(null);
+        setUploadProgress(0);
+
+        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+            toast.error("Format file tidak didukung.", { description: "Hanya gambar atau video yang diizinkan." });
+            return;
+        }
+
+        // Create local preview URL immediately
+        const objectUrl = URL.createObjectURL(file);
+        setPreviewUrl(objectUrl);
+        setFileType(file.type.startsWith('image/') ? 'image' : 'video');
+        setIsUploadingInternal(true); // Start internal loading indicator
+
+        try {
+            // PENTING: Teruskan setUploadProgress sebagai callback ke onUploadFile
+            const uploadedUrl = await onUploadFile(file, (p) => setUploadProgress(p));
+            if (uploadedUrl) {
+                onChange(uploadedUrl); // Update parent's form value
+                toast.success("Thumbnail berhasil diunggah.");
+                setUploadProgress(100);
+            } else {
+                setUploadError("Gagal mengunggah thumbnail.");
+                toast.error("Gagal mengunggah thumbnail.", { description: "Silakan coba lagi." });
+                // Clean up local preview if upload failed
+                URL.revokeObjectURL(objectUrl);
+                setPreviewUrl(null);
+                setFileType(null);
             }
-
-            setInternalProgress(0);
-
-            const animateProgress = () => {
-                let p = 0;
-                const interval = setInterval(() => {
-                    p += 10;
-                    if (p > 100) {
-                        clearInterval(interval);
-                        setInternalProgress(0);
-                        return;
-                    }
-                    setInternalProgress(p);
-                }, 100);
-            };
-
-            if (!isLoading) {
-                animateProgress();
+        } catch (error) {
+            console.error("Error during thumbnail upload:", error);
+            setUploadError("Gagal mengunggah thumbnail.");
+            toast.error("Gagal mengunggah thumbnail.", { description: "Terjadi kesalahan tak terduga." });
+            // Clean up local preview if upload failed
+            URL.revokeObjectURL(objectUrl);
+            setPreviewUrl(null);
+            setFileType(null);
+        } finally {
+            setIsUploadingInternal(false); // End internal loading
+            if (fileInputRef.current) {
+                fileInputRef.current.value = ''; // Reset input to allow re-uploading the same file
             }
+        }
+    }, [onChange, onUploadFile]);
 
-            try {
-                const url = await onUploadFile(file);
-                if (url) {
-                    onChange(url);
-                    toast.success("Upload berhasil", {
-                        description: "Thumbnail berhasil diupload",
-                    });
-                } else {
-                    onChange(null);
-                    toast.error("Upload gagal", {
-                        description: "Terjadi kesalahan saat mengunggah thumbnail",
-                    });
-                }
-            } catch (error) {
-                console.error("Error during thumbnail upload process:", error);
-                onChange(null);
-                toast.error("Upload gagal", {
-                    description: "Terjadi kesalahan saat mengunggah thumbnail",
-                });
-            } finally {
-                setInternalProgress(0);
-            }
-        },
-        [onChange, onUploadFile, isLoading],
-    );
+    const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            handleFileProcessing(file);
+        }
+    }, [handleFileProcessing]);
 
+    const handleDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setIsDragOver(false);
+        // Pastikan displayIsLoading dapat diakses di sini
+        if (disabled || displayIsLoading) return;
 
-    const handleDrop = useCallback(
-        (e: React.DragEvent) => {
-            e.preventDefault();
-            setDragActive(false);
+        const file = event.dataTransfer.files?.[0];
+        if (file) {
+            handleFileProcessing(file);
+        }
+    }, [disabled, displayIsLoading, handleFileProcessing]); // Tambahkan displayIsLoading sebagai dependensi
 
-            if (disabled || isLoading) return;
+    const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        // Pastikan displayIsLoading dapat diakses di sini
+        if (disabled || displayIsLoading) {
+            event.dataTransfer.dropEffect = "none";
+        } else {
+            event.dataTransfer.dropEffect = "copy";
+            setIsDragOver(true);
+        }
+    }, [disabled, displayIsLoading]); // Tambahkan displayIsLoading sebagai dependensi
 
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFile(files[0]);
-            }
-        },
-        [disabled, isLoading, handleFile],
-    );
-
-    const handleDragOver = useCallback(
-        (e: React.DragEvent) => {
-            e.preventDefault();
-            if (!disabled && !isLoading) {
-                setDragActive(true);
-            }
-        },
-        [disabled, isLoading],
-    );
-
-    const handleDragLeave = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        setDragActive(false);
+    const handleDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setIsDragOver(false);
     }, []);
 
-    const handleFileInput = useCallback(
-        (e: React.ChangeEvent<HTMLInputElement>) => {
-            const files = e.target.files;
-            if (files && files.length > 0) {
-                handleFile(files[0]);
-            }
-            e.target.value = "";
-        },
-        [handleFile],
-    );
 
-    const isCurrentlyUploading = isLoading || internalProgress > 0;
+    const handleRemoveThumbnail = useCallback(() => {
+        if (previewUrl) {
+            URL.revokeObjectURL(previewUrl); // Clean up blob URL
+        }
+        onChange(null); // Clear thumbnail in parent form
+        setPreviewUrl(null);
+        setFileType(null);
+        setUploadProgress(0);
+        setUploadError(null);
+        setIsUploadingInternal(false);
+        toast.info("Thumbnail dihapus.");
+    }, [onChange, previewUrl]);
+
 
     return (
-        <div className="space-y-3">
-            <Label>Thumbnail (Opsional)</Label>
+        <div className="space-y-2">
+            <div
+                className={cn(
+                    "relative w-full h-48 border rounded-lg overflow-hidden group flex items-center justify-center",
+                    "cursor-pointer transition-colors duration-200",
+                    isDragOver ? "border-blue-500 bg-blue-50 dark:bg-blue-950" : "border-gray-200 dark:border-gray-700",
+                    displayIsLoading ? "cursor-wait" : ""
+                )}
+                onClick={() => !displayIsLoading && fileInputRef.current?.click()}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+            >
+                {/* Konten Pratinjau */}
+                {previewUrl ? (
+                    fileType === "image" ? (
+                        <Image
+                            src={previewUrl}
+                            alt="Thumbnail Preview"
+                            layout="fill"
+                            objectFit="cover"
+                            className="transition-transform duration-300 group-hover:scale-105"
+                        />
+                    ) : (
+                        <video
+                            src={previewUrl}
+                            className="w-full h-full object-cover"
+                            poster={value && fileType === 'video' ? `${value}?tr=f-jpg` : undefined}
+                            muted
+                            loop
+                            playsInline
+                            autoPlay
+                        />
+                    )
+                ) : (
+                    <div className={cn("w-full h-full flex flex-col items-center justify-center relative p-4 text-center", placeholderGradient)}>
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
+                        <PlaceholderIcon className="h-16 w-16 text-white/80 mb-2" />
+                        <p className="text-white text-sm font-medium">Drag & Drop atau Klik untuk Upload</p>
+                        <p className="text-white text-xs opacity-80 mt-1">Gambar atau Video (Max 5MB)</p>
+                    </div>
+                )}
 
-            {(value !== null && value !== undefined) ? (
-                <Card className="overflow-hidden">
-                    <div className="relative">
-                        <Image height="500" width="500" src={value} alt="Thumbnail preview" className="w-full h-48 object-cover" />
+                {/* Overlay for uploading status */}
+                {displayIsLoading && (
+                    <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-white p-4 z-10">
+                        <Loader2 className="h-10 w-10 animate-spin mb-3 text-blue-400" />
+                        <p className="text-lg font-semibold mb-2">Mengunggah...</p>
+                        <span className="text-sm">{Math.round(uploadProgress)}%</span>
+                        <Progress value={uploadProgress} className="w-4/5 mt-3 h-2 bg-blue-300" />
+                    </div>
+                )}
 
-                        {isCurrentlyUploading && (
-                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                <div className="text-center text-white">
-                                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-                                    <div className="text-sm">{internalProgress > 0 ? `${Math.round(internalProgress)}%` : "Uploading..."}</div>
-                                    {internalProgress > 0 && <Progress value={internalProgress} className="w-32 mt-2" />}
-                                </div>
-                            </div>
-                        )}
-
-                        {!isCurrentlyUploading && (
-                            <div className="absolute top-2 left-2">
-                                <div className="bg-green-500 text-white rounded-full p-1">
-                                    <Check className="h-4 w-4" />
-                                </div>
-                            </div>
-                        )}
+                {/* Overlay for upload error */}
+                {!displayIsLoading && uploadError && (
+                    <div className="absolute inset-0 bg-red-600/80 flex flex-col items-center justify-center text-white p-4 z-10">
+                        <X className="h-10 w-10 mb-3" />
+                        <p className="text-lg font-semibold mb-2">Unggah Gagal</p>
+                        <p className="text-sm text-center">{uploadError}</p>
                         <Button
-                            type="button" // Pastikan type="button"
-                            variant="destructive"
-                            size="icon"
-                            className="absolute top-2 right-2 h-6 w-6 rounded-full opacity-80 hover:opacity-100 z-10"
-                            onClick={(e) => { e.stopPropagation(); onChange(null); }}
-                            disabled={disabled || isCurrentlyUploading}
-                            title="Hapus Thumbnail"
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="mt-3 bg-white/20 hover:bg-white/30 text-white"
+                            onClick={handleRemoveThumbnail} // Allows user to remove failed upload
                         >
-                            <X className="h-3 w-3" />
+                            <Trash2 className="h-4 w-4 mr-2" /> Hapus
                         </Button>
                     </div>
+                )}
 
-                    <CardContent className="p-3">
-                        <p className="text-sm text-gray-600">Thumbnail akan ditampilkan sebagai gambar utama post</p>
-                    </CardContent>
-                </Card>
-            ) : (
-                <div
-                    className={cn(`
-                        border-2 border-dashed rounded-lg p-6 text-center transition-all duration-200
-                        ${dragActive ? "border-blue-400 bg-blue-50" : "border-gray-300 hover:border-gray-400"}
-                        ${disabled || isCurrentlyUploading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
-                    `, {
-                        'relative overflow-hidden': true,
-                    })}
-                    onDrop={handleDrop}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onClick={() => !disabled && !isCurrentlyUploading && fileInputRef.current?.click()}
-                >
-                    {/* Dynamic Placeholder Icon and Gradient */}
-                    <div className={cn("absolute inset-0 flex items-center justify-center", placeholderGradient)}>
-                        <PlaceholderIcon className="h-16 w-16 text-white/80 opacity-60" />
-                    </div>
-                    {/* Content on top of the placeholder */}
-                    <div className="relative z-10 space-y-3">
-                        <div className="flex justify-center">
-                            <div className="p-3 bg-gray-100 rounded-full">
-                                <ImageIcon className="h-6 w-6 text-gray-600" />
-                            </div>
-                        </div>
+                {/* Tombol Hapus (selalu muncul di atas overlay jika ada preview dan tidak loading) */}
+                {previewUrl && !displayIsLoading && (
+                    <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2 h-8 w-8 rounded-full opacity-80 hover:opacity-100 z-20 flex items-center justify-center"
+                        onClick={handleRemoveThumbnail}
+                        disabled={disabled}
+                        aria-label="Hapus thumbnail"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                        <span className="sr-only">Hapus Thumbnail</span>
+                    </Button>
+                )}
+            </div>
 
-                        <div>
-                            <p className="font-medium text-gray-700">Upload Thumbnail</p>
-                            <p className="text-sm text-gray-500 mt-1">Drag & drop atau klik untuk memilih gambar</p>
-                            <p className="text-xs text-gray-400 mt-1">Format: JPG, PNG, GIF, WebP (Maks. 5MB)</p>
-                        </div>
-
-                        <div className="flex justify-center gap-2">
-                            <Button
-                                type="button" // Pastikan type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    fileInputRef.current?.click();
-                                }}
-                                disabled={disabled || isCurrentlyUploading}
-                            >
-                                <FileImage className="h-4 w-4 mr-2" />
-                                Pilih File
-                            </Button>
-
-                            <Button
-                                type="button" // Pastikan type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    cameraInputRef.current?.click();
-                                }}
-                                disabled={disabled || isCurrentlyUploading}
-                            >
-                                <Camera className="h-4 w-4 mr-2" />
-                                Kamera
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileInput} className="hidden" />
+            {/* Input file tersembunyi (dulu tombol upload) */}
             <input
-                ref={cameraInputRef}
                 type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleFileInput}
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/*,video/*"
                 className="hidden"
+                disabled={disabled || displayIsLoading}
             />
+            {/* Tombol "Upload/Ganti Thumbnail" ini opsional, karena area drop sudah ada. Bisa dihapus jika diinginkan. */}
+            <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full"
+                disabled={disabled || displayIsLoading}
+            >
+                <Upload className="h-4 w-4 mr-2" />
+                {previewUrl ? "Ganti Thumbnail" : "Upload Thumbnail"}
+            </Button>
+            <p className="text-xs text-gray-500 mt-1">Format: JPG, PNG, GIF, WEBP, MP4. Max 5MB. Gunakan rasio 16:9 untuk tampilan terbaik.</p>
+
+            <style jsx>{`
+                @keyframes shimmer {
+                    0% {
+                        transform: translateX(-100%);
+                    }
+                    100% {
+                        transform: translateX(100%);
+                    }
+                }
+                .animate-shimmer {
+                    animation: shimmer 2s infinite;
+                }
+            `}</style>
         </div>
     );
 }

@@ -23,7 +23,7 @@ import {
     Link as LinkIcon,
     Image as ImageIcon,
     Video,
-    Smile, // Pastikan Smile diimpor jika digunakan di sini untuk default
+    Smile,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -31,6 +31,7 @@ import {
     EMOJI_REACTIONS,
     ForumMedia,
     EmojiReactionKey,
+    ForumPost,
 } from "@/types/forum";
 import { formatTimeAgo } from "@/lib/utils/date-utils";
 import { MarkdownEditor } from "./markdown-editor";
@@ -62,13 +63,13 @@ interface ReplyItemProps {
     postId: string;
     postTitle?: string;
     postAuthorId: string;
+    postType?: string;
     onVote: (replyId: string, voteType: "up" | "down", currentVoteStatus: "up" | "down" | null) => Promise<void>;
-    // PERUBAHAN: onReaction menerima newKey dan oldKey
     onReaction: (replyId: string, newReactionKey: EmojiReactionKey | null, oldReactionKey: EmojiReactionKey | null) => Promise<void>;
-    onMarkAsSolution: (replyId: string, isCurrentlySolution: boolean) => Promise<void>;
+    onMarkAsSolution: (replyId: string, isCurrentlySolution: boolean, userId: string, isPostAuthor: boolean, isAdmin: boolean) => Promise<void>;
     onCommentAction: (replyId: string, action: string) => void;
     currentUserVoteStatus: "up" | "down" | null;
-    currentUserReaction: EmojiReactionKey | null; // Single reaction key or null
+    currentUserReaction: EmojiReactionKey | null;
     onSubmitReply: (content: string, mediaFiles: ForumMedia[], parentId?: string, mentionedUserIds?: string[]) => Promise<void>;
     isSubmittingReply: boolean;
     isNested?: boolean;
@@ -97,12 +98,13 @@ export function ReplyItem({
     postId,
     postTitle,
     postAuthorId,
+    postType,
     onVote,
     onReaction,
     onMarkAsSolution,
     onCommentAction,
     currentUserVoteStatus,
-    currentUserReaction, // Ini sekarang adalah EmojiReactionKey | null
+    currentUserReaction,
     onSubmitReply,
     isSubmittingReply,
     isNested = false,
@@ -125,7 +127,8 @@ export function ReplyItem({
             uploading: fileItem.uploading,
             progress: fileItem.progress,
             uploadedUrl: fileItem.uploadedMediaData?.url,
-            type: fileItem.file.type.startsWith('image/') ? 'image' : fileItem.file.type.startsWith('video/') ? 'video' : undefined,
+            // PERBAIKAN: Pastikan fileItem.file ada sebelum mengakses .type
+            type: fileItem.file ? (fileItem.file.type.startsWith('image/') ? 'image' : fileItem.file.type.startsWith('video/') ? 'video' : undefined) : undefined,
         }));
     }, [inlineReplyMediaFiles]);
 
@@ -146,7 +149,9 @@ export function ReplyItem({
     const [mentionCaretPosition, setMentionCaretPosition] = useState(0);
 
     const isReplyAuthor = reply.authorId === currentUserId;
-    const isPostAuthor = postAuthorId === currentUserId;
+    const isCurrentUserPostAuthor = postAuthorId === currentUserId;
+    const canMarkSolution = currentUserId && postType === 'pertanyaan' && isCurrentUserPostAuthor;
+
 
     const filteredMentions = useMemo(() => {
         if (!mentionQuery) return allAvailableMentions;
@@ -435,9 +440,6 @@ export function ReplyItem({
                                 {/* Tampilkan reaksi-reaksi lain dari pengguna lain */}
                                 {EMOJI_REACTIONS.map((reaction) => {
                                     const count = reply.reactions?.[reaction.key]?.length || 0;
-                                    // Tampilkan hanya jika ada reaksi dari pengguna lain (bukan current user)
-                                    // atau jika current user bereaksi dengan ini, tapi itu sudah ditangani oleh popover utama.
-                                    // Jadi, kita hanya fokus pada reaksi yang DIBERIKAN oleh pengguna LAIN.
                                     const isReactedByCurrentUser = currentUserReaction === reaction.key;
                                     const isReactedByOthers = count > 0 && !isReactedByCurrentUser;
 
@@ -451,11 +453,10 @@ export function ReplyItem({
                                             size="sm"
                                             className={cn(
                                                 "h-6 px-2 text-xs flex items-center gap-1 opacity-80",
-                                                // Tambahkan styling jika ada reaksi dari orang lain
                                                 isReactedByOthers && "bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-gray-200",
-                                                "cursor-default" // Nonaktifkan kursor klik
+                                                "cursor-default"
                                             )}
-                                            disabled={true} // Selalu disabled karena hanya untuk tampilan jumlah dari user lain
+                                            disabled={true}
                                             aria-label={`${count} reaksi ${reaction.label}`}
                                         >
                                             {reaction.emoji}
@@ -464,14 +465,13 @@ export function ReplyItem({
                                     );
                                 })}
 
-                                {/* Tombol "Batalkan Reaksi" dihapus */}
-
-                                {(isPostAuthor || isAdmin) && (
+                                {/* Tombol Tandai Solusi (kondisional) */}
+                                {canMarkSolution && ( // Hanya tampil jika pengguna berhak (penulis post) DAN postnya adalah 'pertanyaan'
                                     <Button
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() => onMarkAsSolution(reply.id, reply.isSolution)}
+                                        onClick={() => onMarkAsSolution(reply.id, reply.isSolution, currentUserId!, isCurrentUserPostAuthor, isAdmin)}
                                         className={`h-6 px-2 text-xs ${reply.isSolution ? "text-green-600 hover:text-red-700" : "text-gray-600 hover:text-green-700"}`}
                                         disabled={!currentUserId}
                                     >
@@ -501,6 +501,7 @@ export function ReplyItem({
                                             postId={postId}
                                             postTitle={postTitle}
                                             postAuthorId={postAuthorId}
+                                            postType={postType}
                                             onVote={onVote}
                                             onReaction={onReaction}
                                             onMarkAsSolution={onMarkAsSolution}
@@ -578,14 +579,14 @@ export function ReplyItem({
                                                     value={inlineReplyContent}
                                                     onChange={handleMarkdownEditorChange}
                                                     onMediaFilesChange={handleInlineMediaFilesChange}
-                                                    mediaPreviews={inlineReplyMediaFiles.map(p => ({
+                                                    mediaPreviews={inlineReplyMediaPreviews.map(p => ({
                                                         id: p.id,
                                                         url: p.previewUrl,
                                                         filename: p.file?.name || 'media',
                                                         uploading: p.uploading,
                                                         progress: p.progress,
                                                         uploadedUrl: p.uploadedMediaData?.url,
-                                                        type: p.file.type.startsWith('image/') ? 'image' : p.file.type.startsWith('video/') ? 'video' : undefined,
+                                                        type: p.file?.type.startsWith('image/') ? 'image' : p.file?.type.startsWith('video/') ? 'video' : undefined,
                                                     }))}
                                                     placeholder={`Balas komentar...`}
                                                     rows={3}
@@ -594,6 +595,9 @@ export function ReplyItem({
                                                     showMediaInput={true}
                                                     onRemoveMedia={handleRemoveInlineMedia}
                                                     allAvailableMentions={allAvailableMentions}
+                                                    disableMediaPreviewInWriteTab={false}
+                                                    showMediaPreviewInPreviewTab={false}
+                                                    showMediaInsertActions={true}
                                                 />
                                                 {showMentionPopover && filteredMentions.length > 0 && (
                                                     <div
@@ -686,7 +690,6 @@ export function ReplyItem({
                 entityUsername={reply.authorUsername}
                 entityAuthorId={reply.authorId}
                 entityAuthorUsername={reply.authorUsername}
-                entityTitle={postTitle}
             />
         </Card>
     );

@@ -3,14 +3,12 @@
 
 import React, { useState, useCallback } from "react";
 import {
-    DropdownMenu, // Import DropdownMenu
-    DropdownMenuTrigger, // Import DropdownMenuTrigger
-    DropdownMenuContent, // Import DropdownMenuContent
+    DropdownMenu,
+    DropdownMenuTrigger,
+    DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu"; // Pastikan semua diimpor dari sini
-// Hapus import Popover dan PopoverContent karena tidak digunakan lagi
-// import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import {
     MoreHorizontal,
@@ -28,13 +26,15 @@ import {
 import { ReportDialog } from "@/components/shared/ReportDialog";
 import { ForumPost } from "@/types/forum";
 
+import { ForumPostEditDialog } from "./ForumPostEditDialog"; // Import PostEditDialog
+
 interface PostActionsPopoverProps {
     post: ForumPost;
     isBookmarked: boolean;
     isPostAuthor: boolean;
-    onAction: (action: string) => void;
+    onAction: (action: string) => Promise<void> | void; // Aksi umum (delete, pin, archive, bookmark, share, report)
     isAdmin: boolean;
-    isLoggedIn: boolean; // Penting: Tambahkan kembali prop ini dari versi sebelumnya
+    isLoggedIn: boolean;
 }
 
 export function PostActionsPopover({
@@ -43,44 +43,53 @@ export function PostActionsPopover({
     isPostAuthor,
     onAction,
     isAdmin,
-    isLoggedIn, // Terima prop ini
+    isLoggedIn,
 }: PostActionsPopoverProps) {
     const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
 
-    const handleInternalAction = useCallback((action: string) => {
+    const handleGeneralAction = useCallback(async (action: string) => {
         if (action === "report") {
             setIsReportDialogOpen(true);
         } else {
-            onAction(action);
+            // Untuk aksi 'edit', kita tidak memanggil onAction di sini,
+            // karena DialogTrigger akan menangani pembukaan modal secara langsung.
+            // Untuk aksi lain, panggil onAction.
+            if (action !== "edit") {
+                await onAction(action);
+            }
         }
     }, [onAction]);
 
     return (
-        // Ganti Popover dengan DropdownMenu
         <DropdownMenu>
-            {/* Ganti PopoverTrigger dengan DropdownMenuTrigger */}
             <DropdownMenuTrigger asChild>
-                <Button type="button" variant="ghost" size="icon" className="h-8 w-8 p-0 hover:bg-gray-100" aria-label="Post actions">
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 p-0 hover:bg-gray-100"
+                    aria-label="Post actions"
+                    // PENTING: Stop propagation on the trigger itself
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                >
                     <MoreHorizontal className="h-4 w-4" />
                     <span className="sr-only">Opsi post</span>
                 </Button>
             </DropdownMenuTrigger>
-            {/* Ganti PopoverContent dengan DropdownMenuContent */}
-            {/* Pastikan DropdownMenuContent selalu di-render, logika kondisional ada di dalam itemnya */}
-            <DropdownMenuContent className="w-56 p-2" align="end">
+            <DropdownMenuContent align="end" className="w-56 p-2">
                 <div className="space-y-1">
-                    {/* Items yang selalu ada, jika sesuai */}
-                    <DropdownMenuItem onSelect={() => handleInternalAction("share-link")}>
+                    {/* Tambahkan e.preventDefault() pada semua onSelect */}
+                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleGeneralAction("share-link"); }}>
                         <Copy className="h-4 w-4 mr-2" />
                         Salin Link
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => handleInternalAction("share-external")}>
+                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleGeneralAction("share-external"); }}>
                         <ExternalLink className="h-4 w-4 mr-2" />
                         Buka di Tab Baru
                     </DropdownMenuItem>
-                    {/* Pastikan hanya tampil jika pengguna login, karena bookmark membutuhkan userId */}
                     {isLoggedIn && (
-                        <DropdownMenuItem onSelect={() => handleInternalAction("bookmark")}>
+                        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleGeneralAction("bookmark"); }}>
                             {isBookmarked ? (
                                 <>
                                     <BookmarkCheck className="h-4 w-4 mr-2" />
@@ -95,35 +104,45 @@ export function PostActionsPopover({
                         </DropdownMenuItem>
                     )}
                     {post.media && post.media.length > 0 && (
-                        <DropdownMenuItem onSelect={() => handleInternalAction("download")}>
+                        <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleGeneralAction("download"); }}>
                             <Download className="h-4 w-4 mr-2" />
-                            Download Media
+                            Unduh Media
                         </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
 
-                    {/* Aksi untuk penulis post atau admin (jika login) */}
                     {isLoggedIn && (isPostAuthor || isAdmin) ? (
                         <>
-                            <DropdownMenuItem onSelect={() => handleInternalAction("edit")}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit Post
-                            </DropdownMenuItem>
+                            {/* ForumPostEditDialog now directly wraps DropdownMenuItem for 'edit' */}
+                            <ForumPostEditDialog
+                                postId={post.id}
+                                isPostAuthor={isPostAuthor}
+                                isAdmin={isAdmin}
+                                trigger={
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()}> {/* PENTING: e.preventDefault() */}
+                                        <Edit className="h-4 w-4 mr-2" />
+                                        Edit Post
+                                    </DropdownMenuItem>
+                                }
+                            />
+
+                            {/* Aksi Pin Post (hanya admin) */}
                             {isAdmin && (
-                                <DropdownMenuItem onSelect={() => handleInternalAction("pin")}>
+                                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onAction("pin"); }}>
                                     <Pin className="h-4 w-4 mr-2" />
                                     {post.isPinned ? "Lepas Pin" : "Pin Post"}
                                 </DropdownMenuItem>
                             )}
+                            {/* Aksi Arsip Post (hanya admin, fitur akan datang) */}
                             {isAdmin && (
-                                <DropdownMenuItem onSelect={() => handleInternalAction("archive")}>
+                                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onAction("archive"); }}>
                                     <Archive className="h-4 w-4 mr-2" />
                                     {post.isArchived ? "Buka Arsip" : "Arsipkan"}
                                 </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                                onSelect={() => handleInternalAction("delete")}
+                                onSelect={(e) => { e.preventDefault(); handleGeneralAction("delete"); }}
                                 className="text-red-600 focus:text-red-600"
                             >
                                 <Trash2 className="h-4 w-4 mr-2" />
@@ -131,10 +150,9 @@ export function PostActionsPopover({
                             </DropdownMenuItem>
                         </>
                     ) : (
-                        // Aksi untuk user lain (jika login)
                         isLoggedIn && (
                             <DropdownMenuItem
-                                onSelect={() => handleInternalAction("report")}
+                                onSelect={(e) => { e.preventDefault(); handleGeneralAction("report"); }}
                                 className="text-red-600 focus:text-red-600"
                             >
                                 <Flag className="h-4 w-4 mr-2" />

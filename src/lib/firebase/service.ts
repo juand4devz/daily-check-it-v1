@@ -55,6 +55,10 @@ export async function getUserById(userId: string): Promise<User | null> {
     return retriveDataById<User>("users", userId);
 }
 
+export async function getForumReplyById(replyId: string): Promise<ForumReply | null> {
+    return retriveDataById<ForumReply>("forumReplies", replyId);
+}
+
 export async function register(
     data: {
         username: string;
@@ -387,6 +391,38 @@ export async function incrementPostViewCount(postId: string): Promise<{ status: 
     }
 }
 
+export async function togglePostPinStatus(postId: string, isPinned: boolean, userId: string): Promise<{ status: boolean; message: string }> {
+    const postRef = doc(clientDb, "forumPosts", postId);
+    try {
+        // Fetch user to check role (assuming isAdmin check is already done in API route, but good to double check)
+        const userDoc = await getDoc(doc(clientDb, "users", userId));
+        if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+            return { status: false, message: "Unauthorized: Only admins can pin posts." };
+        }
+
+        await updateDoc(postRef, {
+            isPinned: isPinned,
+            updatedAt: new Date().toISOString(),
+        });
+        return { status: true, message: isPinned ? "Postingan berhasil di-pin." : "Pin postingan berhasil dilepas." };
+    } catch (error) {
+        console.error(`Error toggling pin status for post ${postId}:`, error);
+        return { status: false, message: `Gagal mengubah status pin: ${(error as Error).message}` };
+    }
+}
+
+export async function togglePostArchiveStatus(postId: string, isArchived: boolean, userId: string): Promise<{ status: boolean; message: string }> {
+    // For now, this feature is just a placeholder
+    const userDoc = await getDoc(doc(clientDb, "users", userId));
+    if (!userDoc.exists() || userDoc.data()?.role !== 'admin') {
+        return { status: false, message: "Unauthorized: Only admins can archive posts." };
+    }
+    // In a real application, you would update the 'isArchived' field in Firestore here.
+    // For now, we return a success message indicating it's a future feature.
+    console.log(`Admin ${userId} attempted to archive post ${postId}. Feature is pending implementation.`);
+    return { status: true, message: "Fitur arsip akan datang!" };
+}
+
 export async function createForumReply(replyData: Omit<ForumReply, 'id' | 'createdAt' | 'updatedAt' | 'upvotes' | 'downvotes' | 'upvotedBy' | 'downvotedBy' | 'isSolution' | 'isEdited' | 'reactions'>): Promise<{ status: boolean; replyId?: string; message: string }> {
     try {
         const repliesCollectionRef = collection(clientDb, "forumReplies");
@@ -607,9 +643,9 @@ export async function toggleReplyReaction(
     }
 }
 
-export async function markReplyAsSolution(replyId: string, postId: string, isSolution: boolean): Promise<{ status: boolean; message: string }> {
-    const postRef = doc(clientDb, "forumPosts", postId); // Referensi ke dokumen POST
-    const replyDocRef = doc(clientDb, "forumReplies", replyId); // Referensi ke dokumen REPLY
+export async function markReplyAsSolution(replyId: string, postId: string, isSolution: boolean, currentUserId: string, isCurrentUserAdmin: boolean): Promise<{ status: boolean; message: string }> {
+    const postRef = doc(clientDb, "forumPosts", postId);
+    const replyDocRef = doc(clientDb, "forumReplies", replyId);
 
     try {
         await runTransaction(clientDb, async (transaction) => {
@@ -624,28 +660,37 @@ export async function markReplyAsSolution(replyId: string, postId: string, isSol
             }
 
             const postData = postDoc.data() as ForumPost;
+            // Validasi di sini: Hanya post bertipe "pertanyaan" yang bisa ditandai solusi
+            if (postData.type !== 'pertanyaan') {
+                throw new Error("Forbidden: Only posts of type 'pertanyaan' can have solutions marked.");
+            }
+
+            // Validasi di sini: Hanya penulis post yang bisa menandai solusi
+            if (postData.authorId !== currentUserId) { // Hapus !isAdmin untuk membatasi hanya penulis post
+                throw new Error("Unauthorized: Only the post author can mark a solution.");
+            }
+
             let currentSolutionReplyIds = postData.solutionReplyIds || [];
             let newIsResolved = false;
 
             if (isSolution) {
-                // Tandai sebagai solusi: tambahkan replyId ke array jika belum ada
                 if (!currentSolutionReplyIds.includes(replyId)) {
+                    // Jika menandai sebagai solusi, hapus solusi lain jika hanya satu solusi diizinkan
+                    // Saat ini Anda mengizinkan beberapa solusi dengan `currentSolutionReplyIds.push(replyId);`
+                    // Jika Anda hanya ingin SATU solusi, Anda akan clear `currentSolutionReplyIds = [];`
                     currentSolutionReplyIds.push(replyId);
                 }
-                newIsResolved = true; // Jika ada setidaknya satu solusi, post dianggap resolved
+                newIsResolved = true;
             } else {
-                // Batalkan solusi: hapus replyId dari array
                 currentSolutionReplyIds = currentSolutionReplyIds.filter(id => id !== replyId);
-                newIsResolved = currentSolutionReplyIds.length > 0; // Post resolved jika masih ada solusi lain
+                newIsResolved = currentSolutionReplyIds.length > 0;
             }
 
-            // PERUBAHAN PENTING: Update dokumen reply untuk isSolution-nya sendiri
             transaction.update(replyDocRef, {
                 isSolution: isSolution,
                 updatedAt: new Date().toISOString(),
             });
 
-            // Update dokumen post dengan array solutionReplyIds yang baru
             transaction.update(postRef, {
                 solutionReplyIds: currentSolutionReplyIds,
                 isResolved: newIsResolved,
@@ -656,7 +701,6 @@ export async function markReplyAsSolution(replyId: string, postId: string, isSol
         return { status: true, message: isSolution ? "Balasan ditandai sebagai solusi." : "Status solusi dibatalkan." };
     } catch (error: any) {
         console.error("Error marking reply as solution:", error);
-        // Logging error code dari Firebase untuk diagnosis lebih lanjut
         if (error.code) {
             console.error("Firebase error code:", error.code);
         }

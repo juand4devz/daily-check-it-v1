@@ -14624,3 +14624,4201 @@ export default function ProfilePage() {
     );
 
 }
+
+berikutnya saya ingin kamu mengembangkan bagian tandai solusi, saya juga ingin kamu memperbarui nya agar yang dapat menandai forum post hanya post forum diskusi yang bertipe pertanyaan, dan yang dapat menandainya hanya pemilik akun yang mengPost nya, berikut kode - kode yang mungkin perlu diperbarui:
+
+// /app/api/forum/posts/[id]/replies/[replyId]/solution/route.ts
+
+import { NextRequest, NextResponse } from "next/server";
+
+import { auth } from "../../../../../../../../../auth";
+
+import { createNotification, getForumPostById, markReplyAsSolution, getForumRepliesByPostId } from "@/lib/firebase/service"; // Import getForumRepliesByPostId
+
+
+
+export async function PATCH(request: NextRequest, { params }: { params: { id: string; replyId: string } }) {
+
+    const session = await auth();
+
+    // PENTING: Gunakan destructuring dengan await params untuk mengakses properti
+
+    const { id: postId, replyId: replyIdParam } = await params;
+
+
+
+    try {
+
+        const body = await request.json();
+
+        const { isSolution } = body;
+
+
+
+        if (typeof isSolution !== 'boolean') {
+
+            return NextResponse.json({ status: false, statusCode: 400, message: "Invalid 'isSolution' value. Must be boolean." }, { status: 400 });
+
+        }
+
+
+
+        const post = await getForumPostById(postId);
+
+        if (!post) {
+
+            return NextResponse.json({ status: false, statusCode: 404, message: "Post not found." }, { status: 404 });
+
+        }
+
+
+
+        // Authorization check: Only post author or admin can mark a solution
+
+        if (post.authorId !== session?.user?.id && session?.user?.role !== "admin") {
+
+            return NextResponse.json({ status: false, statusCode: 403, message: "Forbidden: Only post author or admin can mark a solution." }, { status: 403 });
+
+        }
+
+
+
+        // Panggil service untuk memperbarui status solusi di Firestore
+
+        const result = await markReplyAsSolution(replyIdParam, postId, isSolution); // Gunakan replyIdParam
+
+
+
+        if (result.status) {
+
+            // Notifikasi: Pastikan data reply yang digunakan sudah benar
+
+            const allRepliesForPost = await getForumRepliesByPostId(postId); // Ambil semua balasan untuk post ini
+
+            const reply = allRepliesForPost.find(r => r.id === replyIdParam); // Temukan balasan spesifik
+
+
+
+            if (reply && post.authorId !== session?.user?.id) { // Notifikasi ke penulis post jika bukan dirinya
+
+                await createNotification({
+
+                    userId: post.authorId,
+
+                    type: "forum_solution_marked",
+
+                    title: isSolution ? "Komentar Anda Ditandai Sebagai Solusi!" : "Status Solusi Dibatalkan.",
+
+                    message: `Komentar Anda di postingan &quot;${post.title}&quot; telah ${isSolution ? "ditandai" : "dibatalkan"} sebagai solusi.`,
+
+                    link: `/forum/${postId}#comment-${replyIdParam}`,
+
+                    actorId: session.user?.id,
+
+                    actorUsername: session.user?.username,
+
+                    postId: postId,
+
+                    postTitle: post.title,
+
+                    replyId: replyIdParam,
+
+                    // PENTING: commentContentPreview harus dari konten REPLY, bukan post
+
+                    commentContentPreview: reply.content.substring(0, Math.min(reply.content.length, 100)) + (reply.content.length > 100 ? "..." : ""),
+
+                });
+
+            }
+
+
+
+            return NextResponse.json({ status: true, statusCode: 200, message: result.message }, { status: 200 });
+
+        } else {
+
+            console.error("API Route Error (from service):", result.message);
+
+            return NextResponse.json({ status: false, statusCode: 500, message: result.message }, { status: 500 });
+
+        }
+
+    } catch (error) {
+
+        console.error(`API Error marking reply as solution for post ${postId} (catch block):`, error);
+
+        return NextResponse.json({ status: false, statusCode: 500, message: "Failed to mark reply as solution.", error: (error instanceof Error) ? error.message : "Terjadi kesalahan yang tidak diketahui." }, { status: 500 });
+
+    }
+
+}
+
+
+
+// /components/forum/ReplyItem.tsx
+
+"use client";
+
+
+
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+import { Button } from "@/components/ui/button";
+
+import { Badge } from "@/components/ui/badge";
+
+import { Separator } from "@/components/ui/separator";
+
+import { Progress } from "@/components/ui/progress";
+
+import { toast } from "sonner";
+
+import ReactMarkdown from "react-markdown";
+
+import remarkGfm from "remark-gfm";
+
+import {
+
+    ChevronUp,
+
+    ChevronDown,
+
+    MessageSquare,
+
+    Award,
+
+    CheckCircle,
+
+    X,
+
+    Loader2,
+
+    Send,
+
+    Copy,
+
+    Link as LinkIcon,
+
+    Image as ImageIcon,
+
+    Video,
+
+    Smile, // Pastikan Smile diimpor jika digunakan di sini untuk default
+
+} from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+import {
+
+    ForumReply,
+
+    EMOJI_REACTIONS,
+
+    ForumMedia,
+
+    EmojiReactionKey,
+
+} from "@/types/forum";
+
+import { formatTimeAgo } from "@/lib/utils/date-utils";
+
+import { MarkdownEditor } from "./markdown-editor";
+
+import { Input } from "@/components/ui/input";
+
+import { MediaViewer } from "./media-viewer";
+
+import { UserProfileClickPopover } from "@/components/user/UserProfileClickPopover";
+
+import { Card, CardContent } from "@/components/ui/card";
+
+import { useRouter } from "next/navigation";
+
+
+
+import { EmojiReactionPopover } from "./EmojiReactionPopover";
+
+import { CommentActionsPopover } from "./CommentActionsPopover";
+
+import { ReportDialog } from "@/components/shared/ReportDialog";
+
+
+
+interface InlineMediaFile {
+
+    file: File;
+
+    id: string;
+
+    previewUrl: string;
+
+    uploading: boolean;
+
+    progress: number;
+
+    uploadedMediaData?: ForumMedia;
+
+}
+
+
+
+export interface ProcessedForumReply extends ForumReply {
+
+    children: ProcessedForumReply[];
+
+}
+
+
+
+interface ReplyItemProps {
+
+    reply: ProcessedForumReply;
+
+    postId: string;
+
+    postTitle?: string;
+
+    postAuthorId: string;
+
+    onVote: (replyId: string, voteType: "up" | "down", currentVoteStatus: "up" | "down" | null) => Promise<void>;
+
+    // PERUBAHAN: onReaction menerima newKey dan oldKey
+
+    onReaction: (replyId: string, newReactionKey: EmojiReactionKey | null, oldReactionKey: EmojiReactionKey | null) => Promise<void>;
+
+    onMarkAsSolution: (replyId: string, isCurrentlySolution: boolean) => Promise<void>;
+
+    onCommentAction: (replyId: string, action: string) => void;
+
+    currentUserVoteStatus: "up" | "down" | null;
+
+    currentUserReaction: EmojiReactionKey | null; // Single reaction key or null
+
+    onSubmitReply: (content: string, mediaFiles: ForumMedia[], parentId?: string, mentionedUserIds?: string[]) => Promise<void>;
+
+    isSubmittingReply: boolean;
+
+    isNested?: boolean;
+
+    currentUserId: string | undefined;
+
+    isAdmin: boolean;
+
+    isHighlighted?: boolean;
+
+    uploadMediaToImageKit: (file: File, onProgress: (p: number) => void) => Promise<ForumMedia | null>;
+
+    allAvailableMentions: { id: string; username: string }[];
+
+}
+
+
+
+const COMMENT_TRUNCATE_LIMIT = 500;
+
+
+
+const highlightMentions = (text: string): string => {
+
+    return text.replace(/@(\w+)/g, '<span class="text-blue-500 font-semibold">@$1</span>');
+
+};
+
+
+
+const extractMentions = (text: string): string[] => {
+
+    const mentionRegex = /@(\w+)/g;
+
+    const matches = text.match(mentionRegex);
+
+    if (!matches) return [];
+
+    return matches.map(match => match.substring(1));
+
+};
+
+
+
+export function ReplyItem({
+
+    reply,
+
+    postId,
+
+    postTitle,
+
+    postAuthorId,
+
+    onVote,
+
+    onReaction,
+
+    onMarkAsSolution,
+
+    onCommentAction,
+
+    currentUserVoteStatus,
+
+    currentUserReaction, // Ini sekarang adalah EmojiReactionKey | null
+
+    onSubmitReply,
+
+    isSubmittingReply,
+
+    isNested = false,
+
+    currentUserId,
+
+    isAdmin,
+
+    isHighlighted = false,
+
+    uploadMediaToImageKit,
+
+    allAvailableMentions,
+
+}: ReplyItemProps) {
+
+    const router = useRouter();
+
+    const [isInlineReplyExpanded, setIsInlineReplyExpanded] = useState(false);
+
+    const [inlineReplyContent, setInlineReplyContent] = useState<string>("");
+
+
+
+    const [inlineReplyMediaFiles, setInlineReplyMediaFiles] = useState<InlineMediaFile[]>([]);
+
+    const inlineReplyMediaPreviews = useMemo(() => {
+
+        return inlineReplyMediaFiles.map(fileItem => ({
+
+            id: fileItem.id,
+
+            url: fileItem.previewUrl,
+
+            filename: fileItem.file?.name || 'media',
+
+            uploading: fileItem.uploading,
+
+            progress: fileItem.progress,
+
+            uploadedUrl: fileItem.uploadedMediaData?.url,
+
+            type: fileItem.file.type.startsWith('image/') ? 'image' : fileItem.file.type.startsWith('video/') ? 'video' : undefined,
+
+        }));
+
+    }, [inlineReplyMediaFiles]);
+
+
+
+    const inlineReplyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+    const itemRef = useRef<HTMLDivElement>(null);
+
+
+
+    const [isContentExpanded, setIsContentExpanded] = useState(false);
+
+    const showReadMore = reply.content.length > COMMENT_TRUNCATE_LIMIT;
+
+    const displayedContent = isContentExpanded
+
+        ? reply.content
+
+        : reply.content.slice(0, COMMENT_TRUNCATE_LIMIT) + (showReadMore ? "..." : "");
+
+
+
+    const [showNestedReplies, setShowNestedReplies] = useState(false);
+
+    const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
+
+
+
+    const [showMentionPopover, setShowMentionPopover] = useState(false);
+
+    const [mentionQuery, setMentionQuery] = useState("");
+
+    const [mentionCaretPosition, setMentionCaretPosition] = useState(0);
+
+
+
+    const isReplyAuthor = reply.authorId === currentUserId;
+
+    const isPostAuthor = postAuthorId === currentUserId;
+
+
+
+    const filteredMentions = useMemo(() => {
+
+        if (!mentionQuery) return allAvailableMentions;
+
+        const lowerCaseQuery = mentionQuery.toLowerCase();
+
+        return allAvailableMentions.filter(user =>
+
+            user.username.toLowerCase().includes(lowerCaseQuery)
+
+        );
+
+    }, [mentionQuery, allAvailableMentions]);
+
+
+
+    const handleInlineMediaFilesChange = useCallback(async (files: File[]) => {
+
+        if (files.length === 0) {
+
+            setInlineReplyMediaFiles([]);
+
+            return;
+
+        }
+
+        if (inlineReplyMediaFiles.length >= 1) {
+
+            toast.error("Maksimal 1 media per balasan.");
+
+            return;
+
+        }
+
+
+
+        const file = files[0];
+
+        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+
+            toast.error("Hanya file gambar atau video yang diizinkan.");
+
+            return;
+
+        }
+
+
+
+        const tempId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+        const previewUrl = URL.createObjectURL(file);
+
+
+
+        setInlineReplyMediaFiles(prev => [...prev, {
+
+            file,
+
+            id: tempId,
+
+            previewUrl,
+
+            uploading: true,
+
+            progress: 0,
+
+        }]);
+
+
+
+        try {
+
+            const uploadedMedia = await uploadMediaToImageKit(file, (p: number) => {
+
+                setInlineReplyMediaFiles(prev =>
+
+                    prev.map(item => item.id === tempId ? { ...item, progress: p } : item)
+
+                );
+
+            });
+
+
+
+            if (uploadedMedia) {
+
+                toast.success(`Media "${file.name}" berhasil diunggah.`);
+
+                setInlineReplyMediaFiles(prev =>
+
+                    prev.map(item => item.id === tempId ? { ...item, uploading: false, progress: 100, uploadedMediaData: uploadedMedia } : item)
+
+                );
+
+            } else {
+
+                toast.error(`Gagal mengunggah media "${file.name}".`);
+
+                setInlineReplyMediaFiles(prev => prev.filter(item => item.id !== tempId));
+
+            }
+
+        } catch (error) {
+
+            console.error("Error uploading inline media:", error);
+
+            toast.error("Gagal mengunggah media inline.");
+
+            setInlineReplyMediaFiles(prev => prev.filter(item => item.id !== tempId));
+
+        }
+
+    }, [inlineReplyMediaFiles, uploadMediaToImageKit]);
+
+
+
+    const handleRemoveInlineMedia = useCallback((idToRemove: string) => {
+
+        setInlineReplyMediaFiles(prev => {
+
+            const itemToRemove = prev.find(item => item.id === idToRemove);
+
+            if (itemToRemove && itemToRemove.previewUrl) {
+
+                URL.revokeObjectURL(itemToRemove.previewUrl);
+
+            }
+
+            return prev.filter(item => item.id !== idToRemove);
+
+        });
+
+        toast.info("Media dihapus.");
+
+    }, []);
+
+
+
+    const handleReplySubmit = async () => {
+
+        const isAnyMediaUploading = inlineReplyMediaFiles.some(item => item.uploading);
+
+        const isAnyMediaUploadFailed = inlineReplyMediaFiles.some(item => !item.uploadedMediaData && !item.uploading);
+
+
+
+        if (isAnyMediaUploading) {
+
+            toast.error("Tunggu! Ada media yang masih diunggah. Harap tunggu hingga upload selesai.");
+
+            return;
+
+        }
+
+        if (isAnyMediaUploadFailed) {
+
+            toast.error("Ada media yang gagal diunggah. Harap hapus atau coba unggah ulang.");
+
+            return;
+
+        }
+
+        if (!inlineReplyContent.trim() && inlineReplyMediaFiles.length === 0) {
+
+            toast.error("Balasan tidak boleh kosong.");
+
+            return;
+
+        }
+
+
+
+        const mentionedUsernamesFromContent = extractMentions(inlineReplyContent);
+
+        const mentionedUserIds = mentionedUsernamesFromContent
+
+            .map(mUsername => allAvailableMentions.find(u => u.username === mUsername)?.id)
+
+            .filter(Boolean) as string[];
+
+
+
+        const finalMediaForSubmission: ForumMedia[] = inlineReplyMediaFiles
+
+            .filter(item => item.uploadedMediaData)
+
+            .map(item => item.uploadedMediaData!);
+
+
+
+        await onSubmitReply(inlineReplyContent, finalMediaForSubmission, reply.id, mentionedUserIds);
+
+
+
+        setInlineReplyContent("");
+
+        setInlineReplyMediaFiles([]);
+
+        setIsInlineReplyExpanded(false);
+
+        setShowMentionPopover(false);
+
+        setMentionQuery("");
+
+    };
+
+
+
+    useEffect(() => {
+
+        if (isInlineReplyExpanded && inlineReplyTextareaRef.current) {
+
+            inlineReplyTextareaRef.current.focus();
+
+            const length = inlineReplyTextareaRef.current.value.length;
+
+            inlineReplyTextareaRef.current.setSelectionRange(length, length);
+
+        }
+
+    }, [isInlineReplyExpanded]);
+
+
+
+    const displayedChildren = showNestedReplies ? reply.children : [];
+
+
+
+    const handleMarkdownEditorChange = (value: string) => {
+
+        setInlineReplyContent(value);
+
+
+
+        const textarea = inlineReplyTextareaRef.current;
+
+        if (!textarea) {
+
+            setShowMentionPopover(false);
+
+            setMentionQuery("");
+
+            return;
+
+        }
+
+
+
+        const cursorPosition = textarea.selectionStart;
+
+        setMentionCaretPosition(cursorPosition);
+
+
+
+        const textBeforeCaret = value.substring(0, cursorPosition);
+
+        const lastAtIndex = textBeforeCaret.lastIndexOf('@');
+
+
+
+        if (lastAtIndex !== -1 && (lastAtIndex === 0 || /\s|\n/.test(textBeforeCaret[lastAtIndex - 1]))) {
+
+            const potentialMention = textBeforeCaret.substring(lastAtIndex + 1);
+
+            if (!/\s|\n/.test(potentialMention)) {
+
+                setMentionQuery(potentialMention);
+
+                setShowMentionPopover(true);
+
+            } else {
+
+                setShowMentionPopover(false);
+
+                setMentionQuery("");
+
+            }
+
+        } else {
+
+            setShowMentionPopover(false);
+
+            setMentionQuery("");
+
+        }
+
+    };
+
+
+
+    const handleMentionSelect = (username: string) => {
+
+        const textarea = inlineReplyTextareaRef.current;
+
+        if (!textarea) return;
+
+
+
+        const textBeforeCaret = inlineReplyContent.substring(0, mentionCaretPosition);
+
+        const lastAtIndex = textBeforeCaret.lastIndexOf('@');
+
+
+
+        if (lastAtIndex !== -1) {
+
+            const newContent =
+
+                inlineReplyContent.substring(0, lastAtIndex) +
+
+                `@${username} ` +
+
+                inlineReplyContent.substring(mentionCaretPosition);
+
+
+
+            setInlineReplyContent(newContent);
+
+            setShowMentionPopover(false);
+
+            setMentionQuery("");
+
+
+
+            setTimeout(() => {
+
+                textarea.focus();
+
+                textarea.setSelectionRange(lastAtIndex + `@${username} `.length, lastAtIndex + `@${username} `.length);
+
+            }, 0);
+
+        }
+
+    };
+
+
+
+
+
+    return (
+
+        <Card
+
+            id={`comment-${reply.id}`}
+
+            ref={itemRef}
+
+            className={cn(
+
+                reply.isSolution ? "border-green-200 border-2 bg-green-50/50 dark:bg-green-900/20" : "",
+
+                isHighlighted && "animate-highlight border-blue-500 border-2 shadow-lg",
+
+                "flex-col"
+
+            )}
+
+        >
+
+            <CardContent className="p-4">
+
+                <div className="flex gap-3">
+
+                    {!isNested && (
+
+                        <div className="flex flex-col items-center gap-1 mr-2">
+
+                            <Button
+
+                                type="button"
+
+                                variant={currentUserVoteStatus === "up" ? "default" : "ghost"}
+
+                                size="sm"
+
+                                className="h-8 w-8 p-0"
+
+                                onClick={() => onVote(reply.id, "up", currentUserVoteStatus)}
+
+                                disabled={!currentUserId}
+
+                            >
+
+                                <ChevronUp className="h-4 w-4" />
+
+                            </Button>
+
+                            <span className="text-sm font-medium text-center min-w-[2rem]">
+
+                                {reply.upvotes - reply.downvotes}
+
+                            </span>
+
+                            <Button
+
+                                type="button"
+
+                                variant={currentUserVoteStatus === "down" ? "default" : "ghost"}
+
+                                size="sm"
+
+                                className="h-8 w-8 p-0"
+
+                                onClick={() => onVote(reply.id, "down", currentUserVoteStatus)}
+
+                                disabled={!currentUserId}
+
+                            >
+
+                                <ChevronDown className="h-4 w-4" />
+
+                            </Button>
+
+                        </div>
+
+                    )}
+
+
+
+                    <div className="flex-1">
+
+                        <div className="flex items-center justify-between mb-2">
+
+                            <div className="flex items-center gap-2 w-full">
+
+                                <UserProfileClickPopover userId={reply.authorId}>
+
+                                    <div
+
+                                        className="flex items-center gap-2 cursor-pointer"
+
+                                        onMouseDown={(e) => e.stopPropagation()}
+
+                                        onClick={(e) => e.stopPropagation()}
+
+                                    >
+
+                                        <Avatar className={cn(isNested ? "h-7 w-7 border border-gray-300" : "h-9 w-9 border-2 border-blue-400")}>
+
+                                            <AvatarImage src={reply.authorAvatar || "/placeholder.svg"} />
+
+                                            <AvatarFallback className={cn(isNested ? "bg-gray-100 text-gray-600" : "bg-blue-200 text-blue-800 font-semibold")}>{reply.authorUsername?.[0] || '?'}</AvatarFallback>
+
+                                        </Avatar>
+
+                                        <span className="font-medium hover:underline">
+
+                                            {reply.authorUsername}
+
+                                        </span>
+
+                                    </div>
+
+                                </UserProfileClickPopover>
+
+                                <span className="text-sm text-gray-500 ml-2">
+
+                                    {formatTimeAgo(reply.createdAt)}
+
+                                </span>
+
+                                {reply.isSolution && (
+
+                                    <Badge className="bg-green-600 text-white">
+
+                                        <Award className="h-3 w-3 mr-1" />
+
+                                        Solusi
+
+                                    </Badge>
+
+                                )}
+
+                                {reply.isEdited && (
+
+                                    <Badge variant="outline" className="text-xs">
+
+                                        Diedit
+
+                                    </Badge>
+
+                                )}
+
+                            </div>
+
+                            <CommentActionsPopover
+
+                                reply={reply}
+
+                                isAuthor={isReplyAuthor}
+
+                                onAction={onCommentAction}
+
+                                currentUserId={currentUserId}
+
+                                isAdmin={isAdmin}
+
+                                postId={postId}
+
+                                postTitle={postTitle}
+
+                            />
+
+                        </div>
+
+
+
+                        <div className={
+
+                            isNested ? (
+
+                                "prose prose-sm max-w-none dark:prose-invert"
+
+                            ) : (
+
+                                "prose prose-sm max-w-none dark:prose-invert mb-2"
+
+                            )
+
+                        }>
+
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{highlightMentions(displayedContent)}</ReactMarkdown>
+
+                            {showReadMore && (
+
+                                <Button type="button" variant="link" onClick={() => setIsContentExpanded(!isContentExpanded)} className="p-0 h-auto">
+
+                                    {isContentExpanded ? "Sembunyikan" : "Baca Selengkapnya"}
+
+                                </Button>
+
+                            )}
+
+                        </div>
+
+
+
+                        {reply.media && reply.media.length > 0 && (
+
+                            <div className="mb-3">
+
+                                <MediaViewer media={reply.media} />
+
+                            </div>
+
+                        )}
+
+
+
+                        {!isNested && (
+
+                            <div className="flex items-center gap-2 text-sm">
+
+                                {/* Tombol Popover Reaksi Utama */}
+
+                                <EmojiReactionPopover
+
+                                    onSelect={(selectedReactionKey) => onReaction(reply.id, selectedReactionKey, currentUserReaction)}
+
+                                    currentUserReaction={currentUserReaction}
+
+                                    replyReactions={reply.reactions || {}}
+
+                                    disabled={!currentUserId}
+
+                                />
+
+                                {/* Tampilkan reaksi-reaksi lain dari pengguna lain */}
+
+                                {EMOJI_REACTIONS.map((reaction) => {
+
+                                    const count = reply.reactions?.[reaction.key]?.length || 0;
+
+                                    // Tampilkan hanya jika ada reaksi dari pengguna lain (bukan current user)
+
+                                    // atau jika current user bereaksi dengan ini, tapi itu sudah ditangani oleh popover utama.
+
+                                    // Jadi, kita hanya fokus pada reaksi yang DIBERIKAN oleh pengguna LAIN.
+
+                                    const isReactedByCurrentUser = currentUserReaction === reaction.key;
+
+                                    const isReactedByOthers = count > 0 && !isReactedByCurrentUser;
+
+
+
+                                    if (!isReactedByOthers) return null;
+
+
+
+                                    return (
+
+                                        <Button
+
+                                            type="button"
+
+                                            key={reaction.key}
+
+                                            variant="outline"
+
+                                            size="sm"
+
+                                            className={cn(
+
+                                                "h-6 px-2 text-xs flex items-center gap-1 opacity-80",
+
+                                                // Tambahkan styling jika ada reaksi dari orang lain
+
+                                                isReactedByOthers && "bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-gray-200",
+
+                                                "cursor-default" // Nonaktifkan kursor klik
+
+                                            )}
+
+                                            disabled={true} // Selalu disabled karena hanya untuk tampilan jumlah dari user lain
+
+                                            aria-label={`${count} reaksi ${reaction.label}`}
+
+                                        >
+
+                                            {reaction.emoji}
+
+                                            <span className="font-medium">{count}</span>
+
+                                        </Button>
+
+                                    );
+
+                                })}
+
+
+
+                                {/* Tombol "Batalkan Reaksi" dihapus */}
+
+
+
+                                {(isPostAuthor || isAdmin) && (
+
+                                    <Button
+
+                                        type="button"
+
+                                        variant="ghost"
+
+                                        size="sm"
+
+                                        onClick={() => onMarkAsSolution(reply.id, reply.isSolution)}
+
+                                        className={`h-6 px-2 text-xs ${reply.isSolution ? "text-green-600 hover:text-red-700" : "text-gray-600 hover:text-green-700"}`}
+
+                                        disabled={!currentUserId}
+
+                                    >
+
+                                        {reply.isSolution ? (
+
+                                            <>
+
+                                                <X className="h-3 w-3 mr-1" />
+
+                                                Batalkan Solusi
+
+                                            </>
+
+                                        ) : (
+
+                                            <>
+
+                                                <CheckCircle className="h-3 w-3 mr-1" />
+
+                                                Tandai Solusi
+
+                                            </>
+
+                                        )}
+
+                                    </Button>
+
+                                )}
+
+                            </div>
+
+                        )}
+
+
+
+                        {reply.children && reply.children.length > 0 && (
+
+                            <div className="ml-4 mt-4 space-y-4 border-l pl-4">
+
+                                {showNestedReplies &&
+
+                                    displayedChildren.map((childReply) => (
+
+                                        <ReplyItem
+
+                                            key={childReply.id}
+
+                                            reply={childReply}
+
+                                            postId={postId}
+
+                                            postTitle={postTitle}
+
+                                            postAuthorId={postAuthorId}
+
+                                            onVote={onVote}
+
+                                            onReaction={onReaction}
+
+                                            onMarkAsSolution={onMarkAsSolution}
+
+                                            onCommentAction={onCommentAction}
+
+                                            currentUserId={currentUserId}
+
+                                            isAdmin={isAdmin}
+
+                                            currentUserVoteStatus={
+
+                                                currentUserId && childReply.upvotedBy.includes(currentUserId) ? "up" :
+
+                                                    currentUserId && childReply.downvotedBy.includes(currentUserId) ? "down" : null
+
+                                            }
+
+                                            currentUserReaction={
+
+                                                currentUserId ? (
+
+                                                    EMOJI_REACTIONS.find(emoji => childReply.reactions?.[emoji.key]?.includes(currentUserId))?.key || null
+
+                                                ) : null
+
+                                            }
+
+                                            onSubmitReply={onSubmitReply}
+
+                                            isSubmittingReply={isSubmittingReply}
+
+                                            isNested={true}
+
+                                            isHighlighted={false}
+
+                                            uploadMediaToImageKit={uploadMediaToImageKit}
+
+                                            allAvailableMentions={allAvailableMentions}
+
+                                        />
+
+                                    ))}
+
+                                <Button
+
+                                    type="button"
+
+                                    variant="link"
+
+                                    size="sm"
+
+                                    onClick={() => setShowNestedReplies(!showNestedReplies)}
+
+                                    className="w-full justify-start pl-0 text-sm font-medium"
+
+                                >
+
+                                    {showNestedReplies ? (
+
+                                        <>
+
+                                            <ChevronUp className="h-4 w-4 mr-2" />
+
+                                            Sembunyikan Balasan ({reply.children.length})
+
+                                        </>
+
+                                    ) : (
+
+                                        <>
+
+                                            <ChevronDown className="h-4 w-4 mr-2" />
+
+                                            Lihat Balasan ({reply.children.length})
+
+                                        </>
+
+                                    )}
+
+                                </Button>
+
+                            </div>
+
+                        )}
+
+
+
+                        {!isNested && currentUserId && (
+
+                            <div className="mt-4 border-t pt-4">
+
+                                <div className="flex items-start gap-3">
+
+                                    <div className="flex-1 relative">
+
+                                        {!isInlineReplyExpanded ? (
+
+                                            <div className="flex items-center gap-2 w-full">
+
+                                                <Input
+
+                                                    placeholder={`Balas komentar...`}
+
+                                                    value={inlineReplyContent}
+
+                                                    onChange={(e) => setInlineReplyContent(e.target.value)}
+
+                                                    onFocus={() => setIsInlineReplyExpanded(true)}
+
+                                                    className="flex-1"
+
+                                                    disabled={isSubmittingReply}
+
+                                                />
+
+                                                <Button
+
+                                                    type="button"
+
+                                                    size="sm"
+
+                                                    onClick={handleReplySubmit}
+
+                                                    disabled={(!inlineReplyContent.trim() && inlineReplyMediaFiles.length === 0) || isSubmittingReply}
+
+                                                    className="shrink-0"
+
+                                                >
+
+                                                    {isSubmittingReply ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+
+                                                    <span className="sr-only">Kirim</span>
+
+                                                </Button>
+
+                                            </div>
+
+                                        ) : (
+
+                                            <div className="space-y-3">
+
+                                                <MarkdownEditor
+
+                                                    textareaRef={inlineReplyTextareaRef}
+
+                                                    value={inlineReplyContent}
+
+                                                    onChange={handleMarkdownEditorChange}
+
+                                                    onMediaFilesChange={handleInlineMediaFilesChange}
+
+                                                    mediaPreviews={inlineReplyMediaFiles.map(p => ({
+
+                                                        id: p.id,
+
+                                                        url: p.previewUrl,
+
+                                                        filename: p.file?.name || 'media',
+
+                                                        uploading: p.uploading,
+
+                                                        progress: p.progress,
+
+                                                        uploadedUrl: p.uploadedMediaData?.url,
+
+                                                        type: p.file.type.startsWith('image/') ? 'image' : p.file.type.startsWith('video/') ? 'video' : undefined,
+
+                                                    }))}
+
+                                                    placeholder={`Balas komentar...`}
+
+                                                    rows={3}
+
+                                                    disabled={isSubmittingReply || inlineReplyMediaFiles.some(f => f.uploading)}
+
+                                                    isUploadingMedia={inlineReplyMediaFiles.some(f => f.uploading)}
+
+                                                    showMediaInput={true}
+
+                                                    onRemoveMedia={handleRemoveInlineMedia}
+
+                                                    allAvailableMentions={allAvailableMentions}
+
+                                                />
+
+                                                {showMentionPopover && filteredMentions.length > 0 && (
+
+                                                    <div
+
+                                                        className="absolute z-50 bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto"
+
+                                                        style={{
+
+                                                            top: 'calc(100% + 8px)',
+
+                                                            left: '0px',
+
+                                                            width: '100%',
+
+                                                        }}
+
+                                                    >
+
+                                                        <div className="p-2 text-sm text-muted-foreground border-b">Saran Mention:</div>
+
+                                                        {filteredMentions.map((user) => (
+
+                                                            <div
+
+                                                                key={user.id}
+
+                                                                className="px-3 py-2 cursor-pointer hover:bg-accent hover:text-accent-foreground"
+
+                                                                onClick={() => handleMentionSelect(user.username)}
+
+                                                            >
+
+                                                                @{user.username}
+
+                                                            </div>
+
+                                                        ))}
+
+                                                    </div>
+
+                                                )}
+
+                                                {showMentionPopover && filteredMentions.length === 0 && mentionQuery.length > 0 && (
+
+                                                    <div
+
+                                                        className="absolute z-50 bg-popover border rounded-md shadow-lg p-2 text-sm text-muted-foreground"
+
+                                                        style={{
+
+                                                            top: 'calc(100% + 8px)',
+
+                                                            left: '0px',
+
+                                                            width: '100%',
+
+                                                        }}
+
+                                                    >
+
+                                                        Tidak ada pengguna ditemukan.
+
+                                                    </div>
+
+                                                )}
+
+
+
+                                                <div className="flex items-center justify-between mt-3">
+
+                                                    <div className="text-xs text-gray-500">Tekan Ctrl+Enter untuk mengirim cepat</div>
+
+                                                    <div className="flex gap-2">
+
+                                                        <Button
+
+                                                            type="button"
+
+                                                            variant="outline"
+
+                                                            size="sm"
+
+                                                            onClick={() => {
+
+                                                                setIsInlineReplyExpanded(false);
+
+                                                                setInlineReplyContent("");
+
+                                                                setInlineReplyMediaFiles([]);
+
+                                                                setShowMentionPopover(false);
+
+                                                                setMentionQuery("");
+
+                                                            }}
+
+                                                            disabled={isSubmittingReply}
+
+                                                        >
+
+                                                            Batal
+
+                                                        </Button>
+
+                                                        <Button
+
+                                                            type="button"
+
+                                                            onClick={handleReplySubmit}
+
+                                                            disabled={(!inlineReplyContent.trim() && inlineReplyMediaFiles.length === 0) || isSubmittingReply || inlineReplyMediaFiles.some(f => f.uploading)}
+
+                                                        >
+
+                                                            {isSubmittingReply || inlineReplyMediaFiles.some(f => f.uploading) ? (
+
+                                                                <>
+
+                                                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+
+                                                                    Mengirim...
+
+                                                                </>
+
+                                                            ) : (
+
+                                                                <>
+
+                                                                    <Send className="h-3 w-3 mr-1" />
+
+                                                                    Kirim
+
+                                                                </>
+
+                                                            )}
+
+                                                        </Button>
+
+                                                    </div>
+
+                                                </div>
+
+                                            </div>
+
+                                        )}
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        )}
+
+                    </div>
+
+                </div>
+
+            </CardContent>
+
+
+
+            <ReportDialog
+
+                isOpen={isReportDialogOpen}
+
+                onOpenChange={setIsReportDialogOpen}
+
+                reportType="forum_reply"
+
+                entityId={reply.id}
+
+                postIdForReply={postId}
+
+                entityContentPreview={reply.content}
+
+                entityUsername={reply.authorUsername}
+
+                entityAuthorId={reply.authorId}
+
+                entityAuthorUsername={reply.authorUsername}
+
+                entityTitle={postTitle}
+
+            />
+
+        </Card>
+
+    );
+
+}
+
+
+
+// /app/forum/[id]/page.tsx
+
+"use client";
+
+
+
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+
+import { useRouter, useParams, useSearchParams } from "next/navigation";
+
+import { useSession } from "next-auth/react";
+
+import { Button } from "@/components/ui/button";
+
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+
+import { Badge } from "@/components/ui/badge";
+
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+import { Separator } from "@/components/ui/separator";
+
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+import { toast } from "sonner";
+
+import { MediaViewer } from "@/components/forum/media-viewer";
+
+import { MarkdownEditor } from "@/components/forum/markdown-editor";
+
+import ReactMarkdown from "react-markdown";
+
+import remarkGfm from "remark-gfm";
+
+import {
+
+    ArrowLeft,
+
+    MessageSquare,
+
+    Heart,
+
+    Send,
+
+    Eye,
+
+    CheckCircle,
+
+    Pin,
+
+    Bookmark,
+
+    BookmarkCheck,
+
+    Share2,
+
+    AlertTriangle,
+
+    BookOpenText,
+
+    Loader2,
+
+    Edit as EditIcon,
+
+} from "lucide-react";
+
+import { cn } from "@/lib/utils";
+
+import {
+
+    ForumPost,
+
+    ForumReply,
+
+    EMOJI_REACTIONS,
+
+    ForumMedia,
+
+    EmojiReactionKey,
+
+} from "@/types/forum";
+
+import { getReadingTime, ProcessedForumReply } from "@/lib/utils/forum-utils";
+
+import { formatTimeAgo } from "@/lib/utils/date-utils";
+
+import { ReplyItem } from "@/components/forum/ReplyItem";
+
+import { ReportDialog } from "@/components/shared/ReportDialog";
+
+
+
+import { PostHeaderSkeleton, PostContentSkeleton, CommentSkeleton } from "@/components/ui/skeleton-loader";
+
+import { PostThumbnail } from "@/components/forum/PostThumbnail";
+
+import { PostStats } from "@/components/forum/PostStats";
+
+import { QuickActions } from "@/components/forum/QuickActions";
+
+import { PostActionsPopover } from "@/components/forum/PostActionsPopover";
+
+import { ForumPostEditDialog } from "@/components/forum/ForumPostEditDialog"; // <--- Import komponen dialog edit baru
+
+
+
+import { UserState, useUserState } from "@/lib/utils/useUserState";
+
+import { buildReplyTree, flattenReplies } from "@/lib/utils/forum-utils";
+
+
+
+import { clientDb } from "@/lib/firebase/firebase-client";
+
+import { collection, query, where, orderBy, onSnapshot, doc } from "firebase/firestore";
+
+
+
+import { upload, ImageKitAbortError, ImageKitInvalidRequestError, ImageKitServerError, ImageKitUploadNetworkError } from "@imagekit/next";
+
+import { Progress } from "@/components/ui/progress";
+
+import { RelatedPosts } from "@/components/forum/RelatedPosts";
+
+
+
+interface UploadedFileState {
+
+    file: File | null;
+
+    previewUrl: string | null;
+
+    uploadedData: ForumMedia | null;
+
+    uploading: boolean;
+
+    progress: number;
+
+    error: string | null;
+
+}
+
+
+
+// Interface MarkdownEditorProps - ini harus konsisten dengan definisi di markdown-editor.tsx
+
+interface MarkdownEditorProps {
+
+    textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
+
+    value: string;
+
+    onChange: (value: string) => void;
+
+    onMediaFilesChange?: (files: File[]) => void;
+
+    onRemoveMedia?: (id: string) => void;
+
+    placeholder?: string;
+
+    rows?: number;
+
+    disabled?: boolean;
+
+    isUploadingMedia?: boolean;
+
+    mediaPreviews?: {
+
+        id: string;
+
+        url: string;
+
+        filename: string;
+
+        uploading?: boolean;
+
+        progress?: number;
+
+        uploadedUrl?: string;
+
+        type?: "image" | "video";
+
+    }[];
+
+    className?: string;
+
+    allAvailableMentions?: { id: string; username: string }[];
+
+    showMediaInput?: boolean;
+
+    onPaste?: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
+
+    onDrop?: (e: React.DragEvent<HTMLTextAreaElement>) => void;
+
+    onDragOver?: (e: React.DragEvent<HTMLTextAreaElement>) => void;
+
+    onDragLeave?: (e: React.DragEvent<HTMLTextAreaElement>) => void;
+
+    isDragOver?: boolean;
+
+    disableMediaPreviewInWriteTab?: boolean;
+
+    showMediaPreviewInPreviewTab?: boolean;
+
+    showMediaInsertActions?: boolean;
+
+}
+
+
+
+interface MediaViewerProps {
+
+    media: ForumMedia[];
+
+}
+
+
+
+
+
+export default function ForumDetailPage() {
+
+    const params = useParams();
+
+    const router = useRouter();
+
+    const searchParams = useSearchParams();
+
+    const { data: session } = useSession();
+
+    const userId = session?.user?.id;
+
+    const username = session?.user?.username;
+
+    const avatar = session?.user?.avatar;
+
+    const isAdmin = session?.user?.role === "admin";
+
+
+
+    const { userState, updateUserState } = useUserState();
+
+
+
+    const [post, setPost] = useState<ForumPost | null>(null);
+
+    const [replies, setReplies] = useState<ProcessedForumReply[]>([]);
+
+    const [newReplyContent, setNewReplyContent] = useState("");
+
+    const [mainCommentUploadState, setMainCommentUploadState] = useState<UploadedFileState>({
+
+        file: null,
+
+        previewUrl: null,
+
+        uploadedData: null,
+
+        uploading: false,
+
+        progress: 0,
+
+        error: null,
+
+    });
+
+    const [loadingPost, setLoadingPost] = useState(true);
+
+    const [submittingReply, setSubmittingReply] = useState(false);
+
+    const [views, setViews] = useState(0);
+
+    const [error, setError] = useState<string | null>(null);
+
+
+
+    const mainReplyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+    const highlightCommentRef = useRef<HTMLDivElement | null>(null);
+
+
+
+    const isPostAuthor = post?.authorId === userId;
+
+    const isLiked = post ? (userState.postLikes?.[post.id] === true) : false;
+
+    const isBookmarked = post ? (userState.bookmarks?.includes(post.id) === true) : false;
+
+
+
+    // Edit Post Modal Logic is now fully managed by ForumPostEditDialog,
+
+    // We just need to render it here if conditions are met.
+
+    const handleEditPostSuccess = useCallback((updatedPostId: string) => {
+
+        toast.success("Postingan berhasil diperbarui.");
+
+    }, []);
+
+
+
+    const mainCommentMediaPreviews = useMemo(() => {
+
+        if (!mainCommentUploadState.file && !mainCommentUploadState.uploadedData) return [];
+
+
+
+        const preview: { id: string; url: string; filename: string; uploading?: boolean; progress?: number; uploadedUrl?: string; type?: "image" | "video"; } = {
+
+            id: mainCommentUploadState.uploadedData?.id || mainCommentUploadState.file?.name || 'temp',
+
+            url: mainCommentUploadState.uploadedData?.url || mainCommentUploadState.previewUrl || '/placeholder.svg',
+
+            filename: mainCommentUploadState.uploadedData?.filename || mainCommentUploadState.file?.name || 'media',
+
+            uploading: mainCommentUploadState.uploading,
+
+            progress: mainCommentUploadState.progress,
+
+            uploadedUrl: mainCommentUploadState.uploadedData?.url,
+
+            type: mainCommentUploadState.uploadedData?.type || (mainCommentUploadState.file?.type.startsWith('image/') ? 'image' : mainCommentUploadState.file?.type.startsWith('video/') ? 'video' : undefined),
+
+        };
+
+        return [preview];
+
+    }, [mainCommentUploadState]);
+
+
+
+    const commentIdToHighlight = useMemo(() => {
+
+        if (typeof window === 'undefined') return null;
+
+        const hash = window.location.hash;
+
+        if (hash.startsWith('#comment-')) {
+
+            return hash.substring('#comment-'.length);
+
+        }
+
+        return null;
+
+    }, [searchParams]);
+
+
+
+    const [allCommentAuthors, setAllCommentAuthors] = useState<{ id: string; username: string }[]>([]);
+
+
+
+    const uploadMediaToImageKit = useCallback(async (file: File, onProgress: (p: number) => void): Promise<ForumMedia | null> => {
+
+        if (!userId) {
+
+            toast.error("Anda harus login untuk mengunggah media.");
+
+            return null;
+
+        }
+
+        if (!(file instanceof File)) {
+
+            console.error("No file provided or invalid file object for uploadMediaToImageKit:", file);
+
+            toast.error("File tidak valid untuk diunggah. Harap coba lagi.");
+
+            return null;
+
+        }
+
+
+
+        try {
+
+            const authRes = await fetch("/api/upload-auth");
+
+            if (!authRes.ok) {
+
+                const errorText = await authRes.text();
+
+                throw new Error(`Authentication request failed: ${authRes.status} ${errorText}`);
+
+            }
+
+            const authData = await authRes.json();
+
+
+
+            const now = new Date();
+
+            const year = now.getFullYear();
+
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+
+            const day = now.getDate().toString().padStart(2, '0');
+
+            const hours = now.getHours().toString().padStart(2, '0');
+
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+
+            const seconds = now.getSeconds().toString().padStart(2, '0');
+
+            const randomString = Math.random().toString(36).substring(2, 8);
+
+            const fileExtension = file.name.split('.').pop();
+
+            const uniqueFileName = `forum-media-${userId}-${year}${month}${day}-${hours}${minutes}${seconds}-${randomString}.${fileExtension}`;
+
+
+
+
+
+            const uploadResponse = await upload({
+
+                publicKey: authData.publicKey,
+
+                fileName: uniqueFileName,
+
+                file: file,
+
+                folder: "forum-media",
+
+                signature: authData.signature,
+
+                token: authData.token,
+
+                expire: authData.expire,
+
+                onProgress: (event) => {
+
+                    if (event.lengthComputable) {
+
+                        onProgress((event.loaded / event.total) * 100);
+
+                    }
+
+                },
+
+                useUniqueFileName: false,
+
+                overwriteFile: true,
+
+            });
+
+
+
+            if (uploadResponse.url) {
+
+                return {
+
+                    id: uploadResponse.fileId,
+
+                    type: file.type.startsWith('image/') ? 'image' : 'video',
+
+                    filename: uploadResponse.name,
+
+                    size: uploadResponse.size,
+
+                    url: uploadResponse.url,
+
+                    thumbnailUrl: uploadResponse.thumbnailUrl || undefined,
+
+                };
+
+            } else {
+
+                throw new Error("URL gambar tidak ditemukan dari respons upload ImageKit.");
+
+            }
+
+        } catch (error) {
+
+            console.error("Error uploading file to ImageKit:", error);
+
+            let errorMessage = "Terjadi kesalahan saat mengunggah file.";
+
+            if (error instanceof ImageKitAbortError) errorMessage = "Upload dibatalkan.";
+
+            else if (error instanceof ImageKitInvalidRequestError) errorMessage = `Permintaan upload tidak valid: ${error.message}`;
+
+            else if (error instanceof ImageKitUploadNetworkError) errorMessage = `Kesalahan jaringan saat upload: ${error.message}`;
+
+            else if (error instanceof ImageKitServerError) errorMessage = `Kesalahan server ImageKit: ${error.message}`;
+
+            else if (error instanceof Error) errorMessage = `Gagal mengunggah file: ${error.message}`;
+
+
+
+            toast.error(errorMessage);
+
+            return null;
+
+        }
+
+    }, [userId]);
+
+
+
+    const handleMainMediaFilesChange = useCallback(async (files: File[]) => {
+
+        if (files.length === 0) {
+
+            if (mainCommentUploadState.previewUrl) URL.revokeObjectURL(mainCommentUploadState.previewUrl);
+
+            setMainCommentUploadState({ file: null, previewUrl: null, uploadedData: null, uploading: false, progress: 0, error: null });
+
+            return;
+
+        }
+
+
+
+        const file = files[0];
+
+        if (mainCommentUploadState.file && mainCommentUploadState.file !== file) {
+
+            toast.error("Maksimal 1 media per komentar utama.");
+
+            return;
+
+        }
+
+
+
+        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+
+            toast.error("Hanya file gambar atau video yang diizinkan untuk komentar utama.");
+
+            setMainCommentUploadState({ file: null, previewUrl: null, uploadedData: null, uploading: false, progress: 0, error: "Hanya file gambar atau video yang diizinkan." });
+
+            return;
+
+        }
+
+
+
+        const previewUrl = URL.createObjectURL(file);
+
+        setMainCommentUploadState(prev => ({
+
+            ...prev,
+
+            file,
+
+            previewUrl,
+
+            uploading: true,
+
+            progress: 0,
+
+            uploadedData: null,
+
+            error: null,
+
+        }));
+
+
+
+        try {
+
+            const uploadedMedia = await uploadMediaToImageKit(file, (p: number) => {
+
+                setMainCommentUploadState(prev => ({ ...prev, progress: p }));
+
+            });
+
+
+
+            if (uploadedMedia) {
+
+                toast.success(`Media "${file.name}" berhasil diunggah.`);
+
+                setMainCommentUploadState(prev => ({ ...prev, uploading: false, progress: 100, uploadedData: uploadedMedia, error: null }));
+
+            } else {
+
+                toast.error(`Gagal mengunggah media "${file.name}".`);
+
+                setMainCommentUploadState(prev => ({ ...prev, file: null, previewUrl: null, uploadedData: null, uploading: false, progress: 0, error: "Gagal mengunggah media." }));
+
+            }
+
+        } catch (error) {
+
+            console.error("Error uploading main comment media:", error);
+
+            toast.error("Gagal mengunggah media utama.");
+
+            setMainCommentUploadState(prev => ({ ...prev, file: null, previewUrl: null, uploadedData: null, uploading: false, progress: 0, error: "Gagal mengunggah media utama." }));
+
+        }
+
+    }, [mainCommentUploadState, uploadMediaToImageKit]);
+
+
+
+    const handleRemoveMainMedia = useCallback((idToRemove: string) => {
+
+        setMainCommentUploadState(prev => {
+
+            if (prev.previewUrl) {
+
+                URL.revokeObjectURL(prev.previewUrl);
+
+            }
+
+            return { file: null, previewUrl: null, uploadedData: null, uploading: false, progress: 0, error: null };
+
+        });
+
+        toast.info("Media dihapus.");
+
+    }, []);
+
+
+
+    useEffect(() => {
+
+        const postId = params.id as string;
+
+        if (!postId) {
+
+            setLoadingPost(false);
+
+            return;
+
+        }
+
+
+
+        const postDocRef = doc(clientDb, "forumPosts", postId);
+
+
+
+        const unsubscribePost = onSnapshot(postDocRef, async (docSnapshot) => {
+
+            if (docSnapshot.exists()) {
+
+                const fetchedPost = { id: docSnapshot.id, ...(docSnapshot.data() as Omit<ForumPost, 'id'>) };
+
+                setPost(fetchedPost);
+
+                setViews(fetchedPost.views);
+
+                setError(null);
+
+            } else {
+
+                setPost(null);
+
+                setError("Postingan tidak ditemukan.");
+
+                toast.error("Postingan tidak ditemukan.", { description: "Postingan yang Anda cari mungkin sudah dihapus." });
+
+            }
+
+            setLoadingPost(false);
+
+        }, (err) => {
+
+            console.error("Error listening to post data:", err);
+
+            setError("Gagal memuat detail postingan.");
+
+            setLoadingPost(false);
+
+            toast.error("Error", { description: "Gagal memuat detail postingan." });
+
+        });
+
+
+
+        return () => unsubscribePost();
+
+    }, [params.id]);
+
+
+
+    const viewIncrementRef = useRef<{ [key: string]: boolean }>({});
+
+
+
+    useEffect(() => {
+
+        const postId = params.id as string;
+
+        if (!postId) return;
+
+
+
+        const currentViewIncrementRef = viewIncrementRef.current;
+
+
+
+        if (!currentViewIncrementRef[postId]) {
+
+            const incrementView = async () => {
+
+                try {
+
+                    const viewsRes = await fetch(`/api/forum/posts/${postId}/views`, { method: "PATCH" });
+
+                    const viewsData = await viewsRes.json();
+
+                    if (viewsRes.ok && viewsData.status) {
+
+                        setViews(viewsData.newViewCount);
+
+                        currentViewIncrementRef[postId] = true;
+
+                    } else {
+
+                        console.warn("Failed to increment view count via API (already viewed or API error):", viewsData.message);
+
+                    }
+
+                } catch (error) {
+
+                    console.error("Error calling views API:", error);
+
+                }
+
+            };
+
+            incrementView();
+
+        }
+
+        return () => {
+
+            delete currentViewIncrementRef[postId];
+
+        };
+
+    }, [params.id]);
+
+
+
+    useEffect(() => {
+
+        const postId = params.id as string;
+
+        if (!postId) return;
+
+
+
+        const repliesCollectionRef = collection(clientDb, "forumReplies");
+
+        const qReplies = query(repliesCollectionRef, where("postId", "==", postId), orderBy("createdAt", "asc"));
+
+
+
+        const unsubscribeReplies = onSnapshot(qReplies, async (snapshot) => {
+
+            const fetchedReplies: ForumReply[] = [];
+
+            const uniqueAuthors = new Map<string, { id: string; username: string }>();
+
+
+
+            if (post?.authorId && post?.authorUsername) {
+
+                uniqueAuthors.set(post.authorId, { id: post.authorId, username: post.authorUsername });
+
+            }
+
+
+
+            snapshot.forEach((doc) => {
+
+                const replyData = { id: doc.id, ...(doc.data() as Omit<ForumReply, 'id'>) };
+
+                fetchedReplies.push(replyData);
+
+                if (replyData.authorId && replyData.authorUsername && !uniqueAuthors.has(replyData.authorId)) {
+
+                    uniqueAuthors.set(replyData.authorId, { id: replyData.authorId, username: replyData.authorUsername });
+
+                }
+
+            });
+
+
+
+            if (userId) {
+
+                uniqueAuthors.delete(userId);
+
+            }
+
+
+
+            setAllCommentAuthors(Array.from(uniqueAuthors.values()));
+
+            setReplies(buildReplyTree(fetchedReplies));
+
+        }, (error) => {
+
+            console.error("Error listening to replies:", error);
+
+            toast.error("Error real-time komentar", { description: "Gagal memuat komentar secara real-time." });
+
+        });
+
+
+
+        return () => unsubscribeReplies();
+
+    }, [params.id, userId, post?.authorId, post?.authorUsername]);
+
+
+
+    useEffect(() => {
+
+        const postId = params.id as string;
+
+        if (!postId || !userId || !post) {
+
+            return;
+
+        }
+
+
+
+        const fetchUserPostStatus = async () => {
+
+            try {
+
+                const bookmarkCheckRes = await fetch(`/api/forum/bookmarks?userId=${userId}&postId=${postId}`);
+
+                const bookmarkCheckData = await bookmarkCheckRes.json();
+
+                if (bookmarkCheckRes.ok && bookmarkCheckData.status) {
+
+                    const isBookmarkedNow = bookmarkCheckData.data.some((b: any) => b.postId === postId && b.userId === userId);
+
+                    updateUserState(prevUserState => {
+
+                        const currentBookmarks = prevUserState.bookmarks || [];
+
+                        const prevBookmarked = currentBookmarks.includes(postId);
+
+                        if (isBookmarkedNow !== prevBookmarked) {
+
+                            const newBookmarks = isBookmarkedNow
+
+                                ? [...currentBookmarks, postId]
+
+                                : currentBookmarks.filter(id => id !== postId);
+
+                            return { ...prevUserState, bookmarks: newBookmarks };
+
+                        }
+
+                        return prevUserState;
+
+                    });
+
+                } else {
+
+                    console.warn("Failed to fetch bookmark status:", bookmarkCheckData.message);
+
+                }
+
+
+
+                const postIsLiked = post.likedBy?.includes(userId) || false;
+
+                updateUserState(prevUserState => {
+
+                    const currentPostLikes = prevUserState.postLikes || {};
+
+                    const prevLiked = currentPostLikes[postId];
+
+                    if (postIsLiked !== prevLiked) {
+
+                        return {
+
+                            ...prevUserState,
+
+                            postLikes: {
+
+                                ...currentPostLikes,
+
+                                [postId]: postIsLiked,
+
+                            },
+
+                        };
+
+                    }
+
+                    return prevUserState;
+
+                });
+
+
+
+            } catch (error) {
+
+                console.error("Error fetching user post status:", error);
+
+            }
+
+        };
+
+
+
+        fetchUserPostStatus();
+
+    }, [params.id, userId, post?.likedBy, post?.id, updateUserState, post]);
+
+
+
+    const handleSubmitReply = useCallback(
+
+        async (content: string, mediaFilesInput: ForumMedia[], parentId?: string, mentionedUserIds?: string[]) => {
+
+            if (submittingReply || !userId || !username || !avatar || !post) {
+
+                if (!userId) toast.error("Anda harus login untuk berkomentar.");
+
+                return;
+
+            }
+
+
+
+            if (!content.trim() && mediaFilesInput.length === 0 && (!parentId && !mainCommentUploadState.uploadedData)) {
+
+                toast.error("Komentar tidak boleh kosong.");
+
+                return;
+
+            }
+
+
+
+            if (!parentId && mainCommentUploadState.uploading) {
+
+                toast.error("Tunggu! Ada media yang masih diunggah. Harap tunggu hingga upload selesai.");
+
+                return;
+
+            }
+
+            if (!parentId && mainCommentUploadState.file && !mainCommentUploadState.uploadedData && !mainCommentUploadState.uploading) {
+
+                toast.error("Ada media yang gagal diunggah. Harap hapus atau coba unggah ulang.");
+
+                return;
+
+            }
+
+
+
+            const finalMediaForSubmission: ForumMedia[] = parentId ? mediaFilesInput : (mainCommentUploadState.uploadedData ? [mainCommentUploadState.uploadedData] : []);
+
+
+
+            setSubmittingReply(true);
+
+
+
+            try {
+
+                const replyPayload = {
+
+                    postId: post.id,
+
+                    content: content,
+
+                    authorId: userId,
+
+                    authorUsername: username,
+
+                    authorAvatar: avatar || "/placeholder.svg",
+
+                    parentId: parentId || null,
+
+                    mentions: mentionedUserIds || [],
+
+                    media: finalMediaForSubmission,
+
+                };
+
+
+
+                const response = await fetch(`/api/forum/posts/${post.id}/replies`, {
+
+                    method: "POST",
+
+                    headers: { "Content-Type": "application/json" },
+
+                    body: JSON.stringify(replyPayload),
+
+                });
+
+
+
+                const data = await response.json();
+
+                if (response.ok && data.status) {
+
+                    toast.success("Komentar berhasil", { description: "Komentar Anda telah ditambahkan." });
+
+                    setNewReplyContent("");
+
+                    if (!parentId) {
+
+                        if (mainCommentUploadState.previewUrl) URL.revokeObjectURL(mainCommentUploadState.previewUrl);
+
+                        setMainCommentUploadState({ file: null, previewUrl: null, uploadedData: null, uploading: false, progress: 0, error: null });
+
+                    }
+
+                } else {
+
+                    throw new Error(data.message || "Gagal menambahkan komentar.");
+
+                }
+
+            } catch (error) {
+
+                console.error("Error submitting reply:", error);
+
+                toast.error("Gagal menambahkan komentar", {
+
+                    description: (error instanceof Error) ? error.message : "Terjadi kesalahan yang tidak diketahui."
+
+                });
+
+            } finally {
+
+                setSubmittingReply(false);
+
+            }
+
+        },
+
+        [submittingReply, userId, username, avatar, post, mainCommentUploadState],
+
+    );
+
+
+
+    const handleVote = useCallback(
+
+        async (replyId: string, voteType: "up" | "down", currentVoteStatus: "up" | "down" | null) => {
+
+            if (!userId) {
+
+                toast.error("Anda harus login untuk voting.");
+
+                router.push("/login");
+
+                return;
+
+            }
+
+            if (!post?.id) return;
+
+
+
+            setReplies((prev) =>
+
+                buildReplyTree(
+
+                    flattenReplies(prev).map((r: ForumReply) => {
+
+                        if (r.id === replyId) {
+
+                            let newUpvotedBy = [...r.upvotedBy];
+
+                            let newDownvotedBy = [...r.downvotedBy];
+
+                            let newUpvotes = r.upvotes;
+
+                            let newDownvotes = r.downvotes;
+
+
+
+                            if (currentVoteStatus === voteType) {
+
+                                if (voteType === "up") {
+
+                                    newUpvotes = Math.max(0, newUpvotes - 1);
+
+                                    newUpvotedBy = newUpvotedBy.filter(id => id !== userId);
+
+                                } else {
+
+                                    newDownvotes = Math.max(0, newDownvotes - 1);
+
+                                    newDownvotedBy = newDownvotedBy.filter(id => id !== userId);
+
+                                }
+
+                                updateUserState((prevUserState) => ({
+
+                                    ...prevUserState,
+
+                                    votes: { ...(prevUserState.votes || {}), [replyId]: null }
+
+                                }));
+
+                            } else {
+
+                                if (voteType === "up") {
+
+                                    newUpvotes++;
+
+                                    newUpvotedBy.push(userId);
+
+                                    if (newDownvotedBy.includes(userId)) {
+
+                                        newDownvotedBy = newDownvotedBy.filter(id => id !== userId);
+
+                                        newDownvotes = Math.max(0, newDownvotes - 1);
+
+                                    }
+
+                                } else {
+
+                                    newDownvotes++;
+
+                                    newDownvotedBy.push(userId);
+
+                                    if (newUpvotedBy.includes(userId)) {
+
+                                        newUpvotedBy = newUpvotedBy.filter(id => id !== userId);
+
+                                        newUpvotes = Math.max(0, newUpvotes - 1);
+
+                                    }
+
+                                }
+
+                                updateUserState((prevUserState) => ({
+
+                                    ...prevUserState,
+
+                                    votes: { ...(prevUserState.votes || {}), [replyId]: voteType }
+
+                                }));
+
+                            }
+
+                            return { ...r, upvotes: newUpvotes, downvotes: newDownvotes, upvotedBy: newUpvotedBy, downvotedBy: newDownvotedBy };
+
+                        }
+
+                        return r;
+
+                    })
+
+                )
+
+            );
+
+
+
+            try {
+
+                const response = await fetch(`/api/forum/posts/${post.id}/replies/${replyId}/vote`, {
+
+                    method: "POST",
+
+                    headers: { "Content-Type": "application/json" },
+
+                    body: JSON.stringify({ voteType }),
+
+                });
+
+
+
+                const data = await response.json();
+
+                if (!response.ok || !data.status) {
+
+                    toast.error("Gagal memperbarui vote", { description: data.message });
+
+                } else {
+
+                    toast.success("Vote berhasil diperbarui.");
+
+                }
+
+            } catch (error) {
+
+                console.error("Error updating vote:", error);
+
+                toast.error("Gagal memperbarui vote.");
+
+            }
+
+        },
+
+        [post, userId, updateUserState, setReplies, router],
+
+    );
+
+
+
+    const handleLike = useCallback(async () => {
+
+        if (!post || !userId) {
+
+            toast.error("Anda harus login untuk menyukai postingan.");
+
+            router.push("/login");
+
+            return;
+
+        }
+
+
+
+        const currentLikeStatus = userState.postLikes?.[post.id] === true;
+
+
+
+        updateUserState((prevUserState) => ({
+
+            ...prevUserState,
+
+            postLikes: {
+
+                ...(prevUserState.postLikes || {}),
+
+                [post.id]: !currentLikeStatus,
+
+            },
+
+        }));
+
+        setPost((prev) => {
+
+            if (!prev) return null;
+
+            let newLikedBy = [...prev.likedBy];
+
+            let newLikes = prev.likes;
+
+
+
+            if (currentLikeStatus) {
+
+                newLikes--;
+
+                newLikedBy = newLikedBy.filter(id => id !== userId);
+
+            } else {
+
+                newLikes++;
+
+                newLikedBy.push(userId);
+
+            }
+
+
+
+            return {
+
+                ...prev,
+
+                likes: newLikes,
+
+                likedBy: newLikedBy,
+
+            };
+
+        });
+
+
+
+        try {
+
+            const response = await fetch(`/api/forum/posts/${post.id}/like`, { method: "POST" });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.status) {
+
+                updateUserState((prevUserState) => ({
+
+                    ...prevUserState,
+
+                    postLikes: {
+
+                        ...(prevUserState.postLikes || {}),
+
+                        [post.id]: currentLikeStatus,
+
+                    },
+
+                }));
+
+                setPost((prev) => {
+
+                    if (!prev) return null;
+
+                    let newLikedBy = [...prev.likedBy];
+
+                    let newLikes = prev.likes;
+
+                    if (currentLikeStatus) {
+
+                        newLikes++;
+
+                        newLikedBy.push(userId);
+
+                    } else {
+
+                        newLikes--;
+
+                        newLikedBy = newLikedBy.filter(id => id !== userId);
+
+                    }
+
+                    return {
+
+                        ...prev,
+
+                        likes: newLikes,
+
+                        likedBy: newLikedBy,
+
+                    };
+
+                });
+
+                toast.error("Gagal mengubah status suka.", { description: data.message });
+
+            } else {
+
+                toast.success(data.message);
+
+            }
+
+        } catch (error) {
+
+            console.error("Error changing like status:", error);
+
+            toast.error("Gagal mengubah status suka.");
+
+        }
+
+    }, [post, userId, userState.postLikes, updateUserState, router, setPost]);
+
+
+
+    const handleBookmark = useCallback(async () => {
+
+        if (!post || !userId) {
+
+            toast.error("Anda harus login untuk membookmark postingan.");
+
+            router.push("/login");
+
+            return;
+
+        }
+
+
+
+        const isCurrentlyBookmarked = userState.bookmarks?.includes(post.id) === true;
+
+
+
+        updateUserState((prevUserState) => ({
+
+            ...prevUserState,
+
+            bookmarks: isCurrentlyBookmarked
+
+                ? (prevUserState.bookmarks || []).filter((id) => id !== post.id)
+
+                : [...(prevUserState.bookmarks || []), post.id],
+
+        }));
+
+
+
+        try {
+
+            const response = await fetch(`/api/forum/posts/${post.id}/bookmarks`, { method: "POST" });
+
+            const data = await response.json();
+
+            if (!response.ok || !data.status) {
+
+                updateUserState((prevUserState) => ({
+
+                    ...prevUserState,
+
+                    bookmarks: isCurrentlyBookmarked
+
+                        ? [...(prevUserState.bookmarks || []), post.id]
+
+                        : (prevUserState.bookmarks || []).filter((id) => id !== post.id),
+
+                }));
+
+                toast.error("Gagal mengubah status bookmark.", { description: data.message });
+
+            } else {
+
+                toast.success(data.message);
+
+            }
+
+        } catch (error) {
+
+            console.error("Error changing bookmark status:", error);
+
+            toast.error("Gagal mengubah status bookmark.");
+
+        }
+
+    }, [post, userId, userState.bookmarks, updateUserState, router]);
+
+
+
+    const handleReaction = useCallback(
+
+        async (replyId: string, newReactionKey: EmojiReactionKey | null, oldReactionKey: EmojiReactionKey | null) => {
+
+            if (!userId || !post) {
+
+                toast.error("Anda harus login untuk memberikan reaksi.");
+
+                router.push("/login");
+
+                return;
+
+            }
+
+
+
+            setReplies((prev) =>
+
+                buildReplyTree(
+
+                    flattenReplies(prev).map((r: ForumReply) => {
+
+                        if (r.id === replyId) {
+
+                            const updatedReactions = { ...r.reactions };
+
+
+
+                            if (oldReactionKey && updatedReactions[oldReactionKey]) {
+
+                                updatedReactions[oldReactionKey] = updatedReactions[oldReactionKey].filter(id => id !== userId);
+
+                            }
+
+
+
+                            if (newReactionKey && newReactionKey !== oldReactionKey) {
+
+                                if (!updatedReactions[newReactionKey]) {
+
+                                    updatedReactions[newReactionKey] = [];
+
+                                }
+
+                                updatedReactions[newReactionKey].push(userId);
+
+                            }
+
+
+
+                            return { ...r, reactions: updatedReactions };
+
+                        }
+
+                        return r;
+
+                    })
+
+                )
+
+            );
+
+
+
+            updateUserState((prevUserState) => ({
+
+                ...prevUserState,
+
+                reactions: {
+
+                    ...(prevUserState.reactions || {}),
+
+                    [replyId]: newReactionKey,
+
+                },
+
+            }));
+
+
+
+            try {
+
+                const response = await fetch(`/api/forum/posts/${post.id}/replies/${replyId}/react`, {
+
+                    method: "POST",
+
+                    headers: { "Content-Type": "application/json" },
+
+                    body: JSON.stringify({
+
+                        newReactionKey: newReactionKey,
+
+                        oldReactionKey: oldReactionKey
+
+                    }),
+
+                });
+
+
+
+                const data = await response.json();
+
+                if (!response.ok || !data.status) {
+
+                    toast.error("Gagal memperbarui reaksi", { description: data.message });
+
+                } else {
+
+                    toast.success(data.message);
+
+                }
+
+            } catch (error) {
+
+                console.error("Error updating reaction:", error);
+
+                toast.error("Gagal memperbarui reaksi.");
+
+            }
+
+        },
+
+        [userId, post, userState.reactions, updateUserState, setReplies, router],
+
+    );
+
+
+
+    const handleMarkAsSolution = useCallback(
+
+        async (replyId: string, isCurrentlySolution: boolean) => {
+
+            if (!userId || !post || (post.authorId !== userId && !isAdmin)) {
+
+                toast.error("Anda tidak memiliki izin untuk menandai solusi.");
+
+                return;
+
+            }
+
+
+
+            setPost(prevPost => {
+
+                if (!prevPost) return null;
+
+                let newSolutionReplyIds = [...(prevPost.solutionReplyIds || [])];
+
+
+
+                if (isCurrentlySolution) {
+
+                    const index = newSolutionReplyIds.indexOf(replyId);
+
+                    if (index > -1) newSolutionReplyIds.splice(index, 1);
+
+                } else {
+
+                    newSolutionReplyIds.push(replyId);
+
+                }
+
+                const finalIsResolved = newSolutionReplyIds.length > 0;
+
+
+
+                return {
+
+                    ...prevPost,
+
+                    solutionReplyIds: newSolutionReplyIds,
+
+                    isResolved: finalIsResolved,
+
+                };
+
+            });
+
+
+
+            setReplies((prev) =>
+
+                buildReplyTree(
+
+                    flattenReplies(prev).map((r: ForumReply) =>
+
+                        r.id === replyId ? { ...r, isSolution: !isCurrentlySolution } : r
+
+                    )
+
+                )
+
+            );
+
+
+
+            try {
+
+                const response = await fetch(`/api/forum/posts/${post.id}/replies/${replyId}/solution`, {
+
+                    method: "PATCH",
+
+                    headers: { "Content-Type": "application/json" },
+
+                    body: JSON.stringify({ isSolution: !isCurrentlySolution }),
+
+                });
+
+
+
+                const data = await response.json();
+
+                if (!response.ok || !data.status) {
+
+                    toast.error("Gagal memperbarui status solusi", { description: data.message });
+
+                } else {
+
+                    toast.success(data.message);
+
+                }
+
+            } catch (error) {
+
+                console.error("Error marking solution:", error);
+
+                toast.error("Gagal memperbarui status solusi.");
+
+            }
+
+        },
+
+        [userId, post, isAdmin, setPost, setReplies],
+
+    );
+
+
+
+    const [isPostReportDialogOpen, setIsPostReportDialogOpen] = useState(false);
+
+
+
+    const handlePostAction = useCallback(
+
+        async (action: string) => {
+
+            if (!post) return;
+
+
+
+            try {
+
+                switch (action) {
+
+                    case "edit":
+
+                        // Logika edit sudah dipindahkan ke PostActionsPopover yang langsung memicu DialogTrigger
+
+                        // Jadi, `handlePostAction("edit")` di sini tidak perlu melakukan apa-apa.
+
+                        break;
+
+                    case "delete":
+
+                        if (confirm("Apakah Anda yakin ingin menghapus post ini?")) {
+
+                            const response = await fetch(`/api/forum/posts/${post.id}`, { method: "DELETE" });
+
+                            const data = await response.json();
+
+                            if (response.ok && data.status) {
+
+                                toast.success("Post berhasil dihapus", { description: data.message });
+
+                                router.push("/forum");
+
+                            } else {
+
+                                toast.error("Gagal menghapus post", { description: data.message });
+
+                            }
+
+                        }
+
+                        break;
+
+                    case "pin":
+
+                    case "archive":
+
+                        if (!isAdmin) {
+
+                            toast.error("Anda tidak memiliki izin untuk melakukan aksi ini.");
+
+                            return;
+
+                        }
+
+                        const updateData: Partial<ForumPost> = {};
+
+                        if (action === "pin") updateData.isPinned = !post.isPinned;
+
+                        if (action === "archive") updateData.isArchived = !post.isArchived;
+
+
+
+                        const response = await fetch(`/api/forum/posts/${post.id}`, {
+
+                            method: "PATCH",
+
+                            headers: { "Content-Type": "application/json" },
+
+                            body: JSON.stringify(updateData),
+
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok && data.status) {
+
+                            setPost((prev) => (prev ? { ...prev, ...updateData } : null));
+
+                            toast.success(data.message);
+
+                        } else {
+
+                            toast.error("Gagal melakukan aksi", { description: data.message });
+
+                        }
+
+                        break;
+
+                    case "bookmark":
+
+                        handleBookmark();
+
+                        break;
+
+                    case "share-link":
+
+                        if (typeof window !== "undefined") {
+
+                            await navigator.clipboard.writeText(window.location.href);
+
+                            toast.success("Link disalin", { description: "Link post telah disalin ke clipboard" });
+
+                        }
+
+                        break;
+
+                    case "share-external":
+
+                        if (typeof window !== "undefined") {
+
+                            window.open(window.location.href, "_blank");
+
+                        }
+
+                        break;
+
+                    case "download":
+
+                        if (post.media && post.media.length > 0) {
+
+                            post.media.forEach((media, index) => {
+
+                                const link = document.createElement("a");
+
+                                link.href = media.url;
+
+                                link.download = `media-${post.id}-${index + 1}.${media.type === "image" ? "jpg" : "mp4"}`;
+
+                                document.body.appendChild(link);
+
+                                link.click();
+
+                                document.body.removeChild(link);
+
+                            });
+
+                            toast.info("Download dimulai", { description: "Media sedang diunduh" });
+
+                        } else {
+
+                            toast.info("Tidak ada media untuk diunduh.", { description: "Postingan ini tidak memiliki lampiran media." });
+
+                        }
+
+                        break;
+
+                    case "report":
+
+                        if (!userId) {
+
+                            toast.error("Anda harus login untuk melaporkan.");
+
+                            router.push("/login");
+
+                            return;
+
+                        }
+
+                        setIsPostReportDialogOpen(true);
+
+                        break;
+
+                    default:
+
+                        break;
+
+                }
+
+            } catch (error) {
+
+                console.error(error);
+
+                toast.error("Error", { description: "Gagal melakukan aksi" });
+
+            }
+
+        },
+
+        [post, router, handleBookmark, isAdmin, userId, setPost],
+
+    ); // Hapus `setIsEditPostDialogOpen` dari deps karena sudah tidak dipanggil langsung
+
+
+
+    const handleCommentAction = useCallback(
+
+        async (replyId: string, action: string) => {
+
+            if (!post) return;
+
+
+
+            try {
+
+                switch (action) {
+
+                    case "share-link":
+
+                        if (typeof window !== "undefined") {
+
+                            const shareUrl = `${window.location.origin}/forum/${post.id}#comment-${replyId}`;
+
+                            await navigator.clipboard.writeText(shareUrl);
+
+                            toast.success("Link disalin", { description: "Link komentar telah disalin ke clipboard" });
+
+                        }
+
+                        break;
+
+                    case "share-external":
+
+                        if (typeof window !== "undefined") {
+
+                            const externalUrl = `${window.location.origin}/forum/${post.id}#comment-${replyId}`;
+
+                            window.open(externalUrl, "_blank");
+
+                        }
+
+                        break;
+
+                    case "report":
+
+                        if (!userId) {
+
+                            toast.error("Anda harus login untuk melaporkan.");
+
+                            router.push("/login");
+
+                            return;
+
+                        }
+
+                        toast.info("Fitur lapor komentar akan segera tersedia.");
+
+                        break;
+
+                    case "edit":
+
+                        toast.info("Fitur edit komentar akan segera tersedia.");
+
+                        break;
+
+                    case "delete":
+
+                        if (confirm("Apakah Anda yakin ingin menghapus komentar ini?")) {
+
+                            const response = await fetch(`/api/forum/posts/${post.id}/replies/${replyId}`, { method: "DELETE" });
+
+                            const data = await response.json();
+
+                            if (response.ok && data.status) {
+
+                                toast.success("Komentar dihapus", { description: data.message });
+
+                            } else {
+
+                                toast.error("Gagal menghapus komentar", { description: data.message });
+
+                            }
+
+                        }
+
+                        break;
+
+                    default:
+
+                        break;
+
+                }
+
+            } catch (error) {
+
+                console.error(error);
+
+                toast.error("Error", { description: "Gagal melakukan aksi" });
+
+            }
+
+        },
+
+        [post, userId, router],
+
+    );
+
+
+
+    useEffect(() => {
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+
+            const isMainEditorFocused = mainReplyTextareaRef.current === document.activeElement;
+
+
+
+            if (isMainEditorFocused && (event.ctrlKey || event.metaKey) && event.key === "Enter") {
+
+                if (newReplyContent.trim() || mainCommentUploadState.uploadedData) {
+
+                    event.preventDefault();
+
+                    handleSubmitReply(newReplyContent, mainCommentUploadState.uploadedData ? [mainCommentUploadState.uploadedData] : []);
+
+                }
+
+            }
+
+        };
+
+
+
+        document.addEventListener("keydown", handleKeyDown);
+
+        return () => document.removeEventListener("keydown", handleKeyDown);
+
+    }, [newReplyContent, mainCommentUploadState.uploadedData, handleSubmitReply]);
+
+
+
+    useEffect(() => {
+
+        if (commentIdToHighlight && replies.length > 0) {
+
+            setTimeout(() => {
+
+                const targetElement = document.getElementById(`comment-${commentIdToHighlight}`);
+
+                if (targetElement) {
+
+                    targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                }
+
+            }, 100);
+
+        }
+
+    }, [commentIdToHighlight, replies]);
+
+
+
+    const fullPostContent = useMemo(() => `${post?.title || ""} ${post?.description || ""} ${post?.content || ""}`, [post]);
+
+    const readingTime = useMemo(() => getReadingTime(fullPostContent), [fullPostContent]);
+
+
+
+    if (!loadingPost && !post) {
+
+        return (
+
+            <div className="container mx-auto px-4 py-8 max-w-4xl">
+
+                <Card>
+
+                    <CardContent className="p-8 text-center">
+
+                        <AlertTriangle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+
+                        <h2 className="text-xl font-semibold mb-2">Post tidak ditemukan</h2>
+
+                        <p className="text-gray-600 mb-4">{error || "Post yang Anda cari tidak ada atau telah dihapus."}</p>
+
+                        <Button type="button" onClick={() => router.push("/forum")}>
+
+                            <ArrowLeft className="mr-2 h-4 w-4" />
+
+                            Kembali ke Forum
+
+                        </Button>
+
+                    </CardContent>
+
+                </Card>
+
+            </div>
+
+        );
+
+    }
+
+
+
+    return (
+
+        <div className={`container mx-auto px-4 py-8 max-w-7xl`}>
+
+            <div className="flex items-center justify-between mb-6">
+
+                <Button type="button" variant="outline" onClick={() => router.push("/forum")}>
+
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+
+                    Kembali ke Forum
+
+                </Button>
+
+                <div className="flex items-center gap-2">
+
+                    <Button
+
+                        type="button"
+
+                        variant={isBookmarked ? "default" : "outline"}
+
+                        size="sm"
+
+                        onClick={handleBookmark}
+
+                        className="hidden sm:flex"
+
+                        disabled={loadingPost || !userId}
+
+                    >
+
+                        {isBookmarked ? <BookmarkCheck className="h-4 w-4 mr-1" /> : <Bookmark className="h-4 w-4 mr-1" />}
+
+                        {isBookmarked ? "Tersimpan" : "Bookmark"}
+
+                    </Button>
+
+                    <Button
+
+                        type="button"
+
+                        variant="outline"
+
+                        size="sm"
+
+                        onClick={() => handlePostAction("share-link")}
+
+                        className="hidden sm:flex"
+
+                        disabled={loadingPost}
+
+                    >
+
+                        <Share2 className="h-4 w-4 mr-1" />
+
+                        Bagikan
+
+                    </Button>
+
+                </div>
+
+            </div>
+
+
+
+            <div className="mb-6">
+
+                <PostThumbnail post={post} isLoading={loadingPost} />
+
+            </div>
+
+
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                <div className="col-span-2 space-y-6">
+
+                    <Card className="overflow-hidden">
+
+                        <CardHeader className="pb-4">
+
+                            {loadingPost ? (
+
+                                <PostHeaderSkeleton />
+
+                            ) : post ? (
+
+                                <>
+
+                                    <div className="flex items-start justify-between">
+
+                                        <Avatar className="h-12 w-12">
+
+                                            <AvatarImage src={post.authorAvatar || "/placeholder.svg"} />
+
+                                            <AvatarFallback>{post.authorUsername?.[0] || '?'}</AvatarFallback>
+
+                                        </Avatar>
+
+                                        <div className="flex-1">
+
+                                            <p className="font-semibold">{post.authorUsername}</p>
+
+                                            <p className="text-sm text-gray-500">{formatTimeAgo(post.createdAt)}</p>
+
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+
+                                            <Badge variant={post.isResolved ? "default" : "secondary"} className="shrink-0">
+
+                                                {post.isResolved ? (
+
+                                                    <>
+
+                                                        <CheckCircle className="h-3 w-3 mr-1" />
+
+                                                        Selesai
+
+                                                    </>
+
+                                                ) : (
+
+                                                    "Belum Selesai"
+
+                                                )}
+
+                                            </Badge>
+
+                                            {post.isPinned && (
+
+                                                <Badge variant="outline" className="shrink-0">
+
+                                                    <Pin className="h-3 w-3 mr-1" />
+
+                                                    Pinned
+
+                                                </Badge>
+
+                                            )}
+
+                                            {/* PostActionsPopover */}
+
+                                            {/* Pastikan post.id tersedia sebelum render ForumPostEditDialog */}
+
+                                            <PostActionsPopover
+
+                                                post={post}
+
+                                                isBookmarked={isBookmarked}
+
+                                                isPostAuthor={isPostAuthor}
+
+                                                onAction={handlePostAction}
+
+                                                isAdmin={isAdmin}
+
+                                                isLoggedIn={!!userId}
+
+                                            />
+
+                                        </div>
+
+                                    </div>
+
+
+
+                                    <div className="mt-4">
+
+                                        <h1 className="text-2xl font-bold mb-3 leading-tight">{post.title}</h1>
+
+                                        <div className="flex flex-wrap gap-2">
+
+                                            <Badge variant="outline">{post.category}</Badge>
+
+                                            {post.tags.map((tag, index) => (
+
+                                                <Badge key={index} variant="secondary" className="text-xs">
+
+                                                    #{tag}
+
+                                                </Badge>
+
+                                            ))}
+
+                                        </div>
+
+                                    </div>
+
+                                </>
+
+                            ) : null}
+
+                        </CardHeader>
+
+
+
+                        <CardContent>
+
+                            {loadingPost ? (
+
+                                <PostContentSkeleton />
+
+                            ) : post ? (
+
+                                <>
+
+                                    <div className="prose prose-sm max-w-none dark:prose-invert">
+
+                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+
+                                            {post.content}
+
+                                        </ReactMarkdown>
+
+                                    </div>
+
+
+
+                                    {post.media && post.media.length > 0 && (
+
+                                        <div className="mb-6 mt-4">
+
+                                            <MediaViewer media={post.media} />
+
+                                        </div>
+
+                                    )}
+
+
+
+                                    <Separator className="my-4" />
+
+
+
+                                    <div className="flex items-center justify-between">
+
+                                        <div className="flex items-center gap-4">
+
+                                            <Button
+
+                                                type="button"
+
+                                                variant={isLiked ? "default" : "outline"}
+
+                                                size="sm"
+
+                                                onClick={handleLike}
+
+                                                className="flex items-center gap-2"
+
+                                                disabled={!userId}
+
+                                            >
+
+                                                <Heart className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`} />
+
+                                                {post.likes}
+
+                                            </Button>
+
+                                            <div className="flex items-center gap-1 text-sm text-gray-500">
+
+                                                <MessageSquare className="h-4 w-4" />
+
+                                                {post.replies} balasan
+
+                                            </div>
+
+                                            <div className="flex items-center gap-1 text-sm text-gray-500">
+
+                                                <Eye className="h-4 w-4" />
+
+                                                {views.toLocaleString()} views
+
+                                            </div>
+
+                                            <span className="flex items-center gap-1 text-sm text-gray-500">
+
+                                                <BookOpenText className="h-4 w-4" />
+
+                                                {readingTime}
+
+                                            </span>
+
+                                        </div>
+
+                                        <Button
+
+                                            type="button"
+
+                                            variant="ghost"
+
+                                            size="sm"
+
+                                            className="h-6 px-2 text-xs"
+
+                                            onClick={() => handlePostAction("share-link")}
+
+                                        >
+
+                                            <Share2 className="h-4 w-4" />
+
+                                        </Button>
+
+                                    </div>
+
+                                </>
+
+                            ) : null}
+
+                        </CardContent>
+
+                    </Card>
+
+
+
+                    <Card>
+
+                        <CardHeader>
+
+                            <div className="flex items-center gap-2">
+
+                                <MessageSquare className="h-5 w-5" />
+
+                                <span className="font-semibold">
+
+                                    Komentar ({flattenReplies(replies).length})
+
+                                </span>
+
+                            </div>
+
+                        </CardHeader>
+
+                        <CardContent>
+
+                            <ScrollArea className="h-[400px]">
+
+                                <div ref={highlightCommentRef} className="space-y-4 pr-4">
+
+                                    {loadingPost ? (
+
+                                        Array.from({ length: 3 }).map((_, i) => <CommentSkeleton key={i} />)
+
+                                    ) : replies.length > 0 ? (
+
+                                        replies.map((reply) => (
+
+                                            <ReplyItem
+
+                                                key={reply.id}
+
+                                                reply={reply}
+
+                                                postId={post?.id || ""}
+
+                                                postTitle={post?.title || ""}
+
+                                                postAuthorId={post?.authorId || ""}
+
+                                                onVote={handleVote}
+
+                                                onReaction={handleReaction}
+
+                                                onMarkAsSolution={handleMarkAsSolution}
+
+                                                onCommentAction={handleCommentAction}
+
+                                                currentUserId={userId || undefined}
+
+                                                isAdmin={isAdmin}
+
+                                                currentUserVoteStatus={userState.votes?.[reply.id] || null}
+
+                                                currentUserReaction={userState.reactions?.[reply.id] || null}
+
+                                                onSubmitReply={handleSubmitReply}
+
+                                                isSubmittingReply={submittingReply}
+
+                                                isNested={false}
+
+                                                isHighlighted={commentIdToHighlight === reply.id}
+
+                                                uploadMediaToImageKit={uploadMediaToImageKit}
+
+                                                allAvailableMentions={allCommentAuthors}
+
+                                            />
+
+                                        ))
+
+                                    ) : (
+
+                                        <div className="text-center py-12">
+
+                                            <MessageSquare className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+
+                                            <h3 className="text-lg font-medium mb-2">Belum ada komentar</h3>
+
+                                            <p className="text-gray-600">Jadilah yang pertama memberikan komentar!</p>
+
+                                        </div>
+
+                                    )}
+
+                                </div>
+
+                            </ScrollArea>
+
+                            {!loadingPost && userId && (
+
+                                <div className="mt-6 border-t pt-4">
+
+                                    <div className="flex items-start gap-3">
+
+                                        <Avatar className="h-10 w-10">
+
+                                            <AvatarImage src={avatar || "/placeholder.svg"} />
+
+                                            <AvatarFallback>{username?.[0] || '?'}</AvatarFallback>
+
+                                        </Avatar>
+
+                                        <div className="flex-1">
+
+                                            <MarkdownEditor
+
+                                                textareaRef={mainReplyTextareaRef}
+
+                                                value={newReplyContent}
+
+                                                onChange={setNewReplyContent}
+
+                                                onMediaFilesChange={handleMainMediaFilesChange}
+
+                                                mediaPreviews={mainCommentMediaPreviews}
+
+                                                placeholder="Tulis komentar Anda..."
+
+                                                rows={4}
+
+                                                disabled={submittingReply || mainCommentUploadState.uploading}
+
+                                                isUploadingMedia={mainCommentUploadState.uploading}
+
+                                                showMediaInput={true}
+
+                                                onRemoveMedia={handleRemoveMainMedia}
+
+                                                allAvailableMentions={allCommentAuthors}
+
+                                                disableMediaPreviewInWriteTab={false}
+
+                                                showMediaPreviewInPreviewTab={false}
+
+                                                showMediaInsertActions={true}
+
+                                            />
+
+                                            <div className="flex justify-between text-sm text-gray-500 mt-1">
+
+                                                <span>Mendukung Markdown formatting</span>
+
+                                                {mainCommentUploadState.uploading && (
+
+                                                    <div className="flex items-center gap-2">
+
+                                                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+
+                                                        <Progress value={mainCommentUploadState.progress} className="w-24 h-2" />
+
+                                                        <span>{Math.round(mainCommentUploadState.progress)}%</span>
+
+                                                    </div>
+
+                                                )}
+
+                                                {mainCommentUploadState.error && (
+
+                                                    <p className="text-red-500 text-xs mt-1">{mainCommentUploadState.error}</p>
+
+                                                )}
+
+                                                <span>{newReplyContent.length}/5000</span>
+
+                                            </div>
+
+                                            <div className="flex items-center justify-between mt-3">
+
+                                                <div className="text-xs text-gray-500">Tekan Ctrl+Enter untuk mengirim cepat</div>
+
+                                                <Button
+
+                                                    type="button"
+
+                                                    onClick={() => handleSubmitReply(newReplyContent, mainCommentUploadState.uploadedData ? [mainCommentUploadState.uploadedData] : [])}
+
+                                                    disabled={(!newReplyContent.trim() && !mainCommentUploadState.file) || submittingReply || mainCommentUploadState.uploading || (mainCommentUploadState.file && !mainCommentUploadState.uploadedData)}
+
+                                                >
+
+                                                    {submittingReply || mainCommentUploadState.uploading ? (
+
+                                                        <>
+
+                                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+
+                                                            Mengirim...
+
+                                                        </>
+
+                                                    ) : (
+
+                                                        <>
+
+                                                            <Send className="h-4 w-4 mr-2" />
+
+                                                            Kirim Komentar
+
+                                                        </>
+
+                                                    )}
+
+                                                </Button>
+
+                                            </div>
+
+                                        </div>
+
+                                    </div>
+
+                                </div>
+
+                            )}
+
+                            {!userId && !loadingPost && (
+
+                                <div className="text-center py-6 text-muted-foreground">
+
+                                    <p>Login untuk bergabung dalam diskusi dan meninggalkan komentar.</p>
+
+                                    <Button type="button" variant="link" onClick={() => router.push('/login')} className="mt-2">Login Sekarang</Button>
+
+                                </div>
+
+                            )}
+
+                        </CardContent>
+
+                    </Card>
+
+                </div>
+
+
+
+                <div className="hidden lg:block space-y-6 lg:sticky lg:top-[87px] h-fit">
+
+                    <PostStats post={post} views={views} isLiked={isLiked} isLoading={loadingPost} />
+
+                    <QuickActions
+
+                        onBookmark={handleBookmark}
+
+                        onShare={() => handlePostAction("share-link")}
+
+                        onNewPost={() => router.push("/forum/new")}
+
+                        isBookmarked={isBookmarked}
+
+                        isLoading={loadingPost}
+
+                    />
+
+                    <RelatedPosts currentPost={post} isLoading={loadingPost} />
+
+                </div>
+
+            </div>
+
+            {/* Forum Post Edit Dialog */}
+
+            {post && userId && (isPostAuthor || isAdmin) && (
+
+                <ForumPostEditDialog
+
+                    postId={post.id}
+
+                    isPostAuthor={isPostAuthor}
+
+                    isAdmin={isAdmin}
+
+                    onEditSuccess={handleEditPostSuccess}
+
+                />
+
+            )}
+
+            <ReportDialog
+
+                isOpen={isPostReportDialogOpen}
+
+                onOpenChange={setIsPostReportDialogOpen}
+
+                reportType="forum_post"
+
+                entityId={post?.id || ""}
+
+                entityTitle={post?.title}
+
+                entityAuthorId={post?.authorId}
+
+                entityAuthorUsername={post?.authorUsername}
+
+            />
+
+        </div>
+
+    );
+
+}
