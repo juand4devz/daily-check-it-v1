@@ -1,21 +1,17 @@
-// /components/forum/media-viewer.tsx (Minimal perubahan, verifikasi tipe)
+// /components/forum/media-viewer.tsx
 "use client";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Expand, Play, X } from "lucide-react"; // Re-added X for clarity
+import { Expand, Play, X } from "lucide-react";
 import Image from "next/image";
-import { cn } from "@/lib/utils"; // Assuming cn utility
+import { cn } from "@/lib/utils";
+import { ForumMedia } from "@/types/forum"; // Import ForumMedia langsung
 
-// Ensure consistency with @/types/forum/ForumMedia
-interface MediaItem {
-  type: "image" | "video";
-  url: string;
-  thumbnailUrl?: string; // Changed from thumbnail to thumbnailUrl for consistency
-}
-
+// Gunakan ForumMedia sebagai tipe dasar untuk MediaItem di sini
+// Ini memastikan konsistensi antara data yang disimpan dan yang ditampilkan
 interface MediaViewerProps {
-  media: MediaItem[];
+  media: ForumMedia[]; // Menggunakan ForumMedia[] langsung
   className?: string;
 }
 
@@ -27,7 +23,8 @@ export function MediaViewer({ media, className = "" }: MediaViewerProps) {
 
   const currentMedia = media[selectedIndex];
 
-  const MediaPreview = ({ item, index }: { item: MediaItem; index: number }) => (
+  // Helper component untuk pratinjau individu
+  const MediaPreview = ({ item, index }: { item: ForumMedia; index: number }) => ( // Gunakan ForumMedia
     <div
       className="relative group cursor-pointer"
       onClick={() => {
@@ -38,15 +35,21 @@ export function MediaViewer({ media, className = "" }: MediaViewerProps) {
       <div className="relative overflow-hidden rounded-lg">
         {item.type === "image" ? (
           <Image
-            height={500} // Added explicit height/width for Next/Image
+            height={500}
             width={500}
             src={item.url || "/placeholder.svg"}
-            alt={`Media ${index + 1}`}
+            alt={`Media ${item.filename || 'item'} ${index + 1}`} // Gunakan item.filename
             className="w-full h-48 object-cover transition-transform group-hover:scale-105"
           />
         ) : (
           <div className="relative">
-            <video src={item.url} className="w-full h-48 object-cover" poster={item.thumbnailUrl} />
+            <video
+              src={item.url}
+              className="w-full h-48 object-cover"
+              poster={item.thumbnailUrl || undefined} // Gunakan thumbnailUrl jika ada
+              // Tambahkan `preload="metadata"` untuk membantu browser memuat poster
+              preload="metadata"
+            />
             <div className="absolute inset-0 flex items-center justify-center bg-black/20">
               <Play className="h-12 w-12 text-white" />
             </div>
@@ -55,7 +58,7 @@ export function MediaViewer({ media, className = "" }: MediaViewerProps) {
 
         {/* Expand Icon */}
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button variant="secondary" size="sm" className="h-8 w-8 p-0 bg-black/50 hover:bg-black/70 border-0">
+          <Button variant="secondary" size="sm" className="h-8 w-8 p-0 bg-black/50 hover:bg-black/70 border-0" aria-label="Expand media">
             <Expand className="h-4 w-4 text-white" />
           </Button>
         </div>
@@ -67,10 +70,10 @@ export function MediaViewer({ media, className = "" }: MediaViewerProps) {
     <div className="relative w-full h-full flex items-center justify-center bg-black">
       {currentMedia.type === "image" ? (
         <Image
-          height={1000} // Larger size for full screen
+          height={1000}
           width={1000}
           src={currentMedia.url || "/placeholder.svg"}
-          alt="Full size media"
+          alt={`Full size media ${currentMedia.filename || 'item'}`}
           className="max-w-full max-h-full object-contain"
         />
       ) : (
@@ -83,8 +86,9 @@ export function MediaViewer({ media, className = "" }: MediaViewerProps) {
         size="sm"
         className="absolute top-4 right-4 h-10 w-10 p-0 bg-black/50 hover:bg-black/70 text-white"
         onClick={() => setIsOpen(false)}
+        aria-label="Close full screen media"
       >
-        <X className="h-5 w-5" /> {/* Re-added X icon */}
+        <X className="h-5 w-5" />
       </Button>
 
       {/* Navigation for multiple media */}
@@ -95,6 +99,7 @@ export function MediaViewer({ media, className = "" }: MediaViewerProps) {
             size="sm"
             className="absolute left-4 top-1/2 -translate-y-1/2 h-10 w-10 p-0 bg-black/50 hover:bg-black/70 text-white"
             onClick={() => setSelectedIndex((prev) => (prev > 0 ? prev - 1 : media.length - 1))}
+            aria-label="Previous media"
           >
             ←
           </Button>
@@ -103,6 +108,7 @@ export function MediaViewer({ media, className = "" }: MediaViewerProps) {
             size="sm"
             className="absolute right-4 top-1/2 -translate-y-1/2 h-10 w-10 p-0 bg-black/50 hover:bg-black/70 text-white"
             onClick={() => setSelectedIndex((prev) => (prev < media.length - 1 ? prev + 1 : 0))}
+            aria-label="Next media"
           >
             →
           </Button>
@@ -118,24 +124,25 @@ export function MediaViewer({ media, className = "" }: MediaViewerProps) {
 
   return (
     <div className={cn("grid gap-2", className, media.length === 1 ? "grid-cols-1" : "grid-cols-2")}>
+      {/* Batasi jumlah preview yang ditampilkan di grid, lalu tambahkan "Lihat Semua" */}
       {media.slice(0, media.length > 4 ? 3 : media.length).map((item, index) => (
-        <MediaPreview key={index} item={item} index={index} />
+        <MediaPreview key={item.id || index} item={item} index={index} /> // Gunakan item.id sebagai key
       ))}
       {media.length > 4 && (
         <div
           className="relative group cursor-pointer"
-          onClick={() => { setSelectedIndex(3); setIsOpen(true); }} // Open gallery from 4th item
+          onClick={() => { setSelectedIndex(3); setIsOpen(true); }} // Buka galeri dari item ke-4
         >
           <div className="relative overflow-hidden rounded-lg h-48">
             <Image
               height={500}
               width={500}
-              src={media[3].url || "/placeholder.svg"} // Show 4th image as preview
-              alt={`Media ${4}`}
+              src={media[3].url || "/placeholder.svg"} // Tampilkan gambar ke-4 sebagai pratinjau
+              alt={`Media ${4} more`}
               className="w-full h-full object-cover transition-transform group-hover:scale-105"
             />
             <div className="absolute inset-0 bg-black/50 flex items-center justify-center rounded-lg">
-              <span className="text-white font-medium text-xl">+{media.length - 3}</span> {/* Correct count */}
+              <span className="text-white font-medium text-xl">+{media.length - 3}</span>
             </div>
           </div>
         </div>
@@ -143,7 +150,7 @@ export function MediaViewer({ media, className = "" }: MediaViewerProps) {
 
       {/* Full Screen Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogTitle className="hidden" />
+        <DialogTitle className="hidden" /> {/* Sembunyikan judul dialog */}
         <DialogContent className="max-w-none max-h-none w-screen h-screen p-0 border-0 bg-black">
           <FullScreenMedia />
         </DialogContent>

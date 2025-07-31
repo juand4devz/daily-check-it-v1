@@ -38,7 +38,8 @@ import {
     BookmarkX,
     Grid3X3,
     List,
-    Loader2, // Added Loader2 for loading states
+    Loader2,
+    BookmarkCheck, // Added Loader2 for loading states
 } from "lucide-react";
 import { toast } from "sonner";
 import Image from "next/image";
@@ -104,14 +105,14 @@ function BookmarkCard({ post, viewMode, isSelected, bulkDeleteMode, onToggleSele
     if (viewMode === "list") {
         return (
             <Card className={cn(
-                "hover:shadow-md transition-all duration-300",
+                "hover:shadow-md transition-all duration-300 py-2",
                 isSelected ? "ring-2 ring-blue-500" : ""
             )}>
                 <CardContent className="p-4">
                     <div className="flex gap-4">
                         {/* Checkbox for Bulk Delete */}
                         {bulkDeleteMode && (
-                            <div className="flex items-center">
+                            <div>
                                 <input
                                     type="checkbox"
                                     checked={isSelected}
@@ -235,7 +236,7 @@ function BookmarkCard({ post, viewMode, isSelected, bulkDeleteMode, onToggleSele
     return (
         <Card
             className={cn(
-                "hover:shadow-lg transition-all duration-300 cursor-pointer group overflow-hidden",
+                "hover:shadow-lg transition-all duration-300 cursor-pointer group overflow-hidden p-0",
                 isSelected ? "ring-2 ring-blue-500" : ""
             )}
         >
@@ -886,7 +887,7 @@ export default function BookmarksPage() {
     }
 
     return (
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="container mx-auto px-4 py-4 max-w-7xl">
             {/* Header Halaman */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                 <div className="flex items-center gap-4">
@@ -894,15 +895,7 @@ export default function BookmarksPage() {
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Kembali
                     </Button>
-                    <div>
-                        <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-                            <Bookmark className="h-8 w-8 text-blue-600" />
-                            Bookmark Saya
-                        </h1>
-                        <p className="text-gray-600">Koleksi post yang telah Anda simpan</p>
-                    </div>
                 </div>
-
                 {/* Kontrol Mode Bulk Delete (ditempatkan lebih dekat ke daftar post) */}
                 <div className="flex-grow flex justify-end items-center gap-2 md:order-last md:justify-start lg:justify-end">
                     {bulkDeleteMode && (
@@ -942,6 +935,14 @@ export default function BookmarksPage() {
                 </div>
             </div>
 
+            <div>
+                <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
+                    <BookmarkCheck className="h-14 w-14" />
+                    Bookmark Saya
+                </h1>
+                <p className="text-gray-600 mb-8">Koleksi post yang telah Anda simpan</p>
+            </div>
+
             {/* Statistik Cepat */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <Card>
@@ -969,12 +970,11 @@ export default function BookmarksPage() {
                     </CardContent>
                 </Card>
             </div>
-
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 {/* Kolom Kiri: Konten Utama (Filter dan Daftar Post) */}
                 <div className="lg:col-span-3 space-y-6">
                     {/* Filter dan Kontrol Tampilan */}
-                    <Card>
+                    <Card className="p-0">
                         <CardContent className="p-4">
                             <div className="flex flex-col gap-4">
                                 {/* Pencarian dan Toggle Tampilan */}
@@ -992,53 +992,53 @@ export default function BookmarksPage() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex gap-2 justify-end"> {/* Pindahkan tombol view mode ke kanan */}
-                                    <Button
-                                        variant={viewMode === "grid" ? "default" : "outline"}
-                                        size="sm"
-                                        onClick={() => setViewMode("grid")}
-                                    >
-                                        <Grid3X3 className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        variant={viewMode === "list" ? "default" : "outline"}
-                                        size="sm"
-                                        onClick={() => setViewMode("list")}
-                                    >
-                                        <List className="h-4 w-4" />
-                                    </Button>
-                                </div>
-
-                                {/* Filter Kategori dan Urutkan Berdasarkan */}
-                                <div className="flex flex-col md:flex-row gap-4">
-                                    <Select value={selectedCategory} onValueChange={setSelectedCategory} disabled={isDeleting}> {/* Disable during deletion */}
-                                        <SelectTrigger className="w-full md:w-48">
-                                            <SelectValue placeholder="Filter Kategori" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {getCategoryStats.map((category) => (
-                                                <SelectItem key={category.value} value={category.value}>
-                                                    {category.label} ({category.count})
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-
-                                    <Select value={sortBy} onValueChange={setSortBy} disabled={isDeleting}> {/* Disable during deletion */}
-                                        <SelectTrigger className="w-full md:w-48">
-                                            <SelectValue placeholder="Urutkan" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="bookmark-newest">Bookmark Terbaru</SelectItem>
-                                            <SelectItem value="bookmark-oldest">Bookmark Terlama</SelectItem>
-                                            <SelectItem value="post-newest">Post Terbaru</SelectItem>
-                                            <SelectItem value="post-oldest">Post Terlama</SelectItem>
-                                            <SelectItem value="most-liked">Paling Disukai</SelectItem>
-                                            <SelectItem value="most-replies">Paling Banyak Balasan</SelectItem>
-                                            <SelectItem value="title-asc">Judul A-Z</SelectItem>
-                                            <SelectItem value="title-desc">Judul Z-A</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                <div className="flex gap-2 justify-between"> {/* Pindahkan tombol view mode ke kanan */}
+                                    {/* Filter Kategori dan Urutkan Berdasarkan */}
+                                    <div className="flex flex-col md:flex-row gap-4">
+                                        <Select value={selectedCategory} onValueChange={setSelectedCategory} disabled={isDeleting}> {/* Disable during deletion */}
+                                            <SelectTrigger className="w-full md:w-48">
+                                                <SelectValue placeholder="Filter Kategori" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {getCategoryStats.map((category) => (
+                                                    <SelectItem key={category.value} value={category.value}>
+                                                        {category.label} ({category.count})
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <Select value={sortBy} onValueChange={setSortBy} disabled={isDeleting}> {/* Disable during deletion */}
+                                            <SelectTrigger className="w-full md:w-48">
+                                                <SelectValue placeholder="Urutkan" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="bookmark-newest">Bookmark Terbaru</SelectItem>
+                                                <SelectItem value="bookmark-oldest">Bookmark Terlama</SelectItem>
+                                                <SelectItem value="post-newest">Post Terbaru</SelectItem>
+                                                <SelectItem value="post-oldest">Post Terlama</SelectItem>
+                                                <SelectItem value="most-liked">Paling Disukai</SelectItem>
+                                                <SelectItem value="most-replies">Paling Banyak Balasan</SelectItem>
+                                                <SelectItem value="title-asc">Judul A-Z</SelectItem>
+                                                <SelectItem value="title-desc">Judul Z-A</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <Button
+                                            variant={viewMode === "grid" ? "default" : "outline"}
+                                            size="sm"
+                                            onClick={() => setViewMode("grid")}
+                                        >
+                                            <Grid3X3 className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant={viewMode === "list" ? "default" : "outline"}
+                                            size="sm"
+                                            onClick={() => setViewMode("list")}
+                                        >
+                                            <List className="h-4 w-4" />
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                         </CardContent>

@@ -404,6 +404,6 @@ export function BookmarkCard({ post, viewMode, isSelected, bulkDeleteMode, onTog
                     animation: shimmer 2s infinite;
                 }
             `}</style>
-        </Card>
+        </Card >
     );
 }
