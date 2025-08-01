@@ -18822,3 +18822,11 @@ export default function ForumDetailPage() {
     );
 
 }
+
+sepertinnya data yang digunakan pada card chart "Distribusi Gejala Berdasarkan Perangkat" di halaman symptoms masih kurang benar.mari kita perbarui logika untuk nilai jenis perangkat yang kita gunakan pada chart ini.tulis ulang semua code halaman symptoms ini dengan meperbaiki, menyesuaikan, dan mengenmbangkan halaman symptoms ini dengan lengkap, baik, dan benar sesuai keinginan saya diatas. 
+
+dan perlu saya tegaskan bahwa untuk nilai computer dan laptop masing - masing tidak harus 1 nilai pada nilai properti perangkat melainkan meskipun nilainya ada 2 seperti computer dan laptop tapi ada 1 nilai saja yang cocok maka akan dimasukkan sebagai nilai dari computer, contoh: nilai computer mencari pada properti perangkat dan pada response api ada["computer", "laptop"] maka dapat dimasukkan ke sebagai nilai computer meski ada nilai lain seperti laptop, begitu juga nilai untuk perangkat computer, dan untuk contoh value nomor 3 untuk semua perangkat computer dan laptop ini di haruskan memiliki 2 type perangkat ["computer", "laptop"] baru dapat di jadikan sebagai nilai dari kedua perangkat
+
+
+sesuaikan juga tab statistik beserta chart - charts nya agar menyesuaikan dan mengembangkan dengan beberapa perubahan dan pengembangan.
+dan perlu saya tmabahakan bahwa untuk nilai computer dan laptop masing - masing tidak harus 1 nilai pada nilai properti perangkat melainkan meskipun nilainya ada 2 seperti computer dan laptop tapi ada 1 nilai saja yang cocok maka akan dimasukkan sebagai nilai dari computer, contoh: nilai computer mencari pada properti perangkat dan pada response api ada["computer", "laptop"] maka dapat dimasukkan ke sebagai nilai computer meski ada nilai lain seperti laptop, begitu juga nilai untuk perangkat computer, dan untuk contoh value nomor 3 untuk semua perangkat computer dan laptop ini di haruskan memiliki 2 type perangkat ["computer", "laptop"] baru dapat di jadikan sebagai nilai dari kedua perangkat

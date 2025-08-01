@@ -1,6 +1,5 @@
 // /admin/symptoms/add/page.tsx
 "use client";
-
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -13,18 +12,16 @@ export default function AddGejalaPage() {
   const router = useRouter();
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [gejalaList, setGejalaList] = useState<Gejala[]>([]);
   const [kerusakanList, setKerusakanList] = useState<Kerusakan[]>([]);
+  const [gejalaList, setGejalaList] = useState<Gejala[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setIsLoadingData(true);
     setError(null);
     try {
-      const [gejalaResponse, kerusakanResponse] = await Promise.all([
-        fetch("/api/diagnose/symptoms"),
-        fetch("/api/diagnose/damages"),
-      ]);
+      const gejalaResponse = await fetch("/api/diagnose/symptoms");
+      const kerusakanResponse = await fetch("/api/diagnose/damages");
 
       const gejalaData: ApiResponse<Gejala[]> = await gejalaResponse.json();
       const kerusakanData: ApiResponse<Kerusakan[]> = await kerusakanResponse.json();
@@ -88,15 +85,13 @@ export default function AddGejalaPage() {
     }
   };
 
-  // --- Logika untuk Generate Kode Otomatis ---
-  const getNextAvailableCode = useCallback((existingCodes: string[]): string => {
+  const nextCode = useMemo(() => {
+    const existingCodes = gejalaList.map(g => g.kode);
     const sortedCodes = existingCodes
       .map(code => parseInt(code.replace('G', '')))
       .filter(num => !isNaN(num))
       .sort((a, b) => a - b);
-
     let nextNumber = 1;
-    // Cari celah di antara kode yang ada
     for (const codeNumber of sortedCodes) {
       if (codeNumber === nextNumber) {
         nextNumber++;
@@ -105,34 +100,17 @@ export default function AddGejalaPage() {
       }
     }
     return `G${nextNumber}`;
-  }, []);
+  }, [gejalaList]);
 
-  const defaultFormData = useMemo(() => {
-    if (gejalaList.length === 0) {
-      return {
-        kode: "G1",
-        nama: "",
-        deskripsi: "",
-        kategori: "System",
-        perangkat: [],
-        mass_function: {},
-        gambar: "",
-      };
-    }
-
-    const existingCodes = gejalaList.map(g => g.kode);
-    const nextCode = getNextAvailableCode(existingCodes);
-
-    return {
-      kode: nextCode,
-      nama: "",
-      deskripsi: "",
-      kategori: "System",
-      perangkat: [],
-      mass_function: {},
-      gambar: "",
-    };
-  }, [gejalaList, getNextAvailableCode]);
+  const initialDataWithCode: Gejala = {
+    kode: nextCode,
+    nama: "",
+    deskripsi: "",
+    kategori: "System",
+    perangkat: [],
+    mass_function: {},
+    gambar: "",
+  };
 
   if (isLoadingData) {
     return (
@@ -167,7 +145,7 @@ export default function AddGejalaPage() {
 
   return (
     <SymptomForm
-      initialData={defaultFormData} // Gunakan data form yang digenerate otomatis
+      initialData={initialDataWithCode}
       kerusakanList={kerusakanList}
       isSubmitting={isSubmitting}
       onSave={handleSave}

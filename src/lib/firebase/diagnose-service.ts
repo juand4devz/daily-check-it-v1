@@ -10,6 +10,7 @@ import {
     deleteDoc,
     where,
     limit,
+    writeBatch, // Import writeBatch
 } from "firebase/firestore";
 import { clientDb } from "./firebase-client";
 import { Gejala, Kerusakan } from "@/types/diagnose";
@@ -72,6 +73,20 @@ export async function deleteKerusakan(id: string): Promise<void> {
     } catch (error) {
         console.error("Error in deleteKerusakan:", error);
         throw new Error("Gagal menghapus data kerusakan.");
+    }
+}
+
+export async function bulkDeleteKerusakan(ids: string[]): Promise<void> {
+    try {
+        const batch = writeBatch(clientDb);
+        ids.forEach(id => {
+            const docRef = doc(clientDb, "kerusakan", id);
+            batch.delete(docRef);
+        });
+        await batch.commit();
+    } catch (error) {
+        console.error("Error in bulkDeleteKerusakan:", error);
+        throw new Error("Gagal menghapus data kerusakan secara massal.");
     }
 }
 
@@ -148,6 +163,20 @@ export async function deleteGejala(id: string): Promise<void> {
     } catch (error) {
         console.error("Error in deleteGejala:", error);
         throw new Error("Gagal menghapus data gejala.");
+    }
+}
+
+export async function bulkDeleteGejala(ids: string[]): Promise<void> {
+    try {
+        const batch = writeBatch(clientDb);
+        ids.forEach(id => {
+            const docRef = doc(clientDb, "gejala", id);
+            batch.delete(docRef);
+        });
+        await batch.commit();
+    } catch (error) {
+        console.error("Error in bulkDeleteGejala:", error);
+        throw new Error("Gagal menghapus data gejala secara massal.");
     }
 }
 

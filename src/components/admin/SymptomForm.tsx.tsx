@@ -44,7 +44,8 @@ const categories = [
     "Storage", "BIOS", "Port", "Network", "Audio", "Input",
     "Camera", "Battery", "Graphics", "Software", "OS", "Security", "Peripheral",
 ];
-const devices = ["komputer", "laptop"];
+// PERBAIKAN: Gunakan nama perangkat dalam bahasa Inggris yang konsisten
+const devices = ["computer", "laptop"];
 
 interface SymptomFormProps {
     initialData?: Gejala | null;
@@ -494,13 +495,13 @@ export function SymptomForm({
                                         onClick={() => toggleDevice(device)}
                                         disabled={isSubmitting}
                                     >
-                                        {device === "komputer" ? "Komputer" : "Laptop"}
+                                        {device === "computer" ? "Komputer" : "Laptop"}
                                     </Button>
                                 ))}
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="gambar">URL Gambar</Label>
+                            <Label>Gambar Gejala</Label>
                             <div
                                 className={cn(
                                     "relative w-full h-48 border rounded-lg overflow-hidden group flex items-center justify-center",
@@ -513,12 +514,7 @@ export function SymptomForm({
                             >
                                 {mediaFile?.preview ? (
                                     mediaFile.type === "image" ? (
-                                        <Image
-                                            src={mediaFile.preview}
-                                            alt="Gambar Pratinjau"
-                                            layout="fill"
-                                            objectFit="cover"
-                                        />
+                                        <Image src={mediaFile.preview} alt="Gambar Pratinjau" layout="fill" objectFit="cover" />
                                     ) : (
                                         <video src={mediaFile.preview} className="w-full h-full object-cover" autoPlay muted loop />
                                     )

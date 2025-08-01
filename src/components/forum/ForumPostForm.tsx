@@ -613,7 +613,7 @@ export function ForumPostForm({
 
     if (isLoadingPage || isLoadingInitialData) {
         return (
-            <div className={cn("container mx-auto px-4 py-8", isModal ? "max-w-full" : "max-w-4xl")}>
+            <div className={cn("container mx-auto px-4 py-8", isModal ? "max-w-full" : "w-full")}>
                 <div className="space-y-6">
                     <Skeleton className="h-8 w-64" />
                     <Card>

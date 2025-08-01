@@ -11,10 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Edit, Trash2, Download, Upload, Search, RefreshCw, Loader2, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import type { Gejala, ApiResponse } from "@/types/diagnose";
+import type { Gejala, ApiResponse, Kerusakan } from "@/types/diagnose";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Label as ChartLabel } from 'recharts';
+import GejalaPageSkeleton from "./loading";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // --- Constants ---
 const categories = [
@@ -22,7 +26,8 @@ const categories = [
   "Storage", "BIOS", "Port", "Network", "Audio", "Input",
   "Camera", "Battery", "Graphics", "Software", "OS", "Security", "Peripheral",
 ];
-const devices = ["komputer", "laptop"];
+const devices = ["computer", "laptop"];
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#FF0056', '#56FF00'];
 
 // --- Interfaces ---
 interface GejalaStatistics {
@@ -46,16 +51,18 @@ interface ImportGejalaItemClient {
 // --- Main Component ---
 export default function GejalaPage() {
   const [gejalaList, setGejalaList] = useState<Gejala[]>([]);
-  const [searchQuery, setSearchQuery] = useState(""); // State untuk input pencarian
+  const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterDevice, setFilterDevice] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
   const [isSendingImport, setIsSendingImport] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const [errorFetching, setErrorFetching] = useState<string | null>(null);
 
+  // --- Data Loading from API ---
   const loadData = useCallback(async (): Promise<void> => {
     try {
       setIsLoading(true);
@@ -94,6 +101,7 @@ export default function GejalaPage() {
     loadData();
   }, [loadData]);
 
+  // --- Filtering and Search Logic (using Fuse.js) ---
   const fuse = useMemo(() => {
     const options = {
       keys: ['kode', 'nama', 'deskripsi', 'kategori', 'perangkat'],
@@ -111,7 +119,6 @@ export default function GejalaPage() {
       return categoryMatch && deviceMatch;
     });
   }, [gejalaList, searchQuery, filterCategory, filterDevice, fuse]);
-
 
   const handleEdit = useCallback((gejala: Gejala): void => {
     router.push(`/admin/symptoms/edit/${gejala.id}`);
@@ -137,6 +144,49 @@ export default function GejalaPage() {
             toast.success("Gejala berhasil dihapus.");
           } catch (caughtError: unknown) {
             console.error("Terjadi kesalahan saat menghapus:", caughtError);
+            let errorMessage = "Gagal menghapus gejala.";
+            if (caughtError instanceof Error) {
+              errorMessage = caughtError.message;
+            }
+            toast.error(errorMessage);
+          }
+        },
+      },
+      cancel: {
+        label: "Batal",
+        onClick: () => toast.dismiss(),
+      },
+    });
+  };
+
+  const handleBulkDelete = async (): Promise<void> => {
+    if (selectedItems.length === 0) {
+      toast.info("Tidak ada item yang dipilih untuk dihapus.");
+      return;
+    }
+
+    toast("Konfirmasi Hapus Massal", {
+      description: `Apakah Anda yakin ingin menghapus ${selectedItems.length} gejala? Tindakan ini tidak dapat dibatalkan.`,
+      action: {
+        label: "Hapus",
+        onClick: async () => {
+          try {
+            const response = await fetch("/api/diagnose/symptoms", {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ ids: selectedItems }),
+            });
+
+            const responseData: ApiResponse<any> = await response.json();
+            if (!response.ok || !responseData.status) {
+              throw new Error(responseData.message || `Gagal menghapus gejala: ${response.status}`);
+            }
+
+            await loadData();
+            setSelectedItems([]);
+            toast.success("Gejala berhasil dihapus.");
+          } catch (caughtError: unknown) {
+            console.error("Error deleting:", caughtError);
             let errorMessage = "Gagal menghapus gejala.";
             if (caughtError instanceof Error) {
               errorMessage = caughtError.message;
@@ -372,6 +422,64 @@ export default function GejalaPage() {
 
   const stats = getStatistics();
 
+  const isAllSelected = selectedItems.length === filteredData.length && filteredData.length > 0;
+
+  const toggleAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedItems(filteredData.map(item => item.id!));
+    } else {
+      setSelectedItems([]);
+    }
+  };
+
+  const toggleItem = (id: string, checked: boolean) => {
+    setSelectedItems(prev =>
+      checked ? [...prev, id] : prev.filter(item => item !== id)
+    );
+  };
+
+  const categoryChartData = useMemo(() => {
+    const counts = gejalaList.reduce((acc, item) => {
+      acc[item.kategori] = (acc[item.kategori] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    return Object.entries(counts).map(([name, value], index) => ({
+      name, value, fill: COLORS[index % COLORS.length]
+    }));
+  }, [gejalaList]);
+
+  // PERBAIKAN: Logika penghitungan deviceChartData
+  const deviceChartData = useMemo(() => {
+    const counts = {
+      'Komputer': 0,
+      'Laptop': 0,
+      'Keduanya': 0,
+    };
+
+    gejalaList.forEach(item => {
+      const hasComputer = item.perangkat.includes('computer');
+      const hasLaptop = item.perangkat.includes('laptop');
+
+      if (hasComputer && hasLaptop) {
+        counts['Keduanya']++;
+        counts['Komputer']++;
+        counts['Laptop']++;
+      } else if (hasComputer) {
+        counts['Komputer']++;
+      } else if (hasLaptop) {
+        counts['Laptop']++;
+      }
+    });
+
+    // Hapus entri yang nilainya nol untuk chart yang lebih bersih
+    return Object.entries(counts)
+      .filter(([, value]) => value > 0)
+      .map(([name, value], index) => ({
+        name, value, fill: COLORS[index % COLORS.length]
+      }));
+  }, [gejalaList]);
+
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
@@ -403,235 +511,328 @@ export default function GejalaPage() {
         </div>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card>
-          <CardContent className="px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Gejala</p>
-                <p className="text-2xl font-bold">{stats.total}</p>
-              </div>
-              <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                <div className="h-4 w-4 rounded-full bg-blue-600"></div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Main Content Tabs */}
+      <Tabs defaultValue="statistics" className="w-full">
+        <div className="flex flex-col md:flex-row items-center justify-between mb-4 gap-4">
+          <TabsList className="w-full md:w-auto">
+            <TabsTrigger value="statistics">Statistik</TabsTrigger>
+            <TabsTrigger value="table">Data</TabsTrigger>
+          </TabsList>
+        </div>
 
-        <Card>
-          <CardContent className="px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Kategori Terbanyak</p>
-                <p className="text-2xl font-bold text-green-600">{Object.keys(stats.byCategory).length}</p>
-              </div>
-              <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                <div className="h-4 w-4 rounded-full bg-green-600"></div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {isLoading ? (
+          <GejalaPageSkeleton />
+        ) : errorFetching ? (
+          <Alert variant="destructive" className="mb-4">
+            <WifiOff className="h-4 w-4" />
+            <AlertTitle>Kesalahan Data!</AlertTitle>
+            <AlertDescription>{errorFetching}</AlertDescription>
+          </Alert>
+        ) : (
+          <>
+            <TabsContent value="statistics" className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Total Gejala</p>
+                        <p className="text-2xl font-bold">{stats.total}</p>
+                      </div>
+                      <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                        <div className="h-4 w-4 rounded-full bg-blue-600"></div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-        <Card>
-          <CardContent className="px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Komputer</p>
-                <p className="text-2xl font-bold text-purple-600">{stats.byDevice.komputer || 0}</p>
-              </div>
-              <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
-                <div className="h-4 w-4 rounded-full bg-purple-600"></div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                <Card>
+                  <CardContent className="px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Kategori Terbanyak</p>
+                        <p className="text-2xl font-bold text-green-600">{Object.keys(stats.byCategory).length}</p>
+                      </div>
+                      <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                        <div className="h-4 w-4 rounded-full bg-green-600"></div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-        <Card>
-          <CardContent className="px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Mass Functions</p>
-                <p className="text-2xl font-bold text-orange-600">{stats.totalMassFunctions}</p>
-              </div>
-              <div className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center">
-                <div className="h-4 w-4 rounded-full bg-orange-600"></div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                <Card>
+                  <CardContent className="px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Komputer</p>
+                        <p className="text-2xl font-bold text-purple-600">{stats.byDevice.computer || 0}</p>
+                      </div>
+                      <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
+                        <div className="h-4 w-4 rounded-full bg-purple-600"></div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="px-6 py-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Cari gejala berdasarkan kode, nama, kategori, atau deskripsi..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={filterCategory} onValueChange={setFilterCategory}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="Filter kategori" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Kategori</SelectItem>
-                {categories.map((category: string) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filterDevice} onValueChange={setFilterDevice}>
-              <SelectTrigger className="w-full md:w-48">
-                <SelectValue placeholder="Filter perangkat" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Perangkat</SelectItem>
-                {devices.map((device) => (
-                  <SelectItem key={device} value={device}>
-                    {device === 'komputer' ? 'Komputer' : 'Laptop'}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+                <Card>
+                  <CardContent className="px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Total Mass Functions</p>
+                        <p className="text-2xl font-bold text-orange-600">{stats.totalMassFunctions}</p>
+                      </div>
+                      <div className="h-8 w-8 rounded-full bg-orange-100 flex items-center justify-center">
+                        <div className="h-4 w-4 rounded-full bg-orange-600"></div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-      {/* Data Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Daftar Gejala ({filteredData.length})</CardTitle>
-          <CardDescription>
-            Kelola data gejala dan nilai kepercayaan (mass function) untuk
-            sistem diagnosa.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading || isSendingImport ? (
-            <div className="flex justify-center items-center h-48">
-              <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Kode</TableHead>
-                    <TableHead>Nama Gejala</TableHead>
-                    <TableHead>Kategori</TableHead>
-                    <TableHead>Perangkat</TableHead>
-                    <TableHead>Mass Function</TableHead>
-                    <TableHead>Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredData.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        {searchQuery ||
-                          filterCategory !== "all" ||
-                          filterDevice !== "all"
-                          ? "Tidak ada gejala yang sesuai dengan filter."
-                          : "Belum ada data gejala."}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredData.map((gejala: Gejala) => (
-                      <TableRow key={gejala.id} className="hover:bg-muted/50">
-                        <TableCell>
-                          <Badge variant="outline" className="font-mono">
-                            {gejala.kode}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="max-w-xs">
-                          <div>
-                            <p className="font-medium line-clamp-1">{gejala.nama}</p>
-                            <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
-                              {gejala.deskripsi}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{gejala.kategori}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          {gejala.perangkat && gejala.perangkat.length > 0 ? (
-                            <div className="flex gap-1">
-                              {gejala.perangkat.map((device: string) => (
-                                <Badge key={device} variant="outline" className="text-xs">
-                                  {device === 'komputer' ? 'PC' : 'Laptop'}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Distribusi Gejala Berdasarkan Kategori</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={categoryChartData}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%" cy="50%"
+                            outerRadius={120}
+                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                            stroke="none"
+                          >
+                            {categoryChartData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value: number, name: string) => [`${value} Gejala`, name]} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Distribusi Gejala Berdasarkan Perangkat</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={deviceChartData}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%" cy="50%"
+                            outerRadius={120}
+                            label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                            stroke="none"
+                          >
+                            {deviceChartData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value: number, name: string) => [`${value} Gejala`, name]} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="table" className="mt-4">
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
+                    <div>
+                      <CardTitle>Daftar Gejala ({filteredData.length})</CardTitle>
+                      <CardDescription>
+                        Kelola data gejala dan nilai kepercayaan (mass function) untuk
+                        sistem diagnosa.
+                      </CardDescription>
+                    </div>
+                    <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleBulkDelete}
+                        disabled={selectedItems.length === 0 || isSendingImport}
+                        className={cn("transition-all duration-300", selectedItems.length > 0 ? "scale-100 opacity-100" : "scale-0 opacity-0")}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Hapus Terpilih ({selectedItems.length})
+                      </Button>
+                      <div className="flex-1 relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                        <Input
+                          placeholder="Cari gejala..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <Select value={filterCategory} onValueChange={setFilterCategory}>
+                        <SelectTrigger className="w-full md:w-48">
+                          <SelectValue placeholder="Filter kategori" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Semua Kategori</SelectItem>
+                          {categories.map((category: string) => (
+                            <SelectItem key={category} value={category}>
+                              {category}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select value={filterDevice} onValueChange={setFilterDevice}>
+                        <SelectTrigger className="w-full md:w-48">
+                          <SelectValue placeholder="Filter perangkat" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Semua Perangkat</SelectItem>
+                          {devices.map((device) => (
+                            <SelectItem key={device} value={device}>
+                              {device === 'computer' ? 'Komputer' : 'Laptop'}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[50px]">
+                            <Checkbox
+                              checked={isAllSelected}
+                              onCheckedChange={(checked) => toggleAll(!!checked)}
+                              aria-label="Pilih semua"
+                            />
+                          </TableHead>
+                          <TableHead>Kode</TableHead>
+                          <TableHead>Nama Gejala</TableHead>
+                          <TableHead>Kategori</TableHead>
+                          <TableHead>Perangkat</TableHead>
+                          <TableHead>Mass Function</TableHead>
+                          <TableHead>Aksi</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredData.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                              {searchQuery ||
+                                filterCategory !== "all" ||
+                                filterDevice !== "all"
+                                ? "Tidak ada gejala yang sesuai dengan filter."
+                                : "Belum ada data gejala."}
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredData.map((gejala: Gejala) => (
+                            <TableRow key={gejala.id} className="hover:bg-muted/50">
+                              <TableCell>
+                                <Checkbox
+                                  checked={selectedItems.includes(gejala.id!)}
+                                  onCheckedChange={(checked) => toggleItem(gejala.id!, !!checked)}
+                                  aria-label={`Pilih item ${gejala.kode}`}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="font-mono">
+                                  {gejala.kode}
                                 </Badge>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Accordion type="single" collapsible className="w-[180px]">
-                            <AccordionItem value="mass-function">
-                              <AccordionTrigger className="p-0">
-                                <span className="text-xs font-mono">
-                                  {Object.keys(gejala.mass_function).filter(k => k !== 'uncertainty').length} entri
-                                </span>
-                              </AccordionTrigger>
-                              <AccordionContent>
-                                {Object.entries(gejala.mass_function)
-                                  .filter(([key]: [string, number]) => key !== "uncertainty")
-                                  .map(([key, value]: [string, number]) => (
-                                    <div key={key} className="flex justify-between text-xs mt-1">
-                                      <span className="font-mono">{key}:</span>
-                                      <span className="font-mono font-medium">{Number(value).toFixed(2)}</span>
-                                    </div>
-                                  ))}
-                                <div className="flex justify-between text-xs mt-1">
-                                  <span className="font-mono">uncertainty:</span>
-                                  <span className="font-mono font-medium">{Number(gejala.mass_function.uncertainty || 0).toFixed(2)}</span>
+                              </TableCell>
+                              <TableCell className="max-w-xs">
+                                <div>
+                                  <p className="font-medium line-clamp-1">{gejala.nama}</p>
+                                  <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                                    {gejala.deskripsi}
+                                  </p>
                                 </div>
-                              </AccordionContent>
-                            </AccordionItem>
-                          </Accordion>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            <Button variant="ghost" size="sm" onClick={() => handleEdit(gejala)} className="h-8 w-8 p-0">
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => gejala.id && handleDelete(gejala.id, gejala.nama)}
-                              className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary">{gejala.kategori}</Badge>
+                              </TableCell>
+                              <TableCell>
+                                {gejala.perangkat && gejala.perangkat.length > 0 ? (
+                                  <div className="flex gap-1">
+                                    {gejala.perangkat.map((device: string) => (
+                                      <Badge key={device} variant="outline" className="text-xs">
+                                        {device === 'computer' ? 'PC' : 'Laptop'}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground text-sm">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <Accordion type="single" collapsible className="w-[180px]">
+                                  <AccordionItem value="mass-function">
+                                    <AccordionTrigger className="p-0">
+                                      <span className="text-xs font-mono">
+                                        {Object.keys(gejala.mass_function).filter(k => k !== 'uncertainty').length} entri
+                                      </span>
+                                    </AccordionTrigger>
+                                    <AccordionContent>
+                                      {Object.entries(gejala.mass_function)
+                                        .filter(([key]: [string, number]) => key !== "uncertainty")
+                                        .map(([key, value]: [string, number]) => (
+                                          <div key={key} className="flex justify-between text-xs mt-1">
+                                            <span className="font-mono">{key}:</span>
+                                            <span className="font-mono font-medium">{Number(value).toFixed(2)}</span>
+                                          </div>
+                                        ))}
+                                      <div className="flex justify-between text-xs mt-1">
+                                        <span className="font-mono">uncertainty:</span>
+                                        <span className="font-mono font-medium">{Number(gejala.mass_function.uncertainty || 0).toFixed(2)}</span>
+                                      </div>
+                                    </AccordionContent>
+                                  </AccordionItem>
+                                </Accordion>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  <Button variant="ghost" size="sm" onClick={() => handleEdit(gejala)} className="h-8 w-8 p-0">
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => gejala.id && handleDelete(gejala.id, gejala.nama)}
+                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </>
+        )}
+      </Tabs>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".json"
-        onChange={handleFileChange}
-        className="hidden"
-      />
+      <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} className="hidden" />
     </div>
   );
 }

@@ -4,7 +4,6 @@ import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
-    Brain,
     Home,
     Settings,
     Users,
@@ -19,7 +18,7 @@ import {
     TagIcon,
     Waypoints,
     Flag,
-    Boxes, // Import LucideIcon type for icon components
+    ScanSearch, // Import LucideIcon type for icon components
 } from "lucide-react"
 
 import {
@@ -78,7 +77,7 @@ const mainNavigation: NavItem[] = [
     {
         title: "Diagnose",
         href: "/diagnose",
-        icon: Boxes,
+        icon: ScanSearch,
     },
 ]
 

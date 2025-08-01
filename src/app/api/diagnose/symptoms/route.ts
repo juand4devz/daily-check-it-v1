@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { getUserById } from "@/lib/firebase/service";
-import { addGejala, getAllGejala, getGejalaByKode } from "@/lib/firebase/diagnose-service";
+import { addGejala, getAllGejala, getGejalaByKode, bulkDeleteGejala } from "@/lib/firebase/diagnose-service";
 import { Gejala } from "@/types/diagnose";
 
 // --- GET Request Handler (untuk mengambil semua gejala) ---
@@ -53,6 +53,34 @@ export async function POST(request: NextRequest) {
     } catch (caughtError: unknown) {
         console.error("Terjadi kesalahan saat menambah gejala:", caughtError);
         const errorMessage = "Terjadi kesalahan server saat menambah gejala.";
+        return NextResponse.json({ status: false, statusCode: 500, message: errorMessage }, { status: 500 });
+    }
+}
+
+// --- DELETE Request Handler (untuk bulk delete) ---
+export async function DELETE(request: NextRequest) {
+    const session = await auth();
+    // Validasi: Hanya admin yang dapat menghapus gejala
+    if (!session?.user?.id) {
+        return NextResponse.json({ status: false, statusCode: 401, message: "Unauthorized: User not authenticated." }, { status: 401 });
+    }
+    const user = await getUserById(session.user.id);
+    if (!user || user.role !== 'admin') {
+        return NextResponse.json({ status: false, statusCode: 403, message: "Forbidden: Only administrators can delete symptoms." }, { status: 403 });
+    }
+
+    try {
+        const { ids } = await request.json(); // Menerima array of IDs
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return NextResponse.json({ status: false, statusCode: 400, message: "Array ID gejala diperlukan untuk penghapusan." }, { status: 400 });
+        }
+
+        await bulkDeleteGejala(ids);
+
+        return NextResponse.json({ status: true, statusCode: 200, message: `${ids.length} gejala berhasil dihapus.` });
+    } catch (caughtError: unknown) {
+        console.error("Terjadi kesalahan saat menghapus gejala secara massal:", caughtError);
+        const errorMessage = "Terjadi kesalahan server saat menghapus gejala.";
         return NextResponse.json({ status: false, statusCode: 500, message: errorMessage }, { status: 500 });
     }
 }

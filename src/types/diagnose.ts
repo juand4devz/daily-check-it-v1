@@ -120,6 +120,8 @@ export interface CombinedMassFunctionData {
 export interface DiagnosisResult {
     kode: string;
     nama: string;
+    // Tambahkan deskripsi ke tipe ini
+    deskripsi?: string;
     belief: number;
     plausibility: number;
     uncertainty: number;
@@ -139,6 +141,12 @@ export interface ApiResponse<T> {
     message: string;
     data?: T;
     error?: string;
+    // Tambahan untuk menangani respons dari API Import
+    errors?: string[];
+    warnings?: string[];
+    importedCount?: number;
+    replacedCount?: number;
+    skippedCount?: number;
 }
 
 // Tipe untuk data yang disimpan di sessionStorage
@@ -160,6 +168,7 @@ export interface StoredDiagnosisResult {
     };
     timestamp: string;
     message: string;
+    loading_duration: number;
 }
 
 export interface MediaFileTemp {

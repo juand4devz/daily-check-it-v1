@@ -1,4 +1,3 @@
-// /diagnose/hasil/page.tsx
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -8,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
-  CheckCircle,
   MessageSquare,
   ArrowLeft,
   TrendingUp,
@@ -16,6 +14,8 @@ import {
   Clock,
   DollarSign,
   AlertCircle,
+  Loader2,
+  ScanText,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -31,6 +31,10 @@ export default function HasilDiagnosaPage() {
   const [diagnosisData, setDiagnosisData] = useState<StoredDiagnosisResult | null>(null);
   const [openSolutions, setOpenSolutions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingForum, setIsLoadingForum] = useState(false); // State baru untuk tombol forum
+
+  // Mengelola durasi loading yang ditangkap dari API
+  const [loadingDuration, setLoadingDuration] = useState<number | null>(null);
 
   // --- Mengelola Durasi Loading Modern ---
   const handleLoadingComplete = useCallback(() => {
@@ -48,11 +52,12 @@ export default function HasilDiagnosaPage() {
     try {
       const parsedData: StoredDiagnosisResult = JSON.parse(storedData);
       setDiagnosisData(parsedData);
+      setLoadingDuration(parsedData.loading_duration || 1500); // Gunakan durasi dari API, fallback ke 1.5s
 
-      // Setelah data di-parse, tunggu sebentar lalu selesaikan loading modern
-      setTimeout(() => {
-        handleLoadingComplete();
-      }, 1000); // Durasi loading modern 1 detik
+      // Catatan: Komponen ModernLoading sekarang mengelola sendiri timer,
+      // sehingga kita tidak perlu lagi setTimeout di sini.
+      // Kita hanya perlu mengatur `isLoading` menjadi `false`
+      // setelah `ModernLoading` memanggil `onComplete`.
 
     } catch (caughtError: unknown) {
       console.error("Gagal memparsing data dari sessionStorage:", caughtError);
@@ -63,7 +68,7 @@ export default function HasilDiagnosaPage() {
       toast.error(errorMessage);
       router.push("/diagnose");
     }
-  }, [router, handleLoadingComplete]);
+  }, [router]);
 
   // --- Mengelola Solusi yang Dibuka/Ditutup ---
   const toggleSolution = useCallback((kode: string) => {
@@ -77,26 +82,33 @@ export default function HasilDiagnosaPage() {
   // --- Penangan Diskusi di Forum ---
   const handleDiscussInForum = useCallback(() => {
     if (!diagnosisData) return;
+    setIsLoadingForum(true);
 
-    // Mengambil detail gejala yang dipilih dari data yang diterima
-    const selectedSymptomsForForum = diagnosisData.selectedGejalaDetails
-      .map((gejala: Gejala) => `${gejala.kode}: ${gejala.nama}`)
-      .join(", ");
+    const timer = setTimeout(() => {
+      // Mengambil detail gejala yang dipilih dari data yang diterima
+      const selectedSymptomsForForum = diagnosisData.selectedGejalaDetails
+        .map((gejala: Gejala) => `${gejala.kode}: ${gejala.nama}`)
+        .join(", ");
 
-    const topDiagnosisForForum = diagnosisData.result
-      .sort((a, b) => b.belief - a.belief)
-      .slice(0, 3)
-      .map((r) => `${r.nama} (${(r.belief * 100).toFixed(1)}%)`)
-      .join(", ");
+      const topDiagnosisForForum = diagnosisData.result
+        .sort((a, b) => b.belief - a.belief)
+        .slice(0, 3)
+        .map((r) => `${r.nama} (${(r.belief * 100).toFixed(1)}%)`)
+        .join(", ");
 
-    const forumPostData = {
-      symptoms: selectedSymptomsForForum,
-      diagnosis: topDiagnosisForForum,
-      timestamp: diagnosisData.timestamp,
-    };
+      const forumPostData = {
+        symptoms: selectedSymptomsForForum,
+        diagnosis: topDiagnosisForForum,
+        timestamp: diagnosisData.timestamp,
+      };
 
-    sessionStorage.setItem("forumPostData", JSON.stringify(forumPostData));
-    router.push("/forum/new");
+      sessionStorage.setItem("forumPostData", JSON.stringify(forumPostData));
+      router.push("/forum/new");
+
+      // setIsLoadingForum(false);
+    }, 500); // Durasi 0.5 detik untuk loading tombol
+
+    return () => clearTimeout(timer);
   }, [diagnosisData, router]);
 
   // --- Fungsi Pembantu untuk Gaya UI ---
@@ -128,7 +140,7 @@ export default function HasilDiagnosaPage() {
   }, []);
 
   if (isLoading || !diagnosisData) {
-    return <ModernLoading onComplete={handleLoadingComplete} duration={2000} />;
+    return <ModernLoading duration={loadingDuration || 1500} onComplete={handleLoadingComplete} />;
   }
 
   const topResults = diagnosisData.result.sort((a, b) => b.belief - a.belief).slice(0, 3);
@@ -143,7 +155,7 @@ export default function HasilDiagnosaPage() {
         </Button>
 
         <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-          <CheckCircle className="h-8 w-8 text-green-600" />
+          <ScanText className="h-10 w-10" />
           Hasil Diagnosa Kerusakan
         </h1>
         <p className="text-gray-600">
@@ -190,6 +202,7 @@ export default function HasilDiagnosaPage() {
                           </div>
                           <h3 className="font-semibold text-lg mb-2">{kerusakanDetail.nama}</h3>
 
+                          {/* Deskripsi sudah dihandle oleh ReactMarkdown */}
                           {kerusakanDetail.deskripsi && (
                             <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">{kerusakanDetail.deskripsi}</p>
                           )}
@@ -296,9 +309,18 @@ export default function HasilDiagnosaPage() {
         <div className="xl:col-span-1 lg:col-span-1 space-y-6 order-1 lg:order-2">
           {topResults.length > 0 && (
             <div className="space-y-3">
-              <Button onClick={handleDiscussInForum} className="w-full cursor-pointer">
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Diskusikan di Forum
+              <Button onClick={handleDiscussInForum} disabled={isLoadingForum} className="w-full cursor-pointer">
+                {isLoadingForum ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Memuat...
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Diskusikan di Forum
+                  </>
+                )}
               </Button>
               <Button variant="outline" onClick={() => router.push("/diagnose")} className="w-full cursor-pointer">
                 Diagnosa Ulang

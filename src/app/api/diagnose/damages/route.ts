@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../auth";
 import { getUserById } from "@/lib/firebase/service";
-import { getAllKerusakan, addKerusakan, getKerusakanByKode } from "@/lib/firebase/diagnose-service";
+import { getAllKerusakan, addKerusakan, getKerusakanByKode, bulkDeleteKerusakan } from "@/lib/firebase/diagnose-service";
 import { Kerusakan } from "@/types/diagnose";
 
 // --- GET Request Handler (for fetching all damages) ---
@@ -55,6 +55,33 @@ export async function POST(request: NextRequest) {
     } catch (caughtError: unknown) {
         console.error("Error adding kerusakan:", caughtError);
         const errorMessage = "Server error when adding kerusakan.";
+        return NextResponse.json({ status: false, statusCode: 500, message: errorMessage }, { status: 500 });
+    }
+}
+
+// --- DELETE Request Handler (untuk bulk delete) ---
+export async function DELETE(request: NextRequest) {
+    const session = await auth();
+    if (!session?.user?.id) {
+        return NextResponse.json({ status: false, statusCode: 401, message: "Unauthorized: User not authenticated." }, { status: 401 });
+    }
+    const user = await getUserById(session.user.id);
+    if (!user || user.role !== 'admin') {
+        return NextResponse.json({ status: false, statusCode: 403, message: "Forbidden: Only administrators can delete damages." }, { status: 403 });
+    }
+
+    try {
+        const { ids } = await request.json();
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return NextResponse.json({ status: false, statusCode: 400, message: "Array ID kerusakan diperlukan untuk penghapusan." }, { status: 400 });
+        }
+
+        await bulkDeleteKerusakan(ids);
+
+        return NextResponse.json({ status: true, statusCode: 200, message: `${ids.length} kerusakan berhasil dihapus.` });
+    } catch (caughtError: unknown) {
+        console.error("Terjadi kesalahan saat menghapus kerusakan secara massal:", caughtError);
+        const errorMessage = "Terjadi kesalahan server saat menghapus kerusakan.";
         return NextResponse.json({ status: false, statusCode: 500, message: errorMessage }, { status: 500 });
     }
 }

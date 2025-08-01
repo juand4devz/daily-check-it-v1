@@ -4,14 +4,20 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Fuse from "fuse.js";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Edit, Trash2, DollarSign, Clock, AlertTriangle, Download, Upload, Search, RefreshCw, Loader2, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import type { Kerusakan, ApiResponse } from "@/types/diagnose";
+import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Label as ChartLabel } from 'recharts';
+import KerusakanPageSkeleton from "./loading";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 
 const tingkatKerusakanOptions: Array<Kerusakan["tingkat_kerusakan"]> = ["Ringan", "Sedang", "Berat"];
 
@@ -41,12 +47,16 @@ export default function KerusakanPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isImporting, setIsImporting] = useState(false);
     const [isSendingImport, setIsSendingImport] = useState(false);
+    const [selectedItems, setSelectedItems] = useState<string[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const router = useRouter();
+    const [errorFetching, setErrorFetching] = useState<string | null>(null);
 
     const loadData = useCallback(async (): Promise<void> => {
         try {
             setIsLoading(true);
+            setErrorFetching(null);
+
             const response = await fetch("/api/diagnose/damages");
             const responseData: ApiResponse<Kerusakan[]> = await response.json();
 
@@ -75,10 +85,9 @@ export default function KerusakanPage() {
         loadData();
     }, [loadData]);
 
-    // Menggunakan Fuse.js untuk pencarian
     const fuse = useMemo(() => {
         const options = {
-            keys: ['kode', 'nama', 'deskripsi', 'tingkat_kerusakan'],
+            keys: ['kode', 'nama', 'deskripsi', 'tingkat_kerusakan', 'gejala_terkait'],
             threshold: 0.3,
         };
         return new Fuse(kerusakanList, options);
@@ -114,6 +123,49 @@ export default function KerusakanPage() {
                         }
 
                         await loadData();
+                        toast.success("Kerusakan berhasil dihapus.");
+                    } catch (caughtError: unknown) {
+                        console.error("Error deleting:", caughtError);
+                        let errorMessage = "Gagal menghapus kerusakan.";
+                        if (caughtError instanceof Error) {
+                            errorMessage = caughtError.message;
+                        }
+                        toast.error(errorMessage);
+                    }
+                },
+            },
+            cancel: {
+                label: "Batal",
+                onClick: () => toast.dismiss(),
+            },
+        });
+    };
+
+    const handleBulkDelete = async (): Promise<void> => {
+        if (selectedItems.length === 0) {
+            toast.info("Tidak ada item yang dipilih untuk dihapus.");
+            return;
+        }
+
+        toast("Konfirmasi Hapus Massal", {
+            description: `Apakah Anda yakin ingin menghapus ${selectedItems.length} kerusakan? Tindakan ini tidak dapat dibatalkan.`,
+            action: {
+                label: "Hapus",
+                onClick: async () => {
+                    try {
+                        const response = await fetch("/api/diagnose/damages", {
+                            method: "DELETE",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ ids: selectedItems }),
+                        });
+
+                        const responseData: ApiResponse<any> = await response.json();
+                        if (!response.ok || !responseData.status) {
+                            throw new Error(responseData.message || `Gagal menghapus kerusakan: ${response.status}`);
+                        }
+
+                        await loadData();
+                        setSelectedItems([]);
                         toast.success("Kerusakan berhasil dihapus.");
                     } catch (caughtError: unknown) {
                         console.error("Error deleting:", caughtError);
@@ -351,18 +403,48 @@ export default function KerusakanPage() {
 
     const stats = getStatistics();
 
+    // Data untuk Bar Chart
+    const chartData = useMemo(() => {
+        const counts = kerusakanList.reduce((acc, item) => {
+            acc[item.tingkat_kerusakan] = (acc[item.tingkat_kerusakan] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+
+        return tingkatKerusakanOptions.map(tingkat => ({
+            name: tingkat,
+            count: counts[tingkat] || 0
+        }));
+    }, [kerusakanList]);
+
+    const isAllSelected = selectedItems.length === filteredData.length && filteredData.length > 0;
+
+    const toggleAll = (checked: boolean) => {
+        if (checked) {
+            setSelectedItems(filteredData.map(item => item.id!));
+        } else {
+            setSelectedItems([]);
+        }
+    };
+
+    const toggleItem = (id: string, checked: boolean) => {
+        setSelectedItems(prev =>
+            checked ? [...prev, id] : prev.filter(item => item !== id)
+        );
+    };
+
+
     if (isLoading || isSendingImport) {
+        return <KerusakanPageSkeleton />;
+    }
+
+    if (errorFetching) {
         return (
-            <div className="container mx-auto px-4 py-8 ">
-                <div className="animate-pulse space-y-6">
-                    <div className="h-8 bg-gray-200 dark:bg-zinc-800 rounded w-1/3"></div>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        {Array.from({ length: 4 }).map((_, i) => (
-                            <div key={i} className="h-24 bg-gray-200 dark:bg-zinc-800 rounded"></div>
-                        ))}
-                    </div>
-                    <div className="h-96 bg-gray-200 dark:bg-zinc-800 rounded"></div>
-                </div>
+            <div className="container mx-auto px-4 py-8">
+                <Alert variant="destructive" className="mb-4">
+                    <WifiOff className="h-4 w-4" />
+                    <AlertTitle>Kesalahan Data!</AlertTitle>
+                    <AlertDescription>{errorFetching}</AlertDescription>
+                </Alert>
             </div>
         );
     }
@@ -382,224 +464,269 @@ export default function KerusakanPage() {
                         {isImporting || isSendingImport ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
                         Import
                     </Button>
-                    <Button variant="outline" onClick={handleExport}>
+                    <Button variant="outline" onClick={handleExport} disabled={isLoading}>
                         <Download className="mr-2 h-4 w-4" />
                         Export
                     </Button>
-                    <Button onClick={() => router.push("/admin/damages/add")}>
+                    <Button onClick={() => router.push("/admin/damages/add")} disabled={isLoading}>
                         <Plus className="mr-2 h-4 w-4" />
                         Tambah Kerusakan
                     </Button>
                 </div>
             </div>
 
-            {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground">Total Kerusakan</p>
-                                <p className="text-2xl font-bold">{stats.total}</p>
-                            </div>
-                            <AlertTriangle className="h-8 w-8 text-blue-600" />
-                        </div>
-                    </CardContent>
-                </Card>
+            {/* Main Content Tabs */}
+            <Tabs defaultValue="statistics" className="w-full">
+                <div className="flex flex-col md:flex-row items-center justify-between mb-4 gap-4">
+                    <TabsList className="w-full md:w-auto">
+                        <TabsTrigger value="statistics">Statistik</TabsTrigger>
+                        <TabsTrigger value="table">Data</TabsTrigger>
+                    </TabsList>
+                </div>
 
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground">Kerusakan Ringan</p>
-                                <p className="text-2xl font-bold text-green-600">{stats.byTingkat.Ringan || 0}</p>
-                            </div>
-                            <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                                <div className="h-4 w-4 rounded-full bg-green-600"></div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground">Kerusakan Berat</p>
-                                <p className="text-2xl font-bold text-red-600">{stats.byTingkat.Berat || 0}</p>
-                            </div>
-                            <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
-                                <div className="h-4 w-4 rounded-full bg-red-600"></div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground">Rata-rata Probabilitas</p>
-                                <p className="text-2xl font-bold">{stats.avgProbability.toFixed(3)}</p>
-                            </div>
-                            <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
-                                <div className="h-4 w-4 rounded-full bg-purple-600"></div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Filters */}
-            <Card className="mb-6">
-                <CardContent className="p-6">
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <div className="flex-1 relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                            <Input
-                                placeholder="Cari kerusakan berdasarkan kode, nama, atau deskripsi..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-10"
-                            />
-                        </div>
-                        <Select value={filterTingkat} onValueChange={setFilterTingkat}>
-                            <SelectTrigger className="w-full md:w-48">
-                                <SelectValue placeholder="Filter tingkat" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">Semua Tingkat</SelectItem>
-                                {tingkatKerusakanOptions.map((tingkat) => (
-                                    <SelectItem key={tingkat} value={tingkat}>
-                                        {tingkat}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                <TabsContent value="statistics" className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <Card>
+                            <CardContent className="p-6">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-muted-foreground">Total Kerusakan</p>
+                                        <p className="text-2xl font-bold">{stats.total}</p>
+                                    </div>
+                                    <AlertTriangle className="h-8 w-8 text-blue-600" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="p-6">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-muted-foreground">Kerusakan Ringan</p>
+                                        <p className="text-2xl font-bold text-green-600">{stats.byTingkat.Ringan || 0}</p>
+                                    </div>
+                                    <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                                        <div className="h-4 w-4 rounded-full bg-green-600"></div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="p-6">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-muted-foreground">Kerusakan Berat</p>
+                                        <p className="text-2xl font-bold text-red-600">{stats.byTingkat.Berat || 0}</p>
+                                    </div>
+                                    <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center">
+                                        <div className="h-4 w-4 rounded-full bg-red-600"></div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="p-6">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-muted-foreground">Rata-rata Probabilitas</p>
+                                        <p className="text-2xl font-bold">{stats.avgProbability.toFixed(3)}</p>
+                                    </div>
+                                    <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
+                                        <div className="h-4 w-4 rounded-full bg-purple-600"></div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
-                </CardContent>
-            </Card>
 
-            {/* Data Table */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Daftar Kerusakan ({filteredData.length})</CardTitle>
-                    <CardDescription>Kelola data kerusakan yang digunakan dalam sistem diagnosa</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {isLoading || isSendingImport ? (
-                        <div className="flex justify-center items-center h-48">
-                            <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Kode</TableHead>
-                                        <TableHead>Nama & Deskripsi</TableHead>
-                                        <TableHead>Tingkat</TableHead>
-                                        <TableHead>Probabilitas</TableHead>
-                                        <TableHead>Info Perbaikan</TableHead>
-                                        <TableHead>Gejala Terkait</TableHead>
-                                        <TableHead>Aksi</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filteredData.length === 0 ? (
+                    <Card className="mt-6">
+                        <CardHeader>
+                            <CardTitle>Distribusi Tingkat Kerusakan</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="h-[300px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="name" />
+                                        <YAxis>
+                                            <ChartLabel value="Jumlah Kerusakan" angle={-90} position="insideLeft" style={{ textAnchor: 'middle' }} />
+                                        </YAxis>
+                                        <Tooltip />
+                                        <Bar dataKey="count" fill="#8884d8" name="Jumlah Kerusakan" />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="table" className="mt-4">
+                    <Card>
+                        <CardHeader>
+                            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                                <div>
+                                    <CardTitle>Daftar Kerusakan ({filteredData.length})</CardTitle>
+                                    <CardDescription>Kelola data kerusakan yang digunakan dalam sistem diagnosa</CardDescription>
+                                </div>
+                                <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+                                    <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={handleBulkDelete}
+                                        disabled={selectedItems.length === 0 || isLoading || isSendingImport}
+                                        className={cn("transition-all duration-300", selectedItems.length > 0 ? "scale-100 opacity-100" : "scale-0 opacity-0")}
+                                    >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Hapus Terpilih ({selectedItems.length})
+                                    </Button>
+                                    <div className="flex-1 relative">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                                        <Input
+                                            placeholder="Cari kerusakan..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="pl-10 w-full"
+                                        />
+                                    </div>
+                                    <Select value={filterTingkat} onValueChange={setFilterTingkat}>
+                                        <SelectTrigger className="w-full md:w-48">
+                                            <SelectValue placeholder="Filter tingkat" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">Semua Tingkat</SelectItem>
+                                            {tingkatKerusakanOptions.map((tingkat) => (
+                                                <SelectItem key={tingkat} value={tingkat}>
+                                                    {tingkat}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="overflow-x-auto">
+                                <Table>
+                                    <TableHeader>
                                         <TableRow>
-                                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                                                {searchQuery || filterTingkat !== "all"
-                                                    ? "Tidak ada kerusakan yang sesuai dengan filter"
-                                                    : "Belum ada data kerusakan"}
-                                            </TableCell>
+                                            <TableHead className="w-[50px]">
+                                                <Checkbox
+                                                    checked={isAllSelected}
+                                                    onCheckedChange={(checked) => toggleAll(!!checked)}
+                                                    aria-label="Pilih semua"
+                                                />
+                                            </TableHead>
+                                            <TableHead>Kode</TableHead>
+                                            <TableHead>Nama & Deskripsi</TableHead>
+                                            <TableHead>Tingkat</TableHead>
+                                            <TableHead>Probabilitas</TableHead>
+                                            <TableHead>Info Perbaikan</TableHead>
+                                            <TableHead>Gejala Terkait</TableHead>
+                                            <TableHead>Aksi</TableHead>
                                         </TableRow>
-                                    ) : (
-                                        filteredData.map((item) => (
-                                            <TableRow key={item.id} className="hover:bg-muted/50">
-                                                <TableCell>
-                                                    <Badge variant="outline" className="font-mono">
-                                                        {item.kode}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="max-w-xs">
-                                                    <div>
-                                                        <p className="font-medium line-clamp-1">{item.nama}</p>
-                                                        <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{item.deskripsi}</p>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge className={getTingkatColor(item.tingkat_kerusakan)}>
-                                                        <AlertTriangle className="h-3 w-3 mr-1" />
-                                                        {item.tingkat_kerusakan}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="text-center">
-                                                        <div className="font-mono text-sm font-medium">{item.prior_probability.toFixed(3)}</div>
-                                                        <div className="text-xs text-muted-foreground">
-                                                            {(item.prior_probability * 100).toFixed(1)}%
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="space-y-1 text-xs">
-                                                        {item.estimasi_biaya && (
-                                                            <div className="flex items-center gap-1 text-muted-foreground">
-                                                                <DollarSign className="h-3 w-3" />
-                                                                <span className="truncate max-w-24" title={item.estimasi_biaya}>
-                                                                    {item.estimasi_biaya}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        {item.waktu_perbaikan && (
-                                                            <div className="flex items-center gap-1 text-muted-foreground">
-                                                                <Clock className="h-3 w-3" />
-                                                                <span>{item.waktu_perbaikan}</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {item.gejala_terkait.slice(0, 3).map((gejala) => (
-                                                            <Badge key={gejala} variant="secondary" className="text-xs">
-                                                                {gejala}
-                                                            </Badge>
-                                                        ))}
-                                                        {item.gejala_terkait.length > 3 && (
-                                                            <Badge variant="secondary" className="text-xs">
-                                                                +{item.gejala_terkait.length - 3}
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex gap-1">
-                                                        <Button variant="ghost" size="sm" onClick={() => handleEdit(item)} className="h-8 w-8 p-0">
-                                                            <Edit className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => item.id && handleDelete(item.id, item.nama)}
-                                                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredData.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                                                    {searchQuery || filterTingkat !== "all"
+                                                        ? "Tidak ada kerusakan yang sesuai dengan filter"
+                                                        : "Belum ada data kerusakan"}
                                                 </TableCell>
                                             </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                                        ) : (
+                                            filteredData.map((item) => (
+                                                <TableRow key={item.id} className="hover:bg-muted/50">
+                                                    <TableCell>
+                                                        <Checkbox
+                                                            checked={selectedItems.includes(item.id!)}
+                                                            onCheckedChange={(checked) => toggleItem(item.id!, !!checked)}
+                                                            aria-label={`Pilih item ${item.kode}`}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline" className="font-mono">
+                                                            {item.kode}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="max-w-xs">
+                                                        <div>
+                                                            <p className="font-medium line-clamp-1">{item.nama}</p>
+                                                            <p className="text-sm text-muted-foreground line-clamp-2 mt-1">{item.deskripsi}</p>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge className={getTingkatColor(item.tingkat_kerusakan)}>
+                                                            <AlertTriangle className="h-3 w-3 mr-1" />
+                                                            {item.tingkat_kerusakan}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="text-center">
+                                                            <div className="font-mono text-sm font-medium">{item.prior_probability.toFixed(3)}</div>
+                                                            <div className="text-xs text-muted-foreground">
+                                                                {(item.prior_probability * 100).toFixed(1)}%
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="space-y-1 text-xs">
+                                                            {item.estimasi_biaya && (
+                                                                <div className="flex items-center gap-1 text-muted-foreground">
+                                                                    <DollarSign className="h-3 w-3" />
+                                                                    <span className="truncate max-w-24" title={item.estimasi_biaya}>
+                                                                        {item.estimasi_biaya}
+                                                                    </span>
+                                                                </div>
+                                                            )}
+                                                            {item.waktu_perbaikan && (
+                                                                <div className="flex items-center gap-1 text-muted-foreground">
+                                                                    <Clock className="h-3 w-3" />
+                                                                    <span>{item.waktu_perbaikan}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {item.gejala_terkait.slice(0, 3).map((gejala) => (
+                                                                <Badge key={gejala} variant="secondary" className="text-xs">
+                                                                    {gejala}
+                                                                </Badge>
+                                                            ))}
+                                                            {item.gejala_terkait.length > 3 && (
+                                                                <Badge variant="secondary" className="text-xs">
+                                                                    +{item.gejala_terkait.length - 3}
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex gap-1">
+                                                            <Button variant="ghost" size="sm" onClick={() => handleEdit(item)} className="h-8 w-8 p-0">
+                                                                <Edit className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => item.id && handleDelete(item.id, item.nama)}
+                                                                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
 
-            {/* Hidden file input */}
             <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} className="hidden" />
         </div>
     );

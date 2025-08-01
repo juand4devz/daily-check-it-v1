@@ -1,4 +1,3 @@
-// /diagnose/page.tsx
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -17,7 +16,6 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Loader2,
-  Stethoscope,
   Search,
   Filter,
   AlertTriangle,
@@ -25,6 +23,7 @@ import {
   Check,
   SearchCheckIcon,
   WifiOff,
+  ScanSearch,
 } from "lucide-react";
 import Image from "next/image";
 import Fuse from "fuse.js";
@@ -56,7 +55,7 @@ const GejalaCardSkeleton = () => (
 // --- Komponen Utama ---
 export default function DiagnosaPage() {
   const router = useRouter();
-  const { data: status } = useSession();
+  const { status } = useSession();
 
   const [selectedGejala, setSelectedGejala] = useState<Gejala[]>([]);
   const [isLoadingDiagnose, setIsLoadingDiagnose] = useState(false);
@@ -183,9 +182,9 @@ export default function DiagnosaPage() {
         errorMessage = `Terjadi kesalahan saat memproses diagnosa: ${caughtError.message}.`;
       }
       toast.error(errorMessage);
-    } finally {
-      setIsLoadingDiagnose(false);
-    }
+    }  // finally {
+    // setIsLoadingDiagnose(false);
+    // }
   };
 
   // --- Logika Pencarian dan Penyaringan dengan Fuse.js ---
@@ -227,7 +226,7 @@ export default function DiagnosaPage() {
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-          <Stethoscope className="h-8 w-8 text-blue-600" />
+          <ScanSearch className="h-10 w-10" />
           Sistem Diagnosa Kerusakan Komputer
         </h1>
         <p className="text-gray-600">

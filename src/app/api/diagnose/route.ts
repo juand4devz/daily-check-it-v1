@@ -1,4 +1,3 @@
-// /app/api/diagnose/route.ts
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../auth";
 import { getAllKerusakan } from "@/lib/firebase/diagnose-service";
@@ -195,6 +194,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: "Unauthorized: User not authenticated." }, { status: 401 });
   }
 
+  const startTime = Date.now();
+
   try {
     const body: { gejala: string[]; perangkat?: string; gejalaList: Gejala[] } = await request.json();
     const { gejala: selectedSymptomCodes, perangkat, gejalaList: gejalaListClient } = body;
@@ -249,7 +250,11 @@ export async function POST(request: NextRequest) {
 
     const dominantCategory = Object.entries(categoryCount).sort(([, a], [, b]) => b - a)[0]?.[0] || "Mixed";
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const elapsedTime = Date.now() - startTime;
+    const requiredDelay = 1500; // 1.5 seconds
+    const delay = Math.max(0, requiredDelay - elapsedTime);
+
+    await new Promise((resolve) => setTimeout(resolve, delay));
 
     return NextResponse.json({
       input: selectedSymptomCodes,
@@ -272,6 +277,7 @@ export async function POST(request: NextRequest) {
       },
       timestamp: new Date().toISOString(),
       message: "Diagnosa berhasil diproses menggunakan Enhanced Dempster-Shafer Theory",
+      loading_duration: requiredDelay, // Tambahkan durasi loading ke respons
     });
   } catch (caughtError: unknown) {
     console.error("Terjadi kesalahan saat memproses diagnosa:", caughtError);

@@ -12,7 +12,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         return NextResponse.json({ status: false, statusCode: 401, message: "Unauthorized: User not authenticated." }, { status: 401 });
     }
 
-    const postId = params.id;
+    const postId = await params.id;
     const userId = session.user.id;
 
     try {

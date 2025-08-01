@@ -437,7 +437,7 @@ export default function ForumPage() {
                                 </CardContent>
                             </Card>
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                            <div className="grid sm:grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 3xl:grid-cols-4 4xl:grid-cols-4 gap-6">
                                 {filteredAndSortedPosts.map((post) => (
                                     <PostCard
                                         key={post.id}
