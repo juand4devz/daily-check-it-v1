@@ -30,6 +30,7 @@ import Fuse from "fuse.js";
 import { Gejala, Kerusakan, StoredDiagnosisResult } from "@/types/diagnose";
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // --- Konstanta ---
 const MAX_GEJALA_DEFAULT = 5;
@@ -39,13 +40,13 @@ const MIN_GEJALA = 1;
 const GejalaCardSkeleton = () => (
   <Card className="group animate-pulse transition-all duration-200 border-2 p-0 overflow-hidden">
     <div className="relative">
-      <div className="aspect-video relative overflow-hidden rounded-t-lg bg-gray-200 dark:bg-gray-700"></div>
+      <Skeleton className="aspect-video relative overflow-hidden rounded-t-lg"></Skeleton>
       <CardContent className="p-4">
         <div className="space-y-2">
-          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
-          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
-          <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+          <Skeleton className="h-4 rounded w-3/4"></Skeleton>
+          <Skeleton className="h-3 rounded w-1/3"></Skeleton>
+          <Skeleton className="h-3 rounded w-full"></Skeleton>
+          <Skeleton className="h-3 rounded w-2/3"></Skeleton>
         </div>
       </CardContent>
     </div>

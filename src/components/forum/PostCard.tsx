@@ -9,8 +9,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-// DropdownMenu imports are handled by PostActionsPopover internally now
-// import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import {
     MessageSquare,
     Heart,
@@ -44,7 +42,7 @@ import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { ReportDialog } from "@/components/shared/ReportDialog";
 import { UserProfileClickPopover } from "@/components/user/UserProfileClickPopover";
-import { PostActionsPopover } from "@/components/forum/PostActionsPopover"; // Import PostActionsPopover
+import { PostActionsPopover } from "@/components/forum/PostActionsPopover";
 
 interface PostCardProps {
     post: ForumPost;
@@ -155,12 +153,11 @@ export function PostCard({
                     break;
                 case "pin":
                 case "archive":
-                    // Aksi pin/archive sekarang memanggil API
-                    if (!isAdmin) { // Double check admin role
+                    if (!isAdmin) {
                         toast.error("Anda tidak memiliki izin untuk melakukan aksi ini.");
                         return;
                     }
-                    const response = await fetch(`/api/forum/posts/${post.id}/pin`, { // Panggil API baru
+                    const response = await fetch(`/api/forum/posts/${post.id}/pin`, {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ action: action, status: action === 'pin' ? !post.isPinned : !post.isArchived }),
@@ -168,7 +165,7 @@ export function PostCard({
                     const data = await response.json();
                     if (response.ok && data.status) {
                         toast.success(data.message);
-                        onPostAction?.(post.id, action); // Beri tahu parent (misal halaman listing)
+                        onPostAction?.(post.id, action);
                     } else {
                         toast.error("Gagal melakukan aksi", { description: data.message });
                     }
@@ -204,13 +201,12 @@ export function PostCard({
         <Card
             key={post.id}
             className="hover:shadow-lg transition-all duration-300 group py-0 overflow-hidden"
-        // Hapus onMouseDown/onClick dari Card utama
         >
             <div>
-                {/* Bagian gambar/thumbnail - sekarang ini yang bisa diklik untuk navigasi */}
+                {/* Bagian gambar/thumbnail yang bisa diklik untuk navigasi */}
                 <div
                     className="relative h-48 overflow-hidden cursor-pointer"
-                    onClick={() => router.push(`/forum/${post.id}`)} // Pindahkan navigasi ke sini
+                    onClick={() => router.push(`/forum/${post.id}`)}
                 >
                     {post.thumbnail ? (
                         <Image
@@ -252,11 +248,11 @@ export function PostCard({
                         </Badge>
                     )}
 
-                    {/* Popover Aksi: Pastikan event diblokir di dalamnya */}
+                    {/* Popover Aksi */}
                     <div
                         className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onMouseDown={(e) => e.stopPropagation()} // Ini sangat penting untuk menghentikan klik dari thumbnail/card
-                        onClick={(e) => e.stopPropagation()}     // Ini juga penting untuk menghentikan klik dari thumbnail/card
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => e.stopPropagation()}
                     >
                         <PostActionsPopover
                             post={post}
@@ -271,14 +267,14 @@ export function PostCard({
 
                 {/* Bagian konten kartu (di luar thumbnail) - klik ini juga untuk navigasi */}
                 <CardContent
-                    className="p-4 cursor-pointer" // Menambahkan cursor-pointer
-                    onClick={() => router.push(`/forum/${post.id}`)} // Pindahkan navigasi ke sini
+                    className="p-4 cursor-pointer"
+                    onClick={() => router.push(`/forum/${post.id}`)}
                 >
                     <UserProfileClickPopover userId={post.authorId}>
                         <div
                             className="flex items-start gap-3 mb-3 cursor-pointer"
-                            onMouseDown={(e) => e.stopPropagation()} // Pastikan ini menghentikan untuk popover user
-                            onClick={(e) => e.stopPropagation()}     // Pastikan ini menghentikan untuk popover user
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
                         >
                             <Avatar className="h-8 w-8">
                                 <AvatarImage src={post.authorAvatar || "/placeholder.svg"} />
@@ -310,9 +306,9 @@ export function PostCard({
                                     key={index}
                                     variant="outline"
                                     className="text-xs cursor-pointer hover:bg-blue-100"
-                                    onMouseDown={(e) => e.stopPropagation()} // Hentikan propagasi
+                                    onMouseDown={(e) => e.stopPropagation()}
                                     onClick={(e) => {
-                                        e.stopPropagation(); // Hentikan propagasi
+                                        e.stopPropagation();
                                         onTagClick?.(tag);
                                     }}
                                 >

@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
 
     try {
         const body = await request.json();
-        const { reportType, entityId, reason, details, postIdForReply, // Ambil postIdForReply dari body
+        const { reportType, entityId, reason, details, postIdForReply,
             entityTitle, entityContentPreview, entityUsername, entityAuthorId, entityAuthorUsername } = body;
 
         // Validasi dasar
@@ -77,7 +77,8 @@ export async function POST(request: NextRequest) {
                 const user = await getUserById(entityId);
                 if (user) {
                     finalEntityUsername = user.username;
-                    finalEntityLink = `/profile/${entityId}`;
+                    // PERBAIKAN: Mengubah path dari /profile menjadi /users
+                    finalEntityLink = `/users/${entityId}`;
                 } else {
                     console.error(`API Error: Reported user not found with ID: ${entityId}`);
                     return NextResponse.json({ status: false, statusCode: 404, message: "Reported user not found." }, { status: 404 });
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
         if (result.status) {
             return NextResponse.json({ status: true, statusCode: 201, message: result.message, reportId: result.reportId }, { status: 201 });
         } else {
-            console.error("Firestore service error (createReport failed):", result.message); // Logging lebih detail
+            console.error("Firestore service error (createReport failed):", result.message);
             return NextResponse.json({ status: false, statusCode: 500, message: result.message }, { status: 500 });
         }
     } catch (error) {
@@ -118,7 +119,6 @@ export async function POST(request: NextRequest) {
 // GET: Get all reports (Admin only)
 export async function GET(request: NextRequest) {
     const session = await auth();
-    // PENTING: Periksa peran admin di sini juga
     if (!session?.user?.id || session.user.role !== "admin") {
         return NextResponse.json({ status: false, statusCode: 403, message: "Forbidden: Only admins can view reports." }, { status: 403 });
     }
@@ -127,11 +127,10 @@ export async function GET(request: NextRequest) {
     const statusFilter = searchParams.get('status') as "pending" | "resolved" | "dismissed" | "all" || "all";
 
     try {
-        console.log(`API GET /admin/reports: Fetching reports with status filter: ${statusFilter}`); // Debugging API GET
+        console.log(`API GET /admin/reports: Fetching reports with status filter: ${statusFilter}`);
         const reports = await getReports(statusFilter);
         return NextResponse.json({ status: true, statusCode: 200, message: "Reports fetched successfully.", data: reports }, { status: 200 });
     } catch (error) {
-        // PENTING: Log error Firebase secara langsung untuk debugging
         if (error instanceof Error && 'code' in error && typeof (error as any).code === 'string') {
             console.error(`API Error fetching reports (FirebaseError: ${(error as any).code}):`, error);
         } else {

@@ -1016,7 +1016,7 @@ export default function ForumDetailPage() {
             <AlertTriangle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Post tidak ditemukan</h2>
             <p className="text-gray-600 mb-4">{error || "Post yang Anda cari tidak ada atau telah dihapus."}</p>
-            <Button type="button" onClick={() => router.push("/forum")}>
+            <Button type="button" variant="ghost" onClick={() => router.push("/forum")}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Kembali ke Forum
             </Button>
@@ -1027,9 +1027,9 @@ export default function ForumDetailPage() {
   }
 
   return (
-    <div className={`container mx-auto px-4 py-8 max-w-7xl`}>
+    <div className="px-4 py-8 w-full">
       <div className="flex items-center justify-between mb-6">
-        <Button type="button" variant="outline" onClick={() => router.push("/forum")}>
+        <Button type="button" variant="ghost" onClick={() => router.push("/forum")}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Kembali ke Forum
         </Button>
@@ -1072,7 +1072,7 @@ export default function ForumDetailPage() {
               ) : post ? (
                 <>
                   <div className="flex items-start justify-between">
-                    <Avatar className="h-12 w-12">
+                    <Avatar className="h-12 w-12 mr-3">
                       <AvatarImage src={post.authorAvatar || "/placeholder.svg"} />
                       <AvatarFallback>{post.authorUsername?.[0] || '?'}</AvatarFallback>
                     </Avatar>
@@ -1195,8 +1195,8 @@ export default function ForumDetailPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[400px]">
-                <div ref={highlightCommentRef} className="space-y-4 pr-4">
+              <div>
+                <div ref={highlightCommentRef} className="space-y-4">
                   {loadingPost ? (
                     Array.from({ length: 3 }).map((_, i) => <CommentSkeleton key={i} />)
                   ) : replies.length > 0 ? (
@@ -1232,14 +1232,14 @@ export default function ForumDetailPage() {
                     </div>
                   )}
                 </div>
-              </ScrollArea>
+              </div>
               {!loadingPost && userId && (
                 <div className="mt-6 border-t pt-4">
                   <div className="flex items-start gap-3">
-                    <Avatar className="h-10 w-10">
+                    {/* <Avatar className="h-10 w-10">
                       <AvatarImage src={avatar || "/placeholder.svg"} />
                       <AvatarFallback>{username?.[0] || '?'}</AvatarFallback>
-                    </Avatar>
+                    </Avatar> */}
                     <div className="flex-1">
                       <MarkdownEditor
                         textareaRef={mainReplyTextareaRef}
@@ -1276,6 +1276,7 @@ export default function ForumDetailPage() {
                         <div className="text-xs text-gray-500">Tekan Ctrl+Enter untuk mengirim cepat</div>
                         <Button
                           type="button"
+                          className="max-h-7"
                           onClick={() => handleSubmitReply(newReplyContent, mainCommentUploadState.uploadedData ? [mainCommentUploadState.uploadedData] : [])}
                           disabled={(!newReplyContent.trim() && !mainCommentUploadState.file) || submittingReply || mainCommentUploadState.uploading || (mainCommentUploadState.file && !mainCommentUploadState.uploadedData)}
                         >
@@ -1319,14 +1320,14 @@ export default function ForumDetailPage() {
         </div>
       </div>
       {/* Forum Post Edit Dialog */}
-      {post && userId && (isPostAuthor || isAdmin) && ( // Admin bisa edit post, tapi tidak bisa mark solution
+      {/* {post && userId && (isPostAuthor || isAdmin) && ( // Admin bisa edit post, tapi tidak bisa mark solution
         <ForumPostEditDialog
           postId={post.id}
           isPostAuthor={isPostAuthor} // Teruskan isPostAuthor
           isAdmin={isAdmin} // Teruskan isAdmin
           onEditSuccess={handleEditPostSuccess}
         />
-      )}
+      )} */}
       <ReportDialog
         isOpen={isPostReportDialogOpen}
         onOpenChange={setIsPostReportDialogOpen}

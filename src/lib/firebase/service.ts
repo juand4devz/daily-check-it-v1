@@ -16,7 +16,7 @@ import {
 } from "firebase/firestore";
 import { clientDb } from "./firebase-client";
 import bcrypt from "bcrypt";
-import type { Report, User } from "@/types/types";
+import type { Report, User, UserTokenData } from "@/types/types";
 import type { ForumPost, ForumReply, ForumBookmark, Notification, EmojiReactionKey } from "@/types/forum"; // Import new types
 
 // Constants for default user data
@@ -24,13 +24,184 @@ const DEFAULT_MAX_DAILY_TOKENS = 10;
 const DEFAULT_BIO = "Halo! Saya pengguna baru DailyCheckIt.";
 const DEFAULT_AVATAR_URL = "/placeholder.svg"; // A good default for new users
 
-// Helper function to get today's date in YYYY-MM-DD format
-function getTodayDateString(): string {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = (today.getMonth() + 1).toString().padStart(2, '0');
-    const day = today.getDate().toString().padStart(2, '0');
+export function getTodayDateString(): string {
+    const now = new Date();
+    // Offset WIB adalah +7 jam dari UTC
+    const wibOffset = 7 * 60 * 60 * 1000;
+    const nowWIB = new Date(now.getTime() + wibOffset);
+    const year = nowWIB.getUTCFullYear();
+    const month = (nowWIB.getUTCMonth() + 1).toString().padStart(2, '0');
+    const day = nowWIB.getUTCDate().toString().padStart(2, '0');
     return `${year}-${month}-${day}`;
+}
+
+export function isPast7AMWIB(): boolean {
+    const now = new Date();
+    const wibOffset = 7 * 60 * 60 * 1000;
+    const nowWIB = new Date(now.getTime() + wibOffset);
+    return nowWIB.getUTCHours() >= 7;
+}
+
+// --- NEW/UPDATED ADMIN SERVICE FUNCTIONS ---
+// Mengambil semua pengguna (digunakan di admin panel)
+export async function getAllUsers(): Promise<User[]> {
+    try {
+        const usersCollectionRef = collection(clientDb, "users");
+        const snapshot = await getDocs(usersCollectionRef);
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...(doc.data() as Omit<User, 'id'>)
+        }));
+    } catch (error) {
+        console.error("Error getting all users:", error);
+        return [];
+    }
+}
+
+// Memperbarui role atau status pengguna (digunakan di admin panel)
+export async function updateUserAdminAction(userId: string, data: Partial<User> & { resetTokens?: boolean }): Promise<{ status: boolean; message: string }> {
+    const userDocRef = doc(clientDb, "users", userId);
+    try {
+        const docSnapshot = await getDoc(userDocRef);
+        if (!docSnapshot.exists()) {
+            return { status: false, message: "Pengguna tidak ditemukan." };
+        }
+
+        const existingUser = docSnapshot.data() as User;
+        const updateData: Partial<User> = { updatedAt: new Date().toISOString() };
+
+        if (data.role !== undefined) updateData.role = data.role;
+        if (data.isBanned !== undefined) updateData.isBanned = data.isBanned;
+
+        if (data.resetTokens) {
+            updateData.dailyTokens = existingUser.maxDailyTokens || DEFAULT_MAX_DAILY_TOKENS;
+            updateData.totalUsage = 0;
+            updateData.lastResetDate = getTodayDateString();
+        }
+
+        await updateDoc(userDocRef, updateData);
+        return { status: true, message: "Pengguna berhasil diperbarui." };
+    } catch (error) {
+        console.error("Error updating user admin action:", error);
+        return { status: false, message: `Gagal memperbarui pengguna: ${(error as Error).message}` };
+    }
+}
+
+export async function manageUserTokens(
+    userId: string,
+    tokensUsed: number = 0,
+    action: 'decrement' | 'reset' = 'decrement'
+): Promise<{ status: boolean; message?: string; tokenData?: UserTokenData }> {
+    const userDocRef = doc(clientDb, "users", userId);
+
+    try {
+        const result = await runTransaction(clientDb, async (transaction) => {
+            const userDoc = await transaction.get(userDocRef);
+            if (!userDoc.exists()) {
+                throw new Error("Pengguna tidak ditemukan.");
+            }
+
+            const userData = userDoc.data() as User;
+            const todayDateWIB = getTodayDateString();
+
+            // Cek dan reset token harian secara transaksional
+            let { dailyTokens, lastResetDate, totalUsage, maxDailyTokens = DEFAULT_MAX_DAILY_TOKENS } = userData;
+
+            if (lastResetDate !== todayDateWIB && isPast7AMWIB()) {
+                dailyTokens = maxDailyTokens;
+                lastResetDate = todayDateWIB;
+            }
+
+            if (action === 'decrement') {
+                if (dailyTokens < tokensUsed) {
+                    throw new Error("Token harian tidak mencukupi.");
+                }
+                dailyTokens -= tokensUsed;
+                totalUsage += tokensUsed;
+            } else if (action === 'reset') {
+                dailyTokens = maxDailyTokens;
+                totalUsage = 0;
+            }
+
+            const updatedTokenData: UserTokenData = {
+                id: userId,
+                dailyTokens,
+                maxDailyTokens,
+                lastResetDate,
+                totalUsage,
+            };
+
+            transaction.update(userDocRef, {
+                dailyTokens,
+                totalUsage,
+                lastResetDate,
+                updatedAt: new Date().toISOString(),
+            });
+
+            return updatedTokenData;
+        });
+
+        return { status: true, message: "Token berhasil diperbarui.", tokenData: result };
+    } catch (error) {
+        console.error("Error managing user tokens:", error);
+        return { status: false, message: (error as Error).message };
+    }
+}
+
+// Menghapus pengguna secara permanen
+export async function deleteUser(userId: string): Promise<{ status: boolean; message: string }> {
+    const userDocRef = doc(clientDb, "users", userId);
+    try {
+        await deleteDoc(userDocRef);
+        return { status: true, message: "Pengguna berhasil dihapus." };
+    } catch (error) {
+        console.error("Error deleting user:", error);
+        return { status: false, message: `Gagal menghapus pengguna: ${(error as Error).message}` };
+    }
+}
+
+// Fungsi untuk memeriksa dan mereset token harian secara otomatis
+export async function checkAndResetDailyTokens(userId: string): Promise<{
+    updated: boolean;
+    tokenData: UserTokenData;
+}> {
+    const userDocRef = doc(clientDb, "users", userId);
+    const result = { updated: false, tokenData: {} as UserTokenData };
+
+    await runTransaction(clientDb, async (transaction) => {
+        const userDoc = await transaction.get(userDocRef);
+
+        if (!userDoc.exists()) {
+            throw new Error("User not found.");
+        }
+
+        const userData = userDoc.data() as User;
+        const todayDateWIB = getTodayDateString();
+
+        let { dailyTokens, lastResetDate, totalUsage, maxDailyTokens = DEFAULT_MAX_DAILY_TOKENS } = userData;
+
+        if (lastResetDate !== todayDateWIB && isPast7AMWIB()) {
+            dailyTokens = maxDailyTokens;
+            lastResetDate = todayDateWIB;
+            result.updated = true;
+
+            transaction.update(userDocRef, {
+                dailyTokens,
+                lastResetDate,
+                updatedAt: new Date().toISOString(),
+            });
+        }
+
+        result.tokenData = {
+            id: userId,
+            dailyTokens,
+            maxDailyTokens,
+            lastResetDate,
+            totalUsage,
+        };
+    });
+
+    return result;
 }
 
 export async function getRetriveData(collectionName: string) {
@@ -198,47 +369,6 @@ export async function loginWithGoogle(data: { email: string; name?: string | nul
 export async function loginWithGithub(data: { email: string; name?: string | null; image?: string | null }): Promise<User> {
     const userEmail = data.email || `${data.name?.replace(/\s/g, '').toLowerCase() || Math.random().toString(36).substring(7)}@github.com`;
     return handleOAuthLogin(userEmail, data.name || userEmail.split('@')[0], "github", data.image);
-}
-
-export async function updateUserTokens(userId: string, tokensUsed: number): Promise<{ status: boolean; message?: string }> {
-    const userDocRef = doc(clientDb, "users", userId);
-    const userDoc = await getDoc(userDocRef);
-
-    if (!userDoc.exists()) {
-        return { status: false, message: "Pengguna tidak ditemukan." };
-    }
-
-    const userData = userDoc.data() as User;
-    const todayDate = getTodayDateString();
-
-    let currentDailyTokens = userData.dailyTokens;
-    let currentTotalUsage = userData.totalUsage;
-    let lastResetDate = userData.lastResetDate;
-
-    if (lastResetDate !== todayDate) {
-        currentDailyTokens = userData.maxDailyTokens || DEFAULT_MAX_DAILY_TOKENS;
-        lastResetDate = todayDate;
-    }
-
-    if (currentDailyTokens < tokensUsed) {
-        return { status: false, message: "Token harian tidak mencukupi." };
-    }
-
-    currentDailyTokens -= tokensUsed;
-    currentTotalUsage += tokensUsed;
-
-    try {
-        await updateDoc(userDocRef, {
-            dailyTokens: currentDailyTokens,
-            totalUsage: currentTotalUsage,
-            lastResetDate: lastResetDate,
-            updatedAt: new Date().toISOString(),
-        });
-        return { status: true, message: "Token berhasil diperbarui." };
-    } catch (error) {
-        console.error("Error updating user tokens:", error);
-        return { status: false, message: "Gagal memperbarui token." };
-    }
 }
 
 export async function updateUserProfile(userId: string, updatedFields: Partial<User>): Promise<{ status: boolean; message?: string }> {

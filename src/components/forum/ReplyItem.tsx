@@ -80,7 +80,7 @@ interface ReplyItemProps {
     allAvailableMentions: { id: string; username: string }[];
 }
 
-const COMMENT_TRUNCATE_LIMIT = 500;
+const COMMENT_TRUNCATE_LIMIT = 100;
 
 const highlightMentions = (text: string): string => {
     return text.replace(/@(\w+)/g, '<span class="text-blue-500 font-semibold">@$1</span>');
@@ -330,81 +330,90 @@ export function ReplyItem({
             className={cn(
                 reply.isSolution ? "border-green-200 border-2 bg-green-50/50 dark:bg-green-900/20" : "",
                 isHighlighted && "animate-highlight border-blue-500 border-2 shadow-lg",
-                "flex-col"
+                "flex-col pt-3 pb-4"
             )}
         >
-            <CardContent className="p-4">
+            <CardContent className="px-3 ">
                 <div className="flex gap-3">
-                    {!isNested && (
-                        <div className="flex flex-col items-center gap-1 mr-2">
-                            <Button
-                                type="button"
-                                variant={currentUserVoteStatus === "up" ? "default" : "ghost"}
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                onClick={() => onVote(reply.id, "up", currentUserVoteStatus)}
-                                disabled={!currentUserId}
-                            >
-                                <ChevronUp className="h-4 w-4" />
-                            </Button>
-                            <span className="text-sm font-medium text-center min-w-[2rem]">
-                                {reply.upvotes - reply.downvotes}
-                            </span>
-                            <Button
-                                type="button"
-                                variant={currentUserVoteStatus === "down" ? "default" : "ghost"}
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                                onClick={() => onVote(reply.id, "down", currentUserVoteStatus)}
-                                disabled={!currentUserId}
-                            >
-                                <ChevronDown className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    )}
-
                     <div className="flex-1">
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2 w-full">
-                                <UserProfileClickPopover userId={reply.authorId}>
-                                    <div
-                                        className="flex items-center gap-2 cursor-pointer"
-                                        onMouseDown={(e) => e.stopPropagation()}
-                                        onClick={(e) => e.stopPropagation()}
+                        <div className="flex items-center mb-4 gap-y-1">
+                            {!isNested && (
+                                <div className="flex flex-col items-center mr-3">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() => onVote(reply.id, "up", currentUserVoteStatus)}
+                                        disabled={!currentUserId}
+                                        className={`h-7 w-7 transition-colors duration-200 ${currentUserVoteStatus === "up"
+                                            ? "text-blue-500 hover:text-blue-600"
+                                            : "text-gray-400 hover:text-gray-500"
+                                            }`}
                                     >
-                                        <Avatar className={cn(isNested ? "h-7 w-7 border border-gray-300" : "h-9 w-9 border-2 border-blue-400")}>
-                                            <AvatarImage src={reply.authorAvatar || "/placeholder.svg"} />
-                                            <AvatarFallback className={cn(isNested ? "bg-gray-100 text-gray-600" : "bg-blue-200 text-blue-800 font-semibold")}>{reply.authorUsername?.[0] || '?'}</AvatarFallback>
-                                        </Avatar>
-                                        <span className="font-medium hover:underline">
-                                            {reply.authorUsername}
-                                        </span>
-                                    </div>
-                                </UserProfileClickPopover>
-                                <span className="text-sm text-gray-500 ml-2">
-                                    {formatTimeAgo(reply.createdAt)}
-                                </span>
-                                {reply.isSolution && (
-                                    <Badge className="bg-green-600 text-white">
-                                        <Award className="h-3 w-3 mr-1" />
-                                        Solusi
-                                    </Badge>
-                                )}
-                                {reply.isEdited && (
-                                    <Badge variant="outline" className="text-xs">
-                                        Diedit
-                                    </Badge>
-                                )}
+                                        <ChevronUp className="h-4 w-4" />
+                                    </Button>
+                                    <span className="text-sm font-medium text-center min-w-[2rem]">
+                                        {reply.upvotes - reply.downvotes}
+                                    </span>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() => onVote(reply.id, "down", currentUserVoteStatus)}
+                                        disabled={!currentUserId}
+                                        className={`h-7 w-7 p-0 transition-colors duration-200 ${currentUserVoteStatus === "down"
+                                            ? "text-blue-500 hover:text-blue-600"
+                                            : "text-gray-400 hover:text-gray-500"
+                                            }`}
+                                    >
+                                        <ChevronDown className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            )}
+                            <div className="flex items-center justify-between border p-4 w-full rounded-md">
+                                <div className="flex items-center gap-2 w-full">
+                                    <UserProfileClickPopover userId={reply.authorId}>
+                                        <div
+                                            className="flex items-center gap-2 cursor-pointer"
+                                            onMouseDown={(e) => e.stopPropagation()}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <Avatar className={cn(isNested ? "h-8 w-8 border border-gray-300" : "h-9 w-9 border-2 border-blue-400")}>
+                                                <AvatarImage src={reply.authorAvatar || "/placeholder.svg"} />
+                                                <AvatarFallback className={cn(isNested ? "bg-gray-100 text-gray-600" : "bg-blue-200 text-blue-800 font-semibold")}>{reply.authorUsername?.[0] || '?'}</AvatarFallback>
+                                            </Avatar>
+                                            <div className="flex flex-col ml-2">
+                                                <span className="font-medium hover:underline">
+                                                    {reply.authorUsername}
+                                                </span>
+                                                <span className="text-sm text-gray-500">
+                                                    {formatTimeAgo(reply.createdAt)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </UserProfileClickPopover>
+                                    {reply.isSolution && (
+                                        <Badge className="bg-green-600 text-white">
+                                            <Award className="h-3 w-3 mr-1" />
+                                            Solusi
+                                        </Badge>
+                                    )}
+                                    {reply.isEdited && (
+                                        <Badge variant="outline" className="text-xs">
+                                            Diedit
+                                        </Badge>
+                                    )}
+                                </div>
+                                <CommentActionsPopover
+                                    reply={reply}
+                                    isAuthor={isReplyAuthor}
+                                    onAction={onCommentAction}
+                                    currentUserId={currentUserId}
+                                    isAdmin={isAdmin}
+                                    postId={postId}
+                                    postTitle={postTitle}
+                                />
                             </div>
-                            <CommentActionsPopover
-                                reply={reply}
-                                isAuthor={isReplyAuthor}
-                                onAction={onCommentAction}
-                                currentUserId={currentUserId}
-                                isAdmin={isAdmin}
-                                postId={postId}
-                                postTitle={postTitle}
-                            />
                         </div>
 
                         <div className={
@@ -429,41 +438,43 @@ export function ReplyItem({
                         )}
 
                         {!isNested && (
-                            <div className="flex items-center gap-2 text-sm">
-                                {/* Tombol Popover Reaksi Utama */}
-                                <EmojiReactionPopover
-                                    onSelect={(selectedReactionKey) => onReaction(reply.id, selectedReactionKey, currentUserReaction)}
-                                    currentUserReaction={currentUserReaction}
-                                    replyReactions={reply.reactions || {}}
-                                    disabled={!currentUserId}
-                                />
-                                {/* Tampilkan reaksi-reaksi lain dari pengguna lain */}
-                                {EMOJI_REACTIONS.map((reaction) => {
-                                    const count = reply.reactions?.[reaction.key]?.length || 0;
-                                    const isReactedByCurrentUser = currentUserReaction === reaction.key;
-                                    const isReactedByOthers = count > 0 && !isReactedByCurrentUser;
+                            <div className="flex justify-between items-center gap-2 text-sm">
+                                <div className="flex space-x-2">
+                                    {/* Tombol Popover Reaksi Utama */}
+                                    <EmojiReactionPopover
+                                        onSelect={(selectedReactionKey) => onReaction(reply.id, selectedReactionKey, currentUserReaction)}
+                                        currentUserReaction={currentUserReaction}
+                                        replyReactions={reply.reactions || {}}
+                                        disabled={!currentUserId}
+                                    />
+                                    {/* Tampilkan reaksi-reaksi lain dari pengguna lain */}
+                                    {EMOJI_REACTIONS.map((reaction) => {
+                                        const count = reply.reactions?.[reaction.key]?.length || 0;
+                                        const isReactedByCurrentUser = currentUserReaction === reaction.key;
+                                        const isReactedByOthers = count > 0 && !isReactedByCurrentUser;
 
-                                    if (!isReactedByOthers) return null;
+                                        if (!isReactedByOthers) return null;
 
-                                    return (
-                                        <Button
-                                            type="button"
-                                            key={reaction.key}
-                                            variant="outline"
-                                            size="sm"
-                                            className={cn(
-                                                "h-6 px-2 text-xs flex items-center gap-1 opacity-80",
-                                                isReactedByOthers && "bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-gray-200",
-                                                "cursor-default"
-                                            )}
-                                            disabled={true}
-                                            aria-label={`${count} reaksi ${reaction.label}`}
-                                        >
-                                            {reaction.emoji}
-                                            <span className="font-medium">{count}</span>
-                                        </Button>
-                                    );
-                                })}
+                                        return (
+                                            <Button
+                                                type="button"
+                                                key={reaction.key}
+                                                variant="outline"
+                                                size="sm"
+                                                className={cn(
+                                                    "h-6 px-2 text-xs flex items-center gap-1 opacity-80",
+                                                    isReactedByOthers && "bg-gray-100 text-gray-700 dark:bg-zinc-800 dark:text-gray-200",
+                                                    "cursor-default"
+                                                )}
+                                                disabled={true}
+                                                aria-label={`${count} reaksi ${reaction.label}`}
+                                            >
+                                                {reaction.emoji}
+                                                <span className="font-medium">{count}</span>
+                                            </Button>
+                                        );
+                                    })}
+                                </div>
 
                                 {/* Tombol Tandai Solusi (kondisional) */}
                                 {canMarkSolution && ( // Hanya tampil jika pengguna berhak (penulis post) DAN postnya adalah 'pertanyaan'
@@ -548,7 +559,7 @@ export function ReplyItem({
                         )}
 
                         {!isNested && currentUserId && (
-                            <div className="mt-4 border-t pt-4">
+                            <div className="pt-4">
                                 <div className="flex items-start gap-3">
                                     <div className="flex-1 relative">
                                         {!isInlineReplyExpanded ? (
@@ -558,7 +569,7 @@ export function ReplyItem({
                                                     value={inlineReplyContent}
                                                     onChange={(e) => setInlineReplyContent(e.target.value)}
                                                     onFocus={() => setIsInlineReplyExpanded(true)}
-                                                    className="flex-1"
+                                                    className="flex-1 max-h-7"
                                                     disabled={isSubmittingReply}
                                                 />
                                                 <Button
@@ -566,7 +577,7 @@ export function ReplyItem({
                                                     size="sm"
                                                     onClick={handleReplySubmit}
                                                     disabled={(!inlineReplyContent.trim() && inlineReplyMediaFiles.length === 0) || isSubmittingReply}
-                                                    className="shrink-0"
+                                                    className="shrink-0 max-h-7 max-w-7"
                                                 >
                                                     {isSubmittingReply ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                                                     <span className="sr-only">Kirim</span>
@@ -638,6 +649,7 @@ export function ReplyItem({
                                                     <div className="flex gap-2">
                                                         <Button
                                                             type="button"
+                                                            className="max-h-7"
                                                             variant="outline"
                                                             size="sm"
                                                             onClick={() => {
@@ -653,6 +665,7 @@ export function ReplyItem({
                                                         </Button>
                                                         <Button
                                                             type="button"
+                                                            className="max-h-7"
                                                             onClick={handleReplySubmit}
                                                             disabled={(!inlineReplyContent.trim() && inlineReplyMediaFiles.length === 0) || isSubmittingReply || inlineReplyMediaFiles.some(f => f.uploading)}
                                                         >

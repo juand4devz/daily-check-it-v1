@@ -1,10 +1,9 @@
-// /components/forum/thumbnail-upload.tsx
 "use client";
 
 import React, { useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Trash2, Loader2, Upload, Image as ImageIcon, Video, X } from "lucide-react";
+import { Trash2, Loader2, Upload, X } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
@@ -33,27 +32,13 @@ export function ThumbnailUpload({
     const [uploadProgress, setUploadProgress] = useState(0);
     const [isUploadingInternal, setIsUploadingInternal] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
-    const [fileType, setFileType] = useState<"image" | "video" | null>(null);
     const [isDragOver, setIsDragOver] = useState(false);
 
-    // PERBAIKAN: Pindahkan definisi displayIsLoading ke atas,
-    // sebelum digunakan dalam useCallback.
     const displayIsLoading = isLoading || isUploadingInternal;
 
     // Sync previewUrl with value from parent if value changes (e.g., initialData load)
     React.useEffect(() => {
         setPreviewUrl(value);
-        if (value) {
-            if (value.match(/\.(mp4|mov|webm|ogg)$/i)) {
-                setFileType('video');
-            } else if (value.match(/\.(jpe?g|png|gif|webp|svg)$/i)) {
-                setFileType('image');
-            } else {
-                setFileType(null);
-            }
-        } else {
-            setFileType(null);
-        }
     }, [value]);
 
     const handleFileProcessing = useCallback(async (file: File) => {
@@ -61,15 +46,15 @@ export function ThumbnailUpload({
         setUploadError(null);
         setUploadProgress(0);
 
-        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-            toast.error("Format file tidak didukung.", { description: "Hanya gambar atau video yang diizinkan." });
+        // Perbaikan: Hanya terima format gambar
+        if (!file.type.startsWith('image/')) {
+            toast.error("Format file tidak didukung.", { description: "Hanya gambar yang diizinkan." });
             return;
         }
 
         // Create local preview URL immediately
         const objectUrl = URL.createObjectURL(file);
         setPreviewUrl(objectUrl);
-        setFileType(file.type.startsWith('image/') ? 'image' : 'video');
         setIsUploadingInternal(true); // Start internal loading indicator
 
         try {
@@ -85,7 +70,6 @@ export function ThumbnailUpload({
                 // Clean up local preview if upload failed
                 URL.revokeObjectURL(objectUrl);
                 setPreviewUrl(null);
-                setFileType(null);
             }
         } catch (error) {
             console.error("Error during thumbnail upload:", error);
@@ -94,7 +78,6 @@ export function ThumbnailUpload({
             // Clean up local preview if upload failed
             URL.revokeObjectURL(objectUrl);
             setPreviewUrl(null);
-            setFileType(null);
         } finally {
             setIsUploadingInternal(false); // End internal loading
             if (fileInputRef.current) {
@@ -114,26 +97,24 @@ export function ThumbnailUpload({
         event.preventDefault();
         event.stopPropagation();
         setIsDragOver(false);
-        // Pastikan displayIsLoading dapat diakses di sini
         if (disabled || displayIsLoading) return;
 
         const file = event.dataTransfer.files?.[0];
         if (file) {
             handleFileProcessing(file);
         }
-    }, [disabled, displayIsLoading, handleFileProcessing]); // Tambahkan displayIsLoading sebagai dependensi
+    }, [disabled, displayIsLoading, handleFileProcessing]);
 
     const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
         event.preventDefault();
         event.stopPropagation();
-        // Pastikan displayIsLoading dapat diakses di sini
         if (disabled || displayIsLoading) {
             event.dataTransfer.dropEffect = "none";
         } else {
             event.dataTransfer.dropEffect = "copy";
             setIsDragOver(true);
         }
-    }, [disabled, displayIsLoading]); // Tambahkan displayIsLoading sebagai dependensi
+    }, [disabled, displayIsLoading]);
 
     const handleDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
         event.preventDefault();
@@ -141,20 +122,17 @@ export function ThumbnailUpload({
         setIsDragOver(false);
     }, []);
 
-
     const handleRemoveThumbnail = useCallback(() => {
         if (previewUrl) {
             URL.revokeObjectURL(previewUrl); // Clean up blob URL
         }
         onChange(null); // Clear thumbnail in parent form
         setPreviewUrl(null);
-        setFileType(null);
         setUploadProgress(0);
         setUploadError(null);
         setIsUploadingInternal(false);
         toast.info("Thumbnail dihapus.");
     }, [onChange, previewUrl]);
-
 
     return (
         <div className="space-y-2">
@@ -172,31 +150,19 @@ export function ThumbnailUpload({
             >
                 {/* Konten Pratinjau */}
                 {previewUrl ? (
-                    fileType === "image" ? (
-                        <Image
-                            src={previewUrl}
-                            alt="Thumbnail Preview"
-                            layout="fill"
-                            objectFit="cover"
-                            className="transition-transform duration-300 group-hover:scale-105"
-                        />
-                    ) : (
-                        <video
-                            src={previewUrl}
-                            className="w-full h-full object-cover"
-                            poster={value && fileType === 'video' ? `${value}?tr=f-jpg` : undefined}
-                            muted
-                            loop
-                            playsInline
-                            autoPlay
-                        />
-                    )
+                    <Image
+                        src={previewUrl}
+                        alt="Thumbnail Preview"
+                        layout="fill"
+                        objectFit="cover"
+                        className="transition-transform duration-300 group-hover:scale-105"
+                    />
                 ) : (
                     <div className={cn("w-full h-full flex flex-col items-center justify-center relative p-4 text-center", placeholderGradient)}>
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></div>
                         <PlaceholderIcon className="h-16 w-16 text-white/80 mb-2" />
                         <p className="text-white text-sm font-medium">Drag & Drop atau Klik untuk Upload</p>
-                        <p className="text-white text-xs opacity-80 mt-1">Gambar atau Video (Max 5MB)</p>
+                        <p className="text-white text-xs opacity-80 mt-1">Hanya Gambar (Max 5MB)</p>
                     </div>
                 )}
 
@@ -245,16 +211,16 @@ export function ThumbnailUpload({
                 )}
             </div>
 
-            {/* Input file tersembunyi (dulu tombol upload) */}
+            {/* Input file tersembunyi */}
             <input
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileChange}
-                accept="image/*,video/*"
+                accept="image/*"
                 className="hidden"
                 disabled={disabled || displayIsLoading}
             />
-            {/* Tombol "Upload/Ganti Thumbnail" ini opsional, karena area drop sudah ada. Bisa dihapus jika diinginkan. */}
+
             <Button
                 type="button"
                 variant="outline"
@@ -263,23 +229,23 @@ export function ThumbnailUpload({
                 disabled={disabled || displayIsLoading}
             >
                 <Upload className="h-4 w-4 mr-2" />
-                {previewUrl ? "Ganti Thumbnail" : "Upload Thumbnail"}
+                {previewUrl ? "Ganti Gambar" : "Upload Gambar"}
             </Button>
-            <p className="text-xs text-gray-500 mt-1">Format: JPG, PNG, GIF, WEBP, MP4. Max 5MB. Gunakan rasio 16:9 untuk tampilan terbaik.</p>
+            <p className="text-xs text-gray-500 mt-1">Format: JPG, PNG, GIF, WEBP. Max 5MB. Gunakan rasio 16:9 untuk tampilan terbaik.</p>
 
             <style jsx>{`
-                @keyframes shimmer {
-                    0% {
-                        transform: translateX(-100%);
-                    }
-                    100% {
-                        transform: translateX(100%);
-                    }
-                }
-                .animate-shimmer {
-                    animation: shimmer 2s infinite;
-                }
-            `}</style>
+        @keyframes shimmer {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+        .animate-shimmer {
+          animation: shimmer 2s infinite;
+        }
+      `}</style>
         </div>
     );
 }

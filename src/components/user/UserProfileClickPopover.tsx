@@ -9,17 +9,17 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { MapPin, Calendar, Clock, AlertTriangle } from "lucide-react";
-import Image from "next/image"; // Import Image
-import { toast } from "sonner"; // Import toast
+import Image from "next/image";
+import { toast } from "sonner";
 
 import { formatDateTime, formatTimeAgo } from "@/lib/utils/date-utils";
-import { User as UserType } from "@/types/types"; // Import UserType
+import { User as UserType } from "@/types/types";
 import { Skeleton } from "../ui/skeleton";
 import { Card, CardContent } from "../ui/card";
 
 interface UserProfileClickPopoverProps {
-    children: React.ReactNode; // Element yang memicu popover (e.g., Avatar, Username Span)
-    userId: string; // ID pengguna yang profilnya akan ditampilkan
+    children: React.ReactNode;
+    userId: string;
 }
 
 export function UserProfileClickPopover({ children, userId }: UserProfileClickPopoverProps) {
@@ -29,9 +29,8 @@ export function UserProfileClickPopover({ children, userId }: UserProfileClickPo
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Fetch user data ONLY when the popover opens
     useEffect(() => {
-        if (isOpen && userId && !userData) { // Fetch if open, userId exists, and data not yet loaded
+        if (isOpen && userId && !userData) {
             setLoading(true);
             setError(null);
             const fetchUser = async () => {
@@ -57,17 +56,22 @@ export function UserProfileClickPopover({ children, userId }: UserProfileClickPo
             };
             fetchUser();
         }
-        // Reset data when popover closes to refetch on next open (optional, depends on caching strategy)
         if (!isOpen) {
             setUserData(null);
             setError(null);
         }
-    }, [isOpen, userId, userData]); // userData di dependensi agar tidak fetch ulang jika sudah ada
+    }, [isOpen, userId, userData]);
 
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>{children}</PopoverTrigger>
-            <PopoverContent className="w-72 p-0" align="start" sideOffset={10}> {/* Lebar yang lebih sesuai */}
+            <PopoverContent
+                className="w-72 p-0"
+                align="start"
+                sideOffset={10}
+                onMouseDown={(e) => e.stopPropagation()} // FIX: Tambahkan ini untuk menghentikan perambatan event
+                onClick={(e) => e.stopPropagation()} // FIX: Tambahkan ini juga sebagai jaring pengaman
+            >
                 {loading ? (
                     <div className="p-4 flex flex-col items-center gap-3">
                         <Skeleton className="h-20 w-20 rounded-full" />
@@ -86,7 +90,6 @@ export function UserProfileClickPopover({ children, userId }: UserProfileClickPo
                     </div>
                 ) : userData ? (
                     <Card className="border-none shadow-none">
-                        {/* Header dengan Banner mini */}
                         <div className="relative h-20 w-full rounded-t-md">
                             {userData.banner ? (
                                 <Image
@@ -100,7 +103,6 @@ export function UserProfileClickPopover({ children, userId }: UserProfileClickPo
                                     No Banner
                                 </div>
                             )}
-                            {/* Avatar di atas Banner */}
                             <Avatar className="absolute -bottom-8 left-1/2 -translate-x-1/2 h-16 w-16 border-2 border-background shadow-md">
                                 <AvatarImage src={userData.avatar || "/placeholder.svg"} alt={userData.username} />
                                 <AvatarFallback className="text-2xl">{userData.username[0]}</AvatarFallback>
@@ -134,9 +136,10 @@ export function UserProfileClickPopover({ children, userId }: UserProfileClickPo
                                 type="button"
                                 variant="secondary"
                                 className="w-full mt-4"
-                                onClick={() => {
+                                onClick={(e) => {
+                                    e.stopPropagation(); // FIX: Tambahkan ini untuk mencegah klik merambat
                                     router.push(`/users/${userData.id}`);
-                                    setIsOpen(false); // Tutup popover setelah navigasi
+                                    setIsOpen(false);
                                 }}
                             >
                                 Lihat Profil Lengkap

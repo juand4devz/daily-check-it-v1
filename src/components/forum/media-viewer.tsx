@@ -70,8 +70,8 @@ export function MediaViewer({ media, className = "" }: MediaViewerProps) {
     <div className="relative w-full h-full flex items-center justify-center bg-black">
       {currentMedia.type === "image" ? (
         <Image
-          height={1000}
-          width={1000}
+          height={500}
+          width={500}
           src={currentMedia.url || "/placeholder.svg"}
           alt={`Full size media ${currentMedia.filename || 'item'}`}
           className="max-w-full max-h-full object-contain"
@@ -80,7 +80,7 @@ export function MediaViewer({ media, className = "" }: MediaViewerProps) {
         <video src={currentMedia.url} className="max-w-full max-h-full object-contain" controls autoPlay />
       )}
 
-      {/* Close Button */}
+      {/* Close Button
       <Button
         variant="ghost"
         size="sm"
@@ -89,7 +89,7 @@ export function MediaViewer({ media, className = "" }: MediaViewerProps) {
         aria-label="Close full screen media"
       >
         <X className="h-5 w-5" />
-      </Button>
+      </Button> */}
 
       {/* Navigation for multiple media */}
       {media.length > 1 && (

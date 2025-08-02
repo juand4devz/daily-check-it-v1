@@ -27,12 +27,6 @@ import Image from "next/image";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import {
-    ResizableHandle,
-    ResizablePanel,
-    ResizablePanelGroup,
-} from "@/components/ui/resizable";
-
 import { ThumbnailUpload } from "@/components/forum/thumbnail-upload";
 import { MediaViewer } from "@/components/forum/media-viewer";
 
@@ -662,8 +656,8 @@ export function ForumPostForm({
 
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(handleSubmit)} className={cn("space-y-6", isModal && "px-4")}>
-                    <div className={cn("grid grid-cols-1 gap-6", showRightSidebar ? "lg:grid-cols-3" : "lg:grid-cols-1")}>
-                        <div className={cn("space-y-6", showRightSidebar ? "lg:col-span-2" : "lg:col-span-1")}>
+                    <div className={cn("grid grid-cols-1 gap-6", showRightSidebar ? "lg:grid-cols-4" : "lg:grid-cols-1")}>
+                        <div className={cn("space-y-6", showRightSidebar ? "lg:col-span-3" : "lg:col-span-1")}>
                             <Card>
                                 <CardHeader>
                                     <CardTitle>Informasi Dasar</CardTitle>
@@ -1071,11 +1065,11 @@ export function ForumPostForm({
                         </div>
 
                         {/* Right Sidebar */}
-                        <div className={cn("space-y-6 lg:sticky lg:top-8 h-fit", !showRightSidebar && "hidden")}>
+                        <div className={cn("space-y-6 lg:sticky lg:top-8 h-fit max-w-[15rem]", !showRightSidebar && "hidden")}>
                             {selectedType && (
                                 <Card>
                                     <CardHeader>
-                                        <CardTitle className="text-lg flex items-center gap-2">
+                                        <CardTitle className="text-lg flex items-center gap-x-2">
                                             {(() => {
                                                 const TypeIcon = typeIconsMap[selectedType.icon] || Plus;
                                                 return <TypeIcon className="h-5 w-5" />;
@@ -1084,7 +1078,7 @@ export function ForumPostForm({
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent>
-                                        <p className="text-sm text-gray-600 mb-3">{selectedType.description}</p>
+                                        <p className="space-y-1 text-gray-600 dark:text-gray-400 text-sm mb-4">{selectedType.description}</p>
                                         <div className="space-y-2 text-xs">
                                             <div className="flex items-center justify-between">
                                                 <span>Solusi dapat ditandai:</span>
@@ -1137,7 +1131,7 @@ export function ForumPostForm({
                                     {selectedType?.id === "pertanyaan" && (
                                         <div className="space-y-2">
                                             <h4 className="font-medium">Khusus untuk pertanyaan:</h4>
-                                            <ul className="space-y-1 text-gray-600 list-disc list-inside">
+                                            <ul className="space-y-1 text-gray-600 dark:text-gray-400 list-disc list-inside">
                                                 <li>Jelaskan masalah dengan detail</li>
                                                 <li>Sebutkan apa yang sudah dicoba</li>
                                                 <li>Sertakan spesifikasi sistem jika relevan</li>
@@ -1148,9 +1142,10 @@ export function ForumPostForm({
                                 </CardContent>
                             </Card>
                             <Card>
-                                <CardContent className="p-4">
+                                <CardContent>
                                     <Button
                                         type="submit"
+                                        size="sm"
                                         className="w-full"
                                         disabled={isSubmitting || isThumbnailUploading || isAnyMediaUploading}
                                     >

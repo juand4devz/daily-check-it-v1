@@ -298,13 +298,19 @@ export default function ForumPage() {
     return (
         <div className="px-4 py-8 w-full">
             {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-                <div>
+            <div className="flex justify-between items-center gap-4 mb-8">
+                <div className="flex flex-col">
                     <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
                         <Waypoints className="h-14 w-14 mr-3" />
                         Forum Diskusi
                     </h1>
                     <p className="text-gray-600">Berbagi pengetahuan, pengalaman, dan solusi bersama komunitas</p>
+                </div>
+                <div className="block lg:hidden">
+                    <Button size="sm" onClick={() => router.push("/forum/new")}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Buat Diskusi
+                    </Button>
                 </div>
             </div>
 
@@ -327,7 +333,7 @@ export default function ForumPage() {
                                 </div>
 
                                 {/* Filter Controls */}
-                                <div className="flex flex-wrap gap-2">
+                                <div className="flex flex-wrap gap-4">
                                     <Select value={selectedType} onValueChange={(value) => handleFilterChange("type", value)}>
                                         <SelectTrigger className="w-40">
                                             <SelectValue placeholder="Tipe Diskusi" />
@@ -437,7 +443,7 @@ export default function ForumPage() {
                                 </CardContent>
                             </Card>
                         ) : (
-                            <div className="grid sm:grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 3xl:grid-cols-4 4xl:grid-cols-4 gap-6">
+                            <div className="grid sm:grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 3xl:grid-cols-4 4xl:grid-cols-4 gap-6">
                                 {filteredAndSortedPosts.map((post) => (
                                     <PostCard
                                         key={post.id}
@@ -481,11 +487,11 @@ export default function ForumPage() {
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
                                                 <div className={`p-1 rounded ${getRandomGradient(type.id)} text-white`}>
-                                                    <TypeIcon className="h-4 w-4" />
+                                                    <TypeIcon className="h-4 w-4 outline-zinc-800 dark:outline-zinc-100" />
                                                 </div>
                                                 <div>
                                                     <div className="font-medium text-sm">{type.name}</div>
-                                                    <div className="text-xs text-gray-500">{type.description}</div>
+                                                    <div className="text-xs text-gray-500 dark:text-gray-200">{type.description}</div>
                                                 </div>
                                             </div>
                                             <Badge variant="secondary" className="text-xs">
@@ -511,7 +517,7 @@ export default function ForumPage() {
                                     <Badge
                                         key={tag}
                                         variant={selectedTags.includes(tag) ? "default" : "secondary"}
-                                        className="cursor-pointer hover:bg-blue-100 text-xs"
+                                        className="cursor-pointer hover:bg-blue-100 dark:hover:text-zinc-800 text-xs"
                                         onClick={() => (selectedTags.includes(tag) ? removeTag(tag) : addTag(tag))}
                                     >
                                         #{tag} ({count})

@@ -1,6 +1,6 @@
 // /app/api/admin/reports/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "../../../../../../auth"; // Sesuaikan path sesuai lokasi auth.ts
+import { auth } from "../../../../../../auth";
 import { updateReportStatus, deleteReport } from "@/lib/firebase/service";
 
 // PATCH: Update report status (Admin only)
@@ -13,7 +13,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     const reportId = params.id;
     try {
         const body = await request.json();
-        const { status } = body; // "resolved" or "dismissed"
+        const { status } = body;
 
         if (!status || !["resolved", "dismissed"].includes(status)) {
             return NextResponse.json({ status: false, statusCode: 400, message: "Invalid status provided. Must be 'resolved' or 'dismissed'." }, { status: 400 });
@@ -36,7 +36,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
     const session = await auth();
     if (!session?.user?.id || session.user.role !== "admin") {
-        return NextResponse.json({ status: false, statusCode: 403, message: "Forbidden: Only admins can delete reports." }, { status: 403 }); // Fix: status -> status:
+        return NextResponse.json({ status: false, statusCode: 403, message: "Forbidden: Only admins can delete reports." }, { status: 403 });
     }
 
     const reportId = params.id;

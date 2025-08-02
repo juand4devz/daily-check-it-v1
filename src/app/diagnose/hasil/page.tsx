@@ -149,7 +149,7 @@ export default function HasilDiagnosaPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       <div className="mb-6">
-        <Button variant="outline" onClick={() => router.push("/diagnose")} className="mb-4">
+        <Button variant="ghost" onClick={() => router.push("/diagnose")} className="mb-4">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Kembali ke Diagnosa
         </Button>

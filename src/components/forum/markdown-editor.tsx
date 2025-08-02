@@ -1,4 +1,3 @@
-// /components/forum/markdown-editor.tsx
 "use client";
 
 import React from "react";
@@ -8,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { X, Loader2, Link as LinkIcon, Upload, Image as ImageIcon, Video, Copy } from "lucide-react";
+import { X, Loader2, Link as LinkIcon, Image as ImageIcon, Copy, ImageUp } from "lucide-react"; // Menghapus Video icon
 import { toast } from "sonner";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -28,7 +27,7 @@ interface MediaPreviewProps {
     uploading?: boolean;
     progress?: number;
     uploadedUrl?: string;
-    type?: "image" | "video";
+    type?: "image"; // Hanya mendukung "image"
 }
 
 interface MarkdownEditorProps {
@@ -75,7 +74,7 @@ export function MarkdownEditor({
     onDragLeave,
     isDragOver = false,
     showMediaInput = true,
-    allAvailableMentions,
+    // allAvailableMentions,
     disableMediaPreviewInWriteTab = false, // Default: tampil di tab write
     showMediaPreviewInPreviewTab = false, // Default: tidak tampil di tab preview
     showMediaInsertActions = true, // Default: tampilkan tombol aksi
@@ -108,9 +107,15 @@ export function MarkdownEditor({
     const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
         const files = event.target.files;
         if (files && files.length > 0 && onMediaFilesChange) {
-            onMediaFilesChange(Array.from(files));
+            // Filter files to only allow images
+            const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
+            if (imageFiles.length > 0) {
+                onMediaFilesChange(imageFiles);
+            } else {
+                toast.error("Hanya format gambar yang didukung.");
+            }
         }
-        event.target.value = '';
+        event.target.value = ''; // Reset input file
     }, [onMediaFilesChange]);
 
 
@@ -152,11 +157,11 @@ export function MarkdownEditor({
         >
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col">
                 <div className="flex items-center justify-between border-b p-2 flex-shrink-0">
-                    <TabsList className="grid w-fit grid-cols-2 h-8">
-                        <TabsTrigger value="write" className="h-6 text-xs">
+                    <TabsList className="grid w-fit grid-cols-2 max-h-7">
+                        <TabsTrigger value="write" className="max-h-5 text-xs">
                             Tulis
                         </TabsTrigger>
-                        <TabsTrigger value="preview" className="h-6 text-xs">
+                        <TabsTrigger value="preview" className="max-h-5 text-xs">
                             Review
                         </TabsTrigger>
                     </TabsList>
@@ -171,32 +176,34 @@ export function MarkdownEditor({
                                         size="icon"
                                         onClick={handleInsertImageLink}
                                         disabled={disabled || isUploadingMedia}
-                                        className="h-8 w-8 text-gray-500 hover:text-gray-700"
+                                        className="h-6 w-6 text-gray-500 hover:text-gray-700"
                                         title="Masukkan link gambar Markdown"
                                     >
                                         <LinkIcon className="h-4 w-4" />
                                         <span className="sr-only">Masukkan link gambar Markdown</span>
                                     </Button>
                                 )}
-                                {/* Tombol Upload Gambar/Video */}
+                                {/* Tombol Upload Gambar */}
                                 <Button
                                     type="button"
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => fileInputRef.current?.click()}
                                     disabled={disabled || isUploadingMedia || mediaPreviews.length >= 1}
-                                    className="h-8 w-8 text-gray-500 hover:text-gray-700"
-                                    title="Upload Gambar/Video"
+                                    className="h-6 w-6 text-gray-500 hover:text-gray-700"
+                                    title="Upload Gambar"
+                                // {/* Diperbarui */}
                                 >
-                                    {isUploadingMedia ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                                    <span className="sr-only">Upload Gambar/Video</span>
+                                    {isUploadingMedia ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageUp className="h-4 w-4" />}
+                                    <span className="sr-only">Upload Gambar</span> {/* Diperbarui */}
                                 </Button>
                                 {/* Input file tersembunyi */}
                                 <input
                                     type="file"
                                     ref={fileInputRef}
                                     onChange={handleFileSelect}
-                                    accept="image/*,video/*"
+                                    accept="image/*"
+                                    // {/* Diperbarui: Hanya menerima gambar */}
                                     multiple={false}
                                     className="hidden"
                                     disabled={disabled || isUploadingMedia || mediaPreviews.length >= 1}
@@ -206,7 +213,7 @@ export function MarkdownEditor({
                     </div>
                 </div>
 
-                <TabsContent value="write" className="p-4 mt-0 border-none flex-grow">
+                <TabsContent value="write" className="border-none flex-grow p-2">
                     <Textarea
                         ref={textareaRef}
                         placeholder={placeholder}
@@ -214,7 +221,7 @@ export function MarkdownEditor({
                         onChange={(e) => onChange(e.target.value)}
                         rows={rows}
                         className={cn(
-                            "resize-none border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-0 text-sm h-full min-h-[100px]",
+                            "resize-none border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-2 text-sm min-h-[150px] max-h-[250px] overflow-y-auto",
                             isDragOver ? 'border-2 border-blue-500 bg-blue-50' : '',
                             {
                                 'cursor-wait': isUploadingMedia
@@ -234,6 +241,7 @@ export function MarkdownEditor({
                                 {mediaPreviews.map((media) => (
                                     <div key={media.id} className="relative group w-full rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm bg-gray-50 dark:bg-zinc-800">
                                         <div className="relative w-full h-[180px] bg-gray-200 dark:bg-zinc-700 flex items-center justify-center">
+                                            {/* Hanya render gambar, karena hanya gambar yang didukung */}
                                             {media.type === "image" ? (
                                                 <Image
                                                     src={media.url || "/placeholder.svg"}
@@ -242,18 +250,11 @@ export function MarkdownEditor({
                                                     objectFit="contain"
                                                     className="transition-all duration-300 group-hover:scale-105"
                                                 />
-                                            ) : media.type === "video" ? (
-                                                <video
-                                                    src={media.url}
-                                                    controls={false}
-                                                    muted
-                                                    loop
-                                                    className="w-full h-full object-contain"
-                                                />
                                             ) : (
+                                                // Fallback jika tipe media tidak dikenali (seharusnya tidak terjadi jika filter berfungsi)
                                                 <div className="flex flex-col items-center text-gray-500 dark:text-gray-400">
-                                                    <Upload className="h-12 w-12" />
-                                                    <span className="text-sm">Tipe media tidak dikenal</span>
+                                                    <ImageIcon className="h-12 w-12" /> {/* Menggunakan ImageIcon */}
+                                                    <span className="text-sm">Tipe media tidak didukung</span>
                                                 </div>
                                             )}
                                         </div>
@@ -299,7 +300,7 @@ export function MarkdownEditor({
                                                         className="w-full h-9 px-3 text-sm bg-white/80 text-gray-900 hover:bg-white"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            navigator.clipboard.writeText(media.uploadedUrl!);
+                                                            document.execCommand('copy', false, media.uploadedUrl!); // Menggunakan document.execCommand untuk kompatibilitas iframe
                                                             toast.success("URL media disalin ke clipboard!");
                                                         }}
                                                     >
@@ -326,7 +327,7 @@ export function MarkdownEditor({
                                             </Button>
                                         )}
                                         <div className="p-2 text-sm text-center text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1">
-                                            {media.type === "image" ? <ImageIcon className="h-4 w-4 text-primary" /> : <Video className="h-4 w-4 text-primary" />}
+                                            <ImageIcon className="h-4 w-4 text-primary" /> {/* Hanya menggunakan ImageIcon */}
                                             <span className="truncate">{media.filename}</span>
                                         </div>
                                     </div>
@@ -336,8 +337,8 @@ export function MarkdownEditor({
                     )}
                 </TabsContent>
 
-                <TabsContent value="preview" className="p-4 mt-0 border-none flex-grow">
-                    <div className="prose prose-sm max-w-none dark:prose-invert overflow-y-auto max-h-[400px] mb-4">
+                <TabsContent value="preview" className="p-4 mt-0 border-none flex-grow  min-h-[150px] max-h-[250px] overflow-y-auto ">
+                    <div className="prose prose-sm max-w-none dark:prose-invert mb-4">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{value || "_Tidak ada konten untuk direview_"}</ReactMarkdown>
                     </div>
 
@@ -351,6 +352,7 @@ export function MarkdownEditor({
                                         <ResizablePanel defaultSize={100 / mediaPreviews.length}>
                                             <div className="relative group p-2 h-full flex flex-col items-center justify-center overflow-hidden">
                                                 <div className="relative w-full h-[calc(100%-24px)] flex-shrink-0 bg-gray-200 dark:bg-zinc-700 flex items-center justify-center">
+                                                    {/* Hanya render gambar, karena hanya gambar yang didukung */}
                                                     {media.type === "image" ? (
                                                         <Image
                                                             src={media.url || "/placeholder.svg"}
@@ -359,18 +361,11 @@ export function MarkdownEditor({
                                                             objectFit="contain"
                                                             className="transition-all duration-300 group-hover:scale-105"
                                                         />
-                                                    ) : media.type === "video" ? (
-                                                        <video
-                                                            src={media.url}
-                                                            controls={false}
-                                                            muted
-                                                            loop
-                                                            className="w-full h-full object-contain"
-                                                        />
                                                     ) : (
+                                                        // Fallback jika tipe media tidak dikenali (seharusnya tidak terjadi jika filter berfungsi)
                                                         <div className="flex flex-col items-center text-gray-500 dark:text-gray-400">
-                                                            <Upload className="h-12 w-12" />
-                                                            <span className="text-sm">Tipe media tidak dikenal</span>
+                                                            <ImageIcon className="h-12 w-12" /> {/* Menggunakan ImageIcon */}
+                                                            <span className="text-sm">Tipe media tidak didukung</span>
                                                         </div>
                                                     )}
                                                 </div>

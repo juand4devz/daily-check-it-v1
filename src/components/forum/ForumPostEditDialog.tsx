@@ -10,6 +10,7 @@ import { ForumPostForm } from "@/components/forum/ForumPostForm";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Edit as EditIcon, Loader2, AlertTriangle } from "lucide-react";
+import { ScrollArea, ScrollBar } from "../ui/scroll-area";
 
 interface ForumPostEditDialogProps {
     postId: string;
@@ -165,7 +166,7 @@ export function ForumPostEditDialog({
                         </div>
                     </div>
                 ) : (
-                    <div className="flex-grow overflow-y-auto">
+                    <ScrollArea className="flex-grow overflow-y-auto">
                         {isLoadingInitialData ? (
                             <div className="p-6 text-center">
                                 <Loader2 className="h-10 w-10 animate-spin text-blue-500 mx-auto mb-4" />
@@ -184,7 +185,8 @@ export function ForumPostEditDialog({
                                 showRightSidebar={true} // <--- PERUBAHAN: Tampilkan sidebar di modal edit
                             />
                         )}
-                    </div>
+                        <ScrollBar orientation="vertical" />
+                    </ScrollArea>
                 )}
             </DialogContent>
         </Dialog>
