@@ -26,7 +26,7 @@ export async function GET(
     }
 
     try {
-        const { id } = params;
+        const { id } = await params;
         if (!id) {
             return NextResponse.json({ error: "ID pengguna diperlukan." }, { status: 400 });
         }
@@ -59,7 +59,7 @@ export async function PUT(
     }
 
     try {
-        const { id } = params;
+        const { id } = await params;
         if (!id) {
             return NextResponse.json({ error: "ID pengguna diperlukan untuk pembaruan." }, { status: 400 });
         }
@@ -93,7 +93,7 @@ export async function DELETE(
     }
 
     try {
-        const { id } = params;
+        const { id } = await params;
         if (!id) {
             return NextResponse.json({ error: "ID pengguna diperlukan untuk penghapusan." }, { status: 400 });
         }

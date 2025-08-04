@@ -5,12 +5,14 @@ import { updateReportStatus, deleteReport } from "@/lib/firebase/service";
 
 // PATCH: Update report status (Admin only)
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+    // Pastikan untuk meng-await params sebelum mengakses propertinya
+    const { id: reportId } = await params;
+
     const session = await auth();
     if (!session?.user?.id || session.user.role !== "admin") {
         return NextResponse.json({ status: false, statusCode: 403, message: "Forbidden: Only admins can update report status." }, { status: 403 });
     }
 
-    const reportId = params.id;
     try {
         const body = await request.json();
         const { status } = body;
@@ -34,12 +36,14 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
 // DELETE: Delete a report (Admin only)
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+    // Pastikan untuk meng-await params sebelum mengakses propertinya
+    const { id: reportId } = await params;
+
     const session = await auth();
     if (!session?.user?.id || session.user.role !== "admin") {
         return NextResponse.json({ status: false, statusCode: 403, message: "Forbidden: Only admins can delete reports." }, { status: 403 });
     }
 
-    const reportId = params.id;
     try {
         const result = await deleteReport(reportId);
 

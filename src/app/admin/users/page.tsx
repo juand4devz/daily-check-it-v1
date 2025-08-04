@@ -523,7 +523,7 @@ export default function UsersPage() {
                 </div>
             </div>
             <Tabs defaultValue="statistics" className="w-full">
-                <TabsList className="w-full md:w-auto">
+                <TabsList className="w-full md:w-fit">
                     <TabsTrigger value="statistics">Statistik</TabsTrigger>
                     <TabsTrigger value="users">Data Pengguna</TabsTrigger>
                 </TabsList>
@@ -577,7 +577,7 @@ export default function UsersPage() {
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                         <Card>
-                            <CardHeader className="flex-row justify-between items-center space-y-0">
+                            <CardHeader className="flex justify-between items-center space-y-0">
                                 <CardTitle>Pengguna Terdaftar Mingguan</CardTitle>
                                 <div className="flex gap-2">
                                     <Select value={statsMonth} onValueChange={setStatsMonth}>

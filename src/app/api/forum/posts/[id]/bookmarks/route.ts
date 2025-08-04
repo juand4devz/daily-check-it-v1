@@ -5,12 +5,14 @@ import { toggleBookmark } from "@/lib/firebase/service";
 
 // POST: toggle bookmark
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+    // Menggunakan destructuring dan await untuk mengakses params.id
+    const { id: postId } = await params;
+
     const session = await auth();
     if (!session?.user?.id) {
         return NextResponse.json({ status: false, statusCode: 401, message: "Unauthorized: User not authenticated." }, { status: 401 });
     }
 
-    const postId = params.id;
     const userId = session.user.id;
 
     try {

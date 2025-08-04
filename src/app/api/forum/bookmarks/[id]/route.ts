@@ -5,12 +5,14 @@ import { removeBookmark, getUserBookmarks } from "@/lib/firebase/service";
 
 // DELETE: remove specific bookmark
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+    // Menggunakan destructuring dan await untuk mengakses params.id
+    const { id: bookmarkId } = await params;
+
     const session = await auth();
     if (!session?.user?.id) {
         return NextResponse.json({ status: false, statusCode: 401, message: "Unauthorized: User not authenticated." }, { status: 401 });
     }
 
-    const bookmarkId = params.id;
     const userId = session.user.id;
 
     try {
@@ -19,9 +21,9 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
         const userBookmarks = await getUserBookmarks(userId);
         const bookmarkToDelete = userBookmarks.find(b => b.id === bookmarkId);
         if (!bookmarkToDelete) {
-            return NextResponse.json({ status: false, statusCode: 403, message: "Forbidden: Not authorized to delete this bookmark." }, { status: 403 });
+            // Mengembalikan 404 jika bookmark tidak ditemukan atau tidak dimiliki oleh user
+            return NextResponse.json({ status: false, statusCode: 404, message: "Bookmark not found or not authorized to delete." }, { status: 404 });
         }
-
 
         const result = await removeBookmark(bookmarkId);
 

@@ -33,6 +33,7 @@ import { useSession } from "next-auth/react";
 import { ScrollArea, ScrollBar } from "../ui/scroll-area";
 
 const tingkatKerusakanOptions = ["Ringan", "Sedang", "Berat"];
+const waktuSatuanOptions = ["menit", "jam", "hari"];
 const MAX_MEDIA_FILES = 5;
 
 // Tipe untuk media file sementara yang akan di-upload
@@ -48,7 +49,7 @@ interface MediaFileTemp {
 
 interface DamageFormProps {
     initialData?: Kerusakan | null;
-    gejalaList: Gejala[]; // Menerima daftar gejala dari parent
+    gejalaList: Gejala[];
     isSubmitting: boolean;
     onSave: (data: Omit<Kerusakan, 'id'>, id?: string) => Promise<void>;
     pageTitle: string;
@@ -81,18 +82,23 @@ export function DamageForm({
         gejala_terkait: [],
     });
     const [isGeneratingCode, setIsGeneratingCode] = useState(false);
-    // const [activeTab, setActiveTab] = useState("write");
     const [isDragOver, setIsDragOver] = useState(false);
     const [mediaFiles, setMediaFiles] = useState<MediaFileTemp[]>([]);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const [biayaMin, setBiayaMin] = useState<string>("");
+    const [biayaMax, setBiayaMax] = useState<string>("");
+    const [waktuMin, setWaktuMin] = useState<string>("");
+    const [waktuMax, setWaktuMax] = useState<string>("");
+    const [waktuSatuan, setWaktuSatuan] = useState<string>("hari");
 
     const isEditMode = useMemo(() => !!initialData?.id, [initialData]);
 
     useEffect(() => {
         if (initialData) {
             setFormData({
-                kode: initialData.kode,
+                kode: initialData.kode || "",
                 nama: initialData.nama || "",
                 deskripsi: initialData.deskripsi || "",
                 tingkat_kerusakan: initialData.tingkat_kerusakan || "Ringan",
@@ -102,6 +108,28 @@ export function DamageForm({
                 solusi: initialData.solusi || "",
                 gejala_terkait: Array.isArray(initialData.gejala_terkait) ? initialData.gejala_terkait : [],
             });
+
+            // Pisahkan nilai string biaya menjadi min dan max
+            const biayaParts = (initialData.estimasi_biaya || "").split(" - ").map(p => p.trim().replace("Rp ", "").replace(/\./g, ""));
+            setBiayaMin(biayaParts[0] || "");
+            setBiayaMax(biayaParts[1] || "");
+
+            // Pisahkan nilai string waktu menjadi min, max, dan satuan
+            const waktuParts = (initialData.waktu_perbaikan || "").split("-").map(p => p.trim());
+            if (waktuParts.length === 2) {
+                const [min, maxAndUnit] = waktuParts;
+                setWaktuMin(min);
+                const match = maxAndUnit.match(/(\d+)\s+(menit|jam|hari)/);
+                if (match) {
+                    setWaktuMax(match[1]);
+                    setWaktuSatuan(match[2]);
+                }
+            } else {
+                setWaktuMin("");
+                setWaktuMax("");
+                setWaktuSatuan("hari");
+            }
+
         }
     }, [initialData]);
 
@@ -136,12 +164,36 @@ export function DamageForm({
             toast.error("Prior probability harus antara 0.01 dan 0.50.");
             return false;
         }
+
+        if ((biayaMin && !biayaMax) || (!biayaMin && biayaMax)) {
+            toast.error("Mohon lengkapi kedua input biaya (minimal dan maksimal).");
+            return false;
+        }
+
+        if ((waktuMin && !waktuMax) || (!waktuMin && waktuMax)) {
+            toast.error("Mohon lengkapi kedua input waktu (minimal dan maksimal).");
+            return false;
+        }
+
         return true;
-    }, [formData]);
+    }, [formData, biayaMin, biayaMax, waktuMin, waktuMax]);
 
     const handleSave = async (): Promise<void> => {
+        const finalFormData = { ...formData };
+        if (biayaMin && biayaMax) {
+            finalFormData.estimasi_biaya = `Rp ${biayaMin.replace(/\B(?=(\d{3})+(?!\d))/g, ".")} - Rp ${biayaMax.replace(/\B(?=(\d{3})+(?!\d))/g, ".")}`;
+        } else {
+            finalFormData.estimasi_biaya = "";
+        }
+
+        if (waktuMin && waktuMax) {
+            finalFormData.waktu_perbaikan = `${waktuMin}-${waktuMax} ${waktuSatuan}`;
+        } else {
+            finalFormData.waktu_perbaikan = "";
+        }
+
         if (!validateForm()) return;
-        await onSave(formData, initialData?.id);
+        await onSave(finalFormData, initialData?.id);
     };
 
     const uploadFileToImageKit = useCallback(async (file: File, onProgressCallback: (progress: number) => void): Promise<string | null> => {
@@ -315,28 +367,50 @@ export function DamageForm({
                         <CardDescription>Data utama kerusakan</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-6">
-                        <div className="space-y-2">
-                            <Label htmlFor="kode">Kode Kerusakan *</Label>
-                            <div className="flex gap-2">
-                                <Input
-                                    id="kode"
-                                    value={formData.kode}
-                                    onChange={(e) => handleInputChange("kode", e.target.value)}
-                                    placeholder="KK1, KK2, dst..."
-                                    className="font-mono"
-                                    disabled={isSubmitting || isEditMode}
-                                />
-                                {!isEditMode && (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => console.log("Generate code")} // Placeholder for generate code logic
-                                        disabled={isSubmitting || isGeneratingCode}
-                                        className="shrink-0 bg-transparent"
-                                    >
-                                        <RefreshCw className={cn("h-4 w-4", isGeneratingCode && "animate-spin")} />
-                                    </Button>
-                                )}
+                        <div className="flex space-x-4 w-full">
+                            <div className="space-y-2 w-full">
+                                <Label htmlFor="kode">Kode Kerusakan *</Label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        id="kode"
+                                        value={formData.kode}
+                                        onChange={(e) => handleInputChange("kode", e.target.value)}
+                                        placeholder="KK1, KK2, dst..."
+                                        className="font-mono"
+                                        disabled={isSubmitting || isEditMode}
+                                    />
+                                    {!isEditMode && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => console.log("Generate code")}
+                                            disabled={isSubmitting || isGeneratingCode}
+                                            className="shrink-0 bg-transparent"
+                                        >
+                                            <RefreshCw className={cn("h-4 w-4", isGeneratingCode && "animate-spin")} />
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="space-y-2 w-full">
+                                <Label htmlFor="tingkat">Tingkat Kerusakan</Label>
+                                <Select
+                                    value={formData.tingkat_kerusakan}
+                                    onValueChange={(value: Kerusakan["tingkat_kerusakan"]) => handleInputChange("tingkat_kerusakan", value)}
+                                    disabled={isSubmitting}
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {tingkatKerusakanOptions.map((tingkat) => (
+                                            <SelectItem key={tingkat} value={tingkat}>
+                                                {tingkat}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         <div className="space-y-2">
@@ -361,46 +435,71 @@ export function DamageForm({
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="tingkat">Tingkat Kerusakan</Label>
-                            <Select
-                                value={formData.tingkat_kerusakan}
-                                onValueChange={(value: Kerusakan["tingkat_kerusakan"]) => handleInputChange("tingkat_kerusakan", value)}
-                                disabled={isSubmitting}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {tingkatKerusakanOptions.map((tingkat) => (
-                                        <SelectItem key={tingkat} value={tingkat}>
-                                            {tingkat}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="biaya">Estimasi Biaya</Label>
+                            <Label htmlFor="biaya-min">Estimasi Biaya</Label>
+                            <div className="flex items-center gap-2">
+                                <span className="text-muted-foreground">Rp</span>
                                 <Input
-                                    id="biaya"
-                                    value={formData.estimasi_biaya}
-                                    onChange={(e) => handleInputChange("estimasi_biaya", e.target.value)}
-                                    placeholder="Rp 100.000 - Rp 500.000"
+                                    id="biaya-min"
+                                    type="number"
+                                    value={biayaMin}
+                                    onChange={(e) => setBiayaMin(e.target.value)}
+                                    placeholder="Minimal"
+                                    disabled={isSubmitting}
+                                />
+                                <span className="text-muted-foreground">-</span>
+                                <Input
+                                    id="biaya-max"
+                                    type="number"
+                                    value={biayaMax}
+                                    onChange={(e) => setBiayaMax(e.target.value)}
+                                    placeholder="Maksimal"
                                     disabled={isSubmitting}
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="waktu">Waktu Perbaikan</Label>
+                            <p className="text-xs text-muted-foreground">Contoh: 100000 - 500000</p>
+                        </div>
+
+                        {/* Input Waktu Perbaikan yang diperbarui */}
+                        <div className="space-y-2">
+                            <Label htmlFor="waktu-min">Waktu Perbaikan</Label>
+                            <div className="flex items-center gap-2">
                                 <Input
-                                    id="waktu"
-                                    value={formData.waktu_perbaikan}
-                                    onChange={(e) => handleInputChange("waktu_perbaikan", e.target.value)}
-                                    placeholder="1-3 hari"
+                                    id="waktu-min"
+                                    type="number"
+                                    value={waktuMin}
+                                    onChange={(e) => setWaktuMin(e.target.value)}
+                                    placeholder="Minimal"
                                     disabled={isSubmitting}
                                 />
+                                <span className="text-muted-foreground">-</span>
+                                <Input
+                                    id="waktu-max"
+                                    type="number"
+                                    value={waktuMax}
+                                    onChange={(e) => setWaktuMax(e.target.value)}
+                                    placeholder="Maksimal"
+                                    disabled={isSubmitting}
+                                />
+                                <Select
+                                    value={waktuSatuan}
+                                    onValueChange={setWaktuSatuan}
+                                    disabled={isSubmitting}
+                                >
+                                    <SelectTrigger className="w-[100px]">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {waktuSatuanOptions.map((satuan) => (
+                                            <SelectItem key={satuan} value={satuan}>
+                                                {satuan}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
+                            <p className="text-xs text-muted-foreground">Contoh: 30 menit, 1-2 jam, 1-3 hari</p>
                         </div>
+
                         <div className="space-y-4">
                             <div className="flex justify-between items-center">
                                 <Label>Prior Probability: {formData.prior_probability.toFixed(3)}</Label>

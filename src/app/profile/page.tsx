@@ -100,7 +100,7 @@ export default function ProfilePage() {
                 // avatar dan banner diupdate oleh ImageUploader secara terpisah
             };
 
-            const response = await fetch(`/api/users/${user.id}`, { // Memanggil API update user
+            const response = await fetch(`/api/users/${user.id}/update`, { // Memanggil API update user
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -143,7 +143,7 @@ export default function ProfilePage() {
         if (!user) return;
         try {
             // Kirim perubahan avatar ke API update user
-            const response = await fetch(`/api/users/${user.id}`, {
+            const response = await fetch(`/api/users/${user.id}/update`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ avatar: newUrl || "" }), // Kirim string kosong jika null untuk hapus
@@ -165,7 +165,7 @@ export default function ProfilePage() {
         if (!user) return;
         try {
             // Kirim perubahan banner ke API update user
-            const response = await fetch(`/api/users/${user.id}`, {
+            const response = await fetch(`/api/users/${user.id}/update`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ banner: newUrl || "" }), // Kirim string kosong jika null untuk hapus

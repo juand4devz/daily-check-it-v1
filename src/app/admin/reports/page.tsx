@@ -50,6 +50,7 @@ import {
     BarChart,
     RefreshCcw,
     Calendar,
+    LandPlot,
 } from "lucide-react";
 import Fuse from "fuse.js";
 import {
@@ -582,7 +583,7 @@ export default function AdminReportsPage() {
         <div className="container mx-auto px-4 py-8">
             <div className="flex items-center justify-between mb-6">
                 <h1 className="text-3xl font-bold flex items-center gap-2">
-                    <Flag className="h-8 w-8 text-red-500" />
+                    <LandPlot className="h-10 w-10 mr-2" />
                     Panel Laporan Admin
                 </h1>
                 <Button variant="outline" size="sm" onClick={fetchReports} disabled={isActionLoading}>
@@ -592,7 +593,7 @@ export default function AdminReportsPage() {
             </div>
 
             <Tabs defaultValue="statistics">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full md:w-fit grid-cols-2">
                     <TabsTrigger value="statistics" className="flex items-center gap-2">
                         <BarChart className="h-4 w-4" />
                         Statistik

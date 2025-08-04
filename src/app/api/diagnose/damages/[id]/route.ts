@@ -3,20 +3,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
 import { getUserById } from "@/lib/firebase/service";
 import { getKerusakanById, updateKerusakan, deleteKerusakan } from "@/lib/firebase/diagnose-service";
-import { Kerusakan } from "@/types/diagnose";
+import { z } from "zod";
+
+// Skema Zod untuk validasi data kerusakan
+const kerusakanSchema = z.object({
+    kode: z.string().min(1, { message: "Kode kerusakan tidak boleh kosong." }),
+    nama: z.string().min(1, { message: "Nama kerusakan tidak boleh kosong." }),
+    deskripsi: z.string().min(1, { message: "Deskripsi kerusakan tidak boleh kosong." }),
+    prior_probability: z.number().min(0.01, { message: "Prior probability harus lebih dari 0." }).max(0.5, { message: "Prior probability tidak boleh lebih dari 0.5." }).optional(),
+}).partial();
 
 // --- GET Request Handler (for fetching a single damage by ID) ---
-export async function GET(
-    request: NextRequest,
-    { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
     const session = await auth();
     if (!session?.user?.id) {
         return NextResponse.json({ status: false, statusCode: 401, message: "Unauthorized: User not authenticated." }, { status: 401 });
     }
 
     try {
-        const { id } = params;
+        const { id } = await params;
         if (!id) {
             return NextResponse.json({ status: false, statusCode: 400, message: "ID kerusakan diperlukan." }, { status: 400 });
         }
@@ -36,10 +41,7 @@ export async function GET(
 }
 
 // --- PUT Request Handler (for updating a damage by ID) ---
-export async function PUT(
-    request: NextRequest,
-    { params }: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
     const session = await auth();
     if (!session?.user?.id) {
         return NextResponse.json({ status: false, statusCode: 401, message: "Unauthorized: User not authenticated." }, { status: 401 });
@@ -50,26 +52,24 @@ export async function PUT(
     }
 
     try {
-        const { id } = params;
+        const { id } = await params;
         if (!id) {
             return NextResponse.json({ status: false, statusCode: 400, message: "ID kerusakan diperlukan untuk pembaruan." }, { status: 400 });
         }
 
-        const updatedKerusakanData: Partial<Kerusakan> = await request.json();
+        const body = await request.json();
+        const validation = kerusakanSchema.safeParse(body);
 
-        if (updatedKerusakanData.kode === null || updatedKerusakanData.kode === '') {
-            return NextResponse.json({ status: false, statusCode: 400, message: "Kode kerusakan tidak boleh kosong." }, { status: 400 });
-        }
-        if (updatedKerusakanData.nama === null || updatedKerusakanData.nama === '') {
-            return NextResponse.json({ status: false, statusCode: 400, message: "Nama kerusakan tidak boleh kosong." }, { status: 400 });
-        }
-        if (updatedKerusakanData.deskripsi === null || updatedKerusakanData.deskripsi === '') {
-            return NextResponse.json({ status: false, statusCode: 400, message: "Deskripsi kerusakan tidak boleh kosong." }, { status: 400 });
+        if (!validation.success) {
+            return NextResponse.json({
+                status: false,
+                statusCode: 400,
+                message: "Validasi gagal.",
+                errors: validation.error.formErrors.fieldErrors,
+            }, { status: 400 });
         }
 
-        if (updatedKerusakanData.prior_probability !== undefined && (updatedKerusakanData.prior_probability <= 0 || updatedKerusakanData.prior_probability > 0.5)) {
-            return NextResponse.json({ status: false, statusCode: 400, message: "Prior probability harus antara 0.01 dan 0.50." }, { status: 400 });
-        }
+        const updatedKerusakanData = validation.data;
 
         const kerusakanToUpdate = await getKerusakanById(id);
         if (!kerusakanToUpdate) {
@@ -87,10 +87,7 @@ export async function PUT(
 }
 
 // --- DELETE Request Handler ---
-export async function DELETE(
-    request: NextRequest,
-    { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
     const session = await auth();
     if (!session?.user?.id) {
         return NextResponse.json({ status: false, statusCode: 401, message: "Unauthorized: User not authenticated." }, { status: 401 });
@@ -101,9 +98,14 @@ export async function DELETE(
     }
 
     try {
-        const { id } = params;
+        const { id } = await params;
         if (!id) {
             return NextResponse.json({ status: false, statusCode: 400, message: "ID kerusakan diperlukan untuk penghapusan." }, { status: 400 });
+        }
+
+        const kerusakanToDelete = await getKerusakanById(id);
+        if (!kerusakanToDelete) {
+            return NextResponse.json({ status: false, statusCode: 404, message: "Kerusakan tidak ditemukan untuk dihapus." }, { status: 404 });
         }
 
         await deleteKerusakan(id);

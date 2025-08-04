@@ -1,18 +1,18 @@
 // /app/api/forum/posts/[id]/like/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../../auth";
-import { togglePostLike } from "@/lib/firebase/service";
-import { createNotification } from "@/lib/firebase/service";
-import { getForumPostById } from "@/lib/firebase/service"; // To get post details for notification
+import { togglePostLike, createNotification, getForumPostById } from "@/lib/firebase/service";
 
 // POST: toggle like on post
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+    // Menggunakan destructuring yang lebih ringkas dan sesuai dengan dokumentasi
+    const { id: postId } = await params;
+
     const session = await auth();
     if (!session?.user?.id) {
         return NextResponse.json({ status: false, statusCode: 401, message: "Unauthorized: User not authenticated." }, { status: 401 });
     }
 
-    const postId = await params.id;
     const userId = session.user.id;
 
     try {

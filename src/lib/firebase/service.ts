@@ -22,7 +22,7 @@ import type { ForumPost, ForumReply, ForumBookmark, Notification, EmojiReactionK
 // Constants for default user data
 const DEFAULT_MAX_DAILY_TOKENS = 10;
 const DEFAULT_BIO = "Halo! Saya pengguna baru DailyCheckIt.";
-const DEFAULT_AVATAR_URL = "/placeholder.svg"; // A good default for new users
+const DEFAULT_AVATAR_URL = ""; // A good default for new users
 
 export function getTodayDateString(): string {
     const now = new Date();

@@ -2,7 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function KerusakanPageSkeleton() {
     return (
-        <div className="container mx-auto px-4 py-8">
+        <div className="w-full px-4 py-8">
             <div className="animate-pulse space-y-6">
                 <div className="flex flex-col md:flex-row md:justify-between mb-6 space-y-4 md:space-y-0">
                     <div className="space-y-2">

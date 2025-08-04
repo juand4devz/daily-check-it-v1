@@ -52,6 +52,7 @@ import { getCategoryIcon, FORUM_CATEGORIES, getRandomGradient } from "@/lib/util
 import { ForumPost, ForumBookmark } from "@/types/forum";
 import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import BookmarksSkeleton from "./loading";
 
 
 // Extend ForumPost for bookmarked context
@@ -61,43 +62,47 @@ interface BookmarkedPostDisplay extends ForumPost {
     bookmarkId: string; // The ID of the bookmark document itself (for deletion)
 }
 
-// Komponen BookmarkCard (sudah dimodifikasi di Tahap 2, disertakan di sini untuk kelengkapan)
+// Komponen BookmarkCard
 interface BookmarkCardProps {
     post: BookmarkedPostDisplay;
     viewMode: "grid" | "list";
     isSelected: boolean;
     bulkDeleteMode: boolean;
     onToggleSelection: () => void;
-    onAction: (bookmarkId: string, postId: string, action: string) => void; // Added bookmarkId
+    onAction: (bookmarkId: string, postId: string, action: string) => void;
 }
 
 function BookmarkCard({ post, viewMode, isSelected, bulkDeleteMode, onToggleSelection, onAction }: BookmarkCardProps) {
     const hasMedia = post.media && post.media.length > 0;
-    // Menggunakan optional chaining untuk akses yang lebih aman
-    const thumbnail = post.media?.[0]?.url || null; // Perbaikan di sini
+    const thumbnail = post.media?.[0]?.url || null;
     const CategoryIcon = getCategoryIcon(post.category);
 
     const handleCopyLink = (event: React.MouseEvent) => {
-        event.stopPropagation(); // Mencegah event klik menyebar ke card
+        event.stopPropagation();
         const link = `${window.location.origin}/forum/${post.id}`;
         navigator.clipboard.writeText(link)
             .then(() => toast.success("Tautan postingan berhasil disalin!"))
             .catch(() => toast.error("Gagal menyalin tautan."));
-        // onAction(post.bookmarkId, post.id, "share-link"); // Jika ada logika tambahan di onAction
     };
 
     const handleShareExternal = (event: React.MouseEvent) => {
-        event.stopPropagation(); // Mencegah event klik menyebar ke card
+        event.stopPropagation();
         if (navigator.share) {
             navigator.share({
                 title: post.title,
                 text: post.description,
                 url: `${window.location.origin}/forum/${post.id}`,
             })
-                // .then(() => onAction(post.bookmarkId, post.id, "share-external")) // Jika ada logika tambahan
                 .catch((error) => console.error("Error sharing:", error));
         } else {
             toast.info("Fitur berbagi tidak didukung di browser ini. Gunakan 'Salin Link'.");
+        }
+    };
+
+    // Handler untuk event klik pada card utama
+    const handleCardClick = () => {
+        if (!bulkDeleteMode) {
+            onAction(post.bookmarkId, post.id, "view-post");
         }
     };
 
@@ -108,18 +113,15 @@ function BookmarkCard({ post, viewMode, isSelected, bulkDeleteMode, onToggleSele
                 "hover:shadow-md transition-all duration-300 py-2",
                 isSelected ? "ring-2 ring-blue-500" : ""
             )}>
-                <CardContent className="p-4">
+                <CardContent className="p-4 cursor-pointer" onClick={handleCardClick}>
                     <div className="flex gap-4">
                         {/* Checkbox for Bulk Delete */}
                         {bulkDeleteMode && (
-                            <div>
+                            <div onClick={(e) => e.stopPropagation()}>
                                 <input
                                     type="checkbox"
                                     checked={isSelected}
-                                    onChange={(e) => {
-                                        e.stopPropagation(); // Prevent card click
-                                        onToggleSelection();
-                                    }}
+                                    onChange={onToggleSelection}
                                     className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
                                 />
                             </div>
@@ -149,7 +151,6 @@ function BookmarkCard({ post, viewMode, isSelected, bulkDeleteMode, onToggleSele
                                 <div className="flex-1">
                                     <h3
                                         className="font-semibold text-lg line-clamp-1 hover:text-blue-600 cursor-pointer transition-colors"
-                                        onClick={() => onAction(post.bookmarkId, post.id, "view-post")} // Aksi lihat post
                                     >
                                         {post.title}
                                     </h3>
@@ -165,9 +166,9 @@ function BookmarkCard({ post, viewMode, isSelected, bulkDeleteMode, onToggleSele
                                 </div>
 
                                 {/* Aksi pada Popover (List View) */}
-                                <div className="shrink-0">
+                                <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                                     <DropdownMenu>
-                                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                        <DropdownMenuTrigger asChild>
                                             <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                                                 <MoreHorizontal className="h-4 w-4" />
                                             </Button>
@@ -177,11 +178,11 @@ function BookmarkCard({ post, viewMode, isSelected, bulkDeleteMode, onToggleSele
                                                 <ExternalLink className="h-4 w-4 mr-2" />
                                                 Lihat Post
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={handleCopyLink}> {/* Menggunakan handler terpisah */}
+                                            <DropdownMenuItem onClick={handleCopyLink}>
                                                 <Copy className="h-4 w-4 mr-2" />
                                                 Salin Link
                                             </DropdownMenuItem>
-                                            <DropdownMenuItem onClick={handleShareExternal}> {/* Menggunakan handler terpisah */}
+                                            <DropdownMenuItem onClick={handleShareExternal}>
                                                 <Share2 className="h-4 w-4 mr-2" />
                                                 Bagikan
                                             </DropdownMenuItem>
@@ -219,7 +220,7 @@ function BookmarkCard({ post, viewMode, isSelected, bulkDeleteMode, onToggleSele
                                     {hasMedia && (
                                         <span className="flex items-center gap-1">
                                             <ImageIcon className="h-4 w-4" />
-                                            {post.media?.length} {/* Perbaikan di sini */}
+                                            {post.media?.length}
                                         </span>
                                     )}
                                 </div>
@@ -240,7 +241,7 @@ function BookmarkCard({ post, viewMode, isSelected, bulkDeleteMode, onToggleSele
                 isSelected ? "ring-2 ring-blue-500" : ""
             )}
         >
-            <div onClick={() => !bulkDeleteMode && onAction(post.bookmarkId, post.id, "view-post")}>
+            <div onClick={handleCardClick}>
                 {/* Thumbnail Post */}
                 <div className="relative h-48 overflow-hidden">
                     {thumbnail ? (
@@ -263,21 +264,18 @@ function BookmarkCard({ post, viewMode, isSelected, bulkDeleteMode, onToggleSele
 
                     {/* Checkbox Selection (when bulk delete mode is active) */}
                     {bulkDeleteMode && (
-                        <div className="absolute top-3 left-3 z-10">
+                        <div className="absolute top-3 left-3 z-10" onClick={(e) => e.stopPropagation()}>
                             <input
                                 type="checkbox"
                                 checked={isSelected}
-                                onChange={(e) => {
-                                    e.stopPropagation(); // Prevent card click
-                                    onToggleSelection();
-                                }}
+                                onChange={onToggleSelection}
                                 className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 bg-white"
                             />
                         </div>
                     )}
 
                     {/* Status Badges (Category, Resolved) */}
-                    <div className={cn("absolute top-3 flex gap-2 z-10", bulkDeleteMode ? "right-3" : "left-3")}>
+                    <div className={cn("absolute top-3 flex gap-2 z-10", bulkDeleteMode ? "right-3" : "left-3")} onClick={(e) => e.stopPropagation()}>
                         <Badge variant="secondary" className="bg-black/50 text-white border-0">
                             <CategoryIcon className="h-3 w-3 mr-1" />
                             {post.category}
@@ -292,19 +290,19 @@ function BookmarkCard({ post, viewMode, isSelected, bulkDeleteMode, onToggleSele
 
                     {/* Media Indicator */}
                     {hasMedia && (
-                        <div className="absolute bottom-3 left-3 z-10">
+                        <div className="absolute bottom-3 left-3 z-10" onClick={(e) => e.stopPropagation()}>
                             <Badge variant="secondary" className="bg-black/50 text-white border-0">
                                 <ImageIcon className="h-3 w-3 mr-1" />
-                                {post.media?.length} {/* Perbaikan di sini */}
+                                {post.media?.length}
                             </Badge>
                         </div>
                     )}
 
                     {/* Actions Dropdown (Grid View) */}
                     {!bulkDeleteMode && (
-                        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10" onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
-                                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenuTrigger asChild>
                                     <Button variant="secondary" size="sm" className="h-8 w-8 p-0 bg-black/50 hover:bg-black/70 border-0">
                                         <MoreHorizontal className="h-4 w-4 text-white" />
                                     </Button>
@@ -314,11 +312,11 @@ function BookmarkCard({ post, viewMode, isSelected, bulkDeleteMode, onToggleSele
                                         <ExternalLink className="h-4 w-4 mr-2" />
                                         Lihat Post
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={handleCopyLink}> {/* Menggunakan handler terpisah */}
+                                    <DropdownMenuItem onClick={handleCopyLink}>
                                         <Copy className="h-4 w-4 mr-2" />
                                         Salin Link
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={handleShareExternal}> {/* Menggunakan handler terpisah */}
+                                    <DropdownMenuItem onClick={handleShareExternal}>
                                         <Share2 className="h-4 w-4 mr-2" />
                                         Bagikan
                                     </DropdownMenuItem>
@@ -361,7 +359,6 @@ function BookmarkCard({ post, viewMode, isSelected, bulkDeleteMode, onToggleSele
                     </p>
                 )}
 
-                {/* Tags */}
                 {post.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-4">
                         {post.tags.slice(0, 3).map((tag, index) => (
@@ -377,7 +374,6 @@ function BookmarkCard({ post, viewMode, isSelected, bulkDeleteMode, onToggleSele
                     </div>
                 )}
 
-                {/* Stats */}
                 <div className="flex items-center justify-between text-sm text-gray-500 pt-3 border-t">
                     <div className="flex items-center gap-4">
                         <span className="flex items-center gap-1">
@@ -406,108 +402,6 @@ function BookmarkCard({ post, viewMode, isSelected, bulkDeleteMode, onToggleSele
                 }
             `}</style>
         </Card>
-    );
-}
-
-// --- Bookmarks Skeleton Loader ---
-function BookmarksSkeleton() {
-    return (
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-                <div className="flex items-center gap-4">
-                    <div className="h-10 w-20 bg-gray-200 rounded animate-pulse" />
-                    <div>
-                        <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-2" />
-                        <div className="h-4 w-64 bg-gray-200 rounded animate-pulse" />
-                    </div>
-                </div>
-                <div className="h-10 w-32 bg-gray-200 rounded animate-pulse" />
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                {Array.from({ length: 4 }).map((_, i) => (
-                    <Card key={i}>
-                        <CardContent className="p-4 text-center">
-                            <div className="h-8 w-12 bg-gray-200 rounded animate-pulse mx-auto mb-1" />
-                            <div className="h-4 w-16 bg-gray-200 rounded animate-pulse mx-auto" />
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <div className="lg:col-span-3">
-                    <Card className="mb-6">
-                        <CardContent className="p-4">
-                            <div className="flex flex-col gap-4">
-                                <div className="flex gap-4">
-                                    <div className="flex-1 h-10 bg-gray-200 rounded animate-pulse" />
-                                    <div className="flex gap-2">
-                                        <div className="h-10 w-10 bg-gray-200 rounded animate-pulse" />
-                                        <div className="h-10 w-10 bg-gray-200 rounded animate-pulse" />
-                                    </div>
-                                </div>
-                                <div className="flex gap-4">
-                                    <div className="h-10 w-48 bg-gray-200 rounded animate-pulse" />
-                                    <div className="h-10 w-48 bg-gray-200 rounded animate-pulse" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {Array.from({ length: 6 }).map((_, i) => (
-                            <Card key={i} className="overflow-hidden">
-                                <div className="h-48 bg-gray-200 animate-pulse" />
-                                <CardContent className="p-4">
-                                    <div className="flex items-start gap-3 mb-3">
-                                        <div className="h-8 w-8 bg-gray-200 rounded-full animate-pulse" />
-                                        <div className="flex-1">
-                                            <div className="h-4 w-24 bg-gray-200 rounded animate-pulse mb-1" />
-                                            <div className="h-3 w-32 bg-gray-200 rounded animate-pulse" />
-                                        </div>
-                                    </div>
-                                    <div className="h-6 w-3/4 bg-gray-200 rounded animate-pulse mb-2" />
-                                    <div className="space-y-2 mb-3">
-                                        <div className="h-4 w-full bg-gray-200 rounded animate-pulse" />
-                                        <div className="h-4 w-2/3 bg-gray-200 rounded animate-pulse" />
-                                    </div>
-                                    <div className="flex gap-2 mb-4">
-                                        <div className="h-5 w-16 bg-gray-200 rounded animate-pulse" />
-                                        <div className="h-5 w-12 bg-gray-200 rounded animate-pulse" />
-                                    </div>
-                                    <div className="flex justify-between items-center pt-3 border-t">
-                                        <div className="flex gap-4">
-                                            <div className="h-4 w-12 bg-gray-200 rounded animate-pulse" />
-                                            <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
-                                        </div>
-                                        <div className="h-3 w-20 bg-gray-200 rounded animate-pulse" />
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="lg:col-span-1 space-y-6">
-                    <Card>
-                        <CardHeader>
-                            <div className="h-6 w-20 bg-gray-200 rounded animate-pulse" />
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            {Array.from({ length: 6 }).map((_, i) => (
-                                <div key={i} className="p-3 rounded-lg">
-                                    <div className="flex items-center justify-between">
-                                        <div className="h-4 w-16 bg-gray-200 rounded animate-pulse" />
-                                        <div className="h-5 w-8 bg-gray-200 rounded animate-pulse" />
-                                    </div>
-                                </div>
-                            ))}
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
-        </div>
     );
 }
 

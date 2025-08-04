@@ -6,7 +6,8 @@ import { ForumPost } from "@/types/forum";
 
 // GET: single post
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
-    const postId = await params.id;
+    // Destructuring dan await params agar lebih ringkas
+    const { id: postId } = await params;
 
     try {
         const post = await getForumPostById(postId);
@@ -23,13 +24,13 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
 // PATCH: Update specific fields of a post
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+    // Destructuring dan await params
+    const { id: postId } = await params;
+
     const session = await auth();
-    // Middleware sudah memastikan session ada, tapi kita bisa tambahkan untuk type-safety
     if (!session || !session.user || !session.user.id) {
         return NextResponse.json({ status: false, statusCode: 401, message: "Unauthorized: Session missing." }, { status: 401 });
     }
-
-    const postId = await params.id;
 
     try {
         const body = await request.json();
@@ -40,25 +41,25 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         }
 
         // --- PEMERIKSAAN OTORISASI KETAT DI SINI ---
-        // Hanya penulis postingan atau admin yang dapat memperbarui
         if (existingPost.authorId !== session.user.id && session.user.role !== "admin") {
             return NextResponse.json({ status: false, statusCode: 403, message: "Forbidden: You are not authorized to update this post." }, { status: 403 });
         }
 
+        // Buat objek update hanya dengan properti yang diberikan di body
         const updateData: Partial<ForumPost> = {
-            title: body.title !== undefined ? body.title : existingPost.title, // Only update if provided
-            description: body.description !== undefined ? body.description : existingPost.description,
-            content: body.content !== undefined ? body.content : existingPost.content,
-            type: body.type !== undefined ? body.type : existingPost.type,
-            category: body.category !== undefined ? body.category : existingPost.category,
+            ...body,
+            // Perbarui isPinned dan isArchived HANYA jika admin yang melakukannya
+            ...(session.user.role !== "admin" && {
+                isPinned: existingPost.isPinned,
+                isArchived: existingPost.isArchived,
+            }),
+            // Pastikan media dan tags dihandle jika tidak ada
             tags: body.tags !== undefined ? (body.tags || []) : existingPost.tags,
-            thumbnail: body.thumbnail === undefined ? null : body.thumbnail,
             media: body.media !== undefined ? (body.media || []) : existingPost.media,
-            isResolved: typeof body.isResolved === 'boolean' ? body.isResolved : existingPost.isResolved,
-            solutionReplyId: body.solutionReplyId === undefined ? null : body.solutionReplyId,
-            // isPinned and isArchived can ONLY be changed by admin
-            isPinned: typeof body.isPinned === 'boolean' && session.user.role === "admin" ? body.isPinned : existingPost.isPinned,
-            isArchived: typeof body.isArchived === 'boolean' && session.user.role === "admin" ? body.isArchived : existingPost.isArchived,
+            // Thumbnail bisa diset null
+            thumbnail: body.thumbnail === undefined ? existingPost.thumbnail : (body.thumbnail || null),
+            // Update timestamp
+            updatedAt: new Date().toISOString(),
         };
 
         const result = await updateForumPost(postId, updateData);
@@ -76,12 +77,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
 // DELETE: Delete a single post
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+    // Destructuring dan await params
+    const { id: postId } = await params;
+
     const session = await auth();
     if (!session || !session.user || !session.user.id) {
         return NextResponse.json({ status: false, statusCode: 401, message: "Unauthorized: Session missing." }, { status: 401 });
     }
-
-    const postId = await params.id;
 
     try {
         const existingPost = await getForumPostById(postId);
@@ -90,7 +92,6 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
         }
 
         // --- PEMERIKSAAN OTORISASI KETAT DI SINI ---
-        // Hanya penulis postingan atau admin yang dapat menghapus
         if (existingPost.authorId !== session.user.id && session.user.role !== "admin") {
             return NextResponse.json({ status: false, statusCode: 403, message: "Forbidden: You are not authorized to delete this post." }, { status: 403 });
         }
