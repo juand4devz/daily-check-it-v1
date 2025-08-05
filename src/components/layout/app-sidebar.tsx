@@ -54,6 +54,7 @@ interface NavItem {
 interface NavGroup {
     label: string;
     items: NavItem[];
+    role?: "admin";
 }
 
 // --- Data Konfigurasi Navigasi ---
@@ -144,7 +145,6 @@ const personalHub: NavItem[] = [
     },
 ];
 
-// Gabungkan semua grup navigasi
 const navigationGroups: NavGroup[] = [
     {
         label: "Main",
@@ -157,6 +157,7 @@ const navigationGroups: NavGroup[] = [
     {
         label: "Administration",
         items: adminNavigation,
+        role: "admin",
     },
     {
         label: "Personal Hub",
@@ -164,15 +165,33 @@ const navigationGroups: NavGroup[] = [
     },
 ];
 
-interface SidebarNavProps extends React.HTMLAttributes<HTMLDivElement> {
-    customClassName?: string;
-}
+// --- Komponen Skeleton untuk seluruh konten sidebar ---
+const SidebarSkeleton = () => (
+    <div className="flex flex-col gap-4 p-2">
+        <div className="flex flex-col gap-2">
+            <Skeleton className="h-4 w-24" /> {/* Skeleton untuk label grup */}
+            <Skeleton className="h-10 w-full" /> {/* Skeleton untuk item menu */}
+            <Skeleton className="h-10 w-full" />
+        </div>
+        <div className="flex flex-col gap-2">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+        </div>
+        <div className="flex flex-col gap-2">
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+        </div>
+    </div>
+);
 
-export function SidebarNav({ className, ...props }: SidebarNavProps) {
+// --- Komponen klien untuk konten dinamis ---
+const DynamicSidebarContent = () => {
     const pathname = usePathname();
-    const { data: session } = useSession();
+    const { data: session, status } = useSession();
 
-    // Helper function to determine if a path is active
     const isLinkActive = (href: string, exactMatch?: boolean) => {
         if (exactMatch) {
             return pathname === href;
@@ -208,7 +227,43 @@ export function SidebarNav({ className, ...props }: SidebarNavProps) {
         </SidebarMenuItem>
     );
 
-    // Fungsi untuk menampilkan konfirmasi logout dengan Sonner
+    return (
+        <ScrollArea className="h-full max-h-[calc(100vh-4rem)] pr-2">
+            <div className="flex flex-col gap-2">
+                {/* Tampilkan skeleton saat loading */}
+                {status === "loading" && <SidebarSkeleton />}
+
+                {/* Tampilkan menu setelah loading selesai */}
+                {(status === "authenticated" || status === "unauthenticated") &&
+                    navigationGroups.map((group) => {
+                        // Sembunyikan menu admin jika user bukan admin
+                        if (group.role === "admin" && session?.user?.role !== "admin") {
+                            return null;
+                        }
+                        return (
+                            <SidebarGroup key={group.label}>
+                                <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+                                <SidebarGroupContent>
+                                    <SidebarMenu>
+                                        {group.items.map(renderSidebarItem)}
+                                    </SidebarMenu>
+                                </SidebarGroupContent>
+                            </SidebarGroup>
+                        );
+                    })}
+            </div>
+        </ScrollArea>
+    );
+};
+
+// --- Komponen utama SidebarNav ---
+interface SidebarNavProps extends React.HTMLAttributes<HTMLDivElement> {
+    customClassName?: string;
+}
+
+export function SidebarNav({ className, ...props }: SidebarNavProps) {
+    const { data: session, status } = useSession();
+
     const handleLogout = () => {
         toast("Yakin ingin keluar?", {
             description: "Anda akan keluar dari sesi ini. Tindakan ini tidak dapat dibatalkan.",
@@ -220,11 +275,12 @@ export function SidebarNav({ className, ...props }: SidebarNavProps) {
             },
             cancel: {
                 label: "Batal",
-                onClick: () => { }
+                onClick: () => { },
             },
-            // closeButton: true,
         });
     };
+
+    const isLoading = status === "loading";
 
     return (
         <Sidebar collapsible="icon" className={className} {...props}>
@@ -244,93 +300,72 @@ export function SidebarNav({ className, ...props }: SidebarNavProps) {
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarHeader>
+
             <SidebarContent className="relative group">
-                <div className="hidden data-[collapsible=icon]:hidden group-data-[collapsible=icon]:hidden sm:block h-full w-full">
-                    <ScrollArea className="h-full max-h-[calc(100vh-4rem)] pr-2">
-                        <div className="flex flex-col gap-2">
-                            {navigationGroups.map((group) => (
-                                <SidebarGroup key={group.label}>
-                                    <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-                                    <SidebarGroupContent>
-                                        <SidebarMenu>
-                                            {group.items.map(renderSidebarItem)}
-                                        </SidebarMenu>
-                                    </SidebarGroupContent>
-                                </SidebarGroup>
-                            ))}
-                        </div>
-                    </ScrollArea>
-                </div>
-                <div className="block data-[collapsible=icon]:block group-data-[collapsible=icon]:block sm:hidden h-full w-full">
-                    <div className="flex flex-col gap-2">
-                        {navigationGroups.map((group) => (
-                            <SidebarGroup key={group.label}>
-                                <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
-                                <SidebarGroupContent>
-                                    <SidebarMenu>
-                                        {group.items.map(renderSidebarItem)}
-                                    </SidebarMenu>
-                                </SidebarGroupContent>
-                            </SidebarGroup>
-                        ))}
-                    </div>
-                </div>
+                <DynamicSidebarContent />
             </SidebarContent>
 
-            <SidebarFooter>
+            <SidebarFooter className="p-1">
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <div className="flex items-center justify-between">
-                            <div className="flex gap-2 items-center">
-                                <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl bg-zinc-100">
-                                    {session ? (
-                                        <Avatar className="rounded-xl">
-                                            {session?.user?.avatar ? (
-                                                <AvatarImage
-                                                    src={session?.user?.avatar}
-                                                    alt={session?.user.username}
-                                                    height={50}
-                                                    width={50}
-                                                />
+                        <SidebarMenuButton className="py-6 flex items-center">
+                            <div className="flex w-full items-center justify-between">
+                                <div className="flex items-center justify-center gap-2">
+                                    <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-xl bg-zinc-100">
+                                        {/* Skeleton untuk avatar */}
+                                        {isLoading ? (
+                                            <Skeleton className="h-7 w-7 rounded-full" />
+                                        ) : (
+                                            <Avatar className="rounded-xl">
+                                                {session?.user?.avatar ? (
+                                                    <AvatarImage
+                                                        src={session?.user?.avatar}
+                                                        alt={session?.user.username}
+                                                        height={50}
+                                                        width={50}
+                                                    />
+                                                ) : (
+                                                    <AvatarFallback className="rounded-none">
+                                                        {(() => {
+                                                            const username = session?.user?.username || "";
+                                                            const words = username.trim().split(" ");
+                                                            if (words.length >= 2) {
+                                                                return (words[0][0] + words[1][0]).toUpperCase();
+                                                            }
+                                                            return username.slice(0, 2).toUpperCase();
+                                                        })()}
+                                                    </AvatarFallback>
+                                                )}
+                                            </Avatar>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-col items-start gap-y-1">
+                                        <span className="text-sm font-medium">
+                                            {/* Skeleton untuk nama pengguna */}
+                                            {isLoading ? (
+                                                <Skeleton className="bg-neutral-700 rounded-xs h-4 w-[100px]" />
                                             ) : (
-                                                <AvatarFallback className="rounded-none">
-                                                    {(() => {
-                                                        const username =
-                                                            session?.user?.username || "";
-                                                        const words = username.trim().split(" ");
-                                                        if (words.length >= 2) {
-                                                            return (words[0][0] + words[1][0]).toUpperCase();
-                                                        }
-                                                        return username.slice(0, 2).toUpperCase();
-                                                    })()}
-                                                </AvatarFallback>
+                                                session?.user?.username || "Guest"
                                             )}
-                                        </Avatar>
-                                    ) : (
-                                        <Skeleton className="h-12 w-12 rounded-full" />
-                                    )}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                            {/* Skeleton untuk email */}
+                                            {isLoading ? (
+                                                <Skeleton className="bg-neutral-800 rounded-xs h-4 w-[120px]" />
+                                            ) : (
+                                                session?.user?.email || "Belum Login"
+                                            )}
+                                        </span>
+                                    </div>
                                 </div>
-                                <div className="flex flex-col items-start gap-y-1">
-                                    <span className="text-sm font-medium">
-                                        {session ? (
-                                            session?.user?.username
-                                        ) : (
-                                            <Skeleton className="bg-neutral-700 rounded-xs h-4 w-[100px]" />
-                                        )}
-                                    </span>
-                                    <span className="text-xs text-muted-foreground">
-                                        {session ? (
-                                            session?.user?.email
-                                        ) : (
-                                            <Skeleton className="bg-neutral-800 rounded-xs h-4 w-[120px]" />
-                                        )}
-                                    </span>
-                                </div>
+                                {/* Tombol logout hanya tampil jika sudah login */}
+                                {session && (
+                                    <Button onClick={handleLogout} asChild variant="ghost" size="icon">
+                                        <LogOut className="h-4 w-4 hover:text-red-600" />
+                                    </Button>
+                                )}
                             </div>
-                            <Button onClick={handleLogout} variant="ghost">
-                                <LogOut className="size-4 hover:fill-red-600" />
-                            </Button>
-                        </div>
+                        </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarFooter>

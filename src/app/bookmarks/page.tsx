@@ -22,7 +22,6 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
-    Bookmark,
     Search,
     MoreHorizontal,
     Trash2,

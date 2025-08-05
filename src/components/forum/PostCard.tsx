@@ -3,7 +3,7 @@
 
 import type React from "react";
 import Image from "next/image";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,18 +13,9 @@ import {
     MessageSquare,
     Heart,
     CheckCircle,
-    MoreHorizontal,
     Pin,
-    Archive,
-    Edit,
-    Trash2,
-    Flag,
     Share2,
-    BookmarkPlus,
-    ExternalLink,
-    Copy,
     Eye,
-    BookmarkCheck,
     BookOpenText,
 } from "lucide-react";
 import type { ForumPost } from "@/types/forum";
@@ -305,7 +296,7 @@ export function PostCard({
                                 <Badge
                                     key={index}
                                     variant="outline"
-                                    className="text-xs cursor-pointer hover:bg-blue-100"
+                                    className="text-xs cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-950"
                                     onMouseDown={(e) => e.stopPropagation()}
                                     onClick={(e) => {
                                         e.stopPropagation();

@@ -18,7 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
     User,
-    Mail,
+    // Mail,
     Phone,
     MapPin,
     Globe,
@@ -154,6 +154,18 @@ export function UserProfileContent({ userId, onClose }: UserProfileContentProps)
                         Tidak ada gambar banner
                     </div>
                 )}
+
+                {!isCurrentUserProfile && (
+                    <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="mt-4 absolute top-0 right-5 rounded-xl"
+                        onClick={() => setIsReportDialogOpen(true)}
+                    >
+                        <Flag className="h-4 w-4" />
+                    </Button>
+                )}
             </div>
 
             {/* Profile Header & Info (Avatar, Name, Bio, Badges) */}
@@ -162,7 +174,7 @@ export function UserProfileContent({ userId, onClose }: UserProfileContentProps)
                     <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.username} />
                     <AvatarFallback className="text-5xl">{user.username[0]}</AvatarFallback>
                 </Avatar>
-                <div className="flex-1 space-y-3 text-center md:text-left mt-10 md:mt-0">
+                <div className="flex-1 space-y-3 text-center md:text-left mt-10 md:mt-20">
                     <h1 className="text-4xl font-bold">{user.username}</h1>
                     <p className="text-lg text-muted-foreground">{user.bio || "Tidak ada bio."}</p>
                     <div className="flex items-center justify-center md:justify-start gap-2 flex-wrap">
@@ -171,20 +183,9 @@ export function UserProfileContent({ userId, onClose }: UserProfileContentProps)
                                 <MapPin className="h-3 w-3" /> {user.location}
                             </Badge>
                         )}
-                        <Badge variant="secondary">{user.role}</Badge>
-                        {user.isBanned && <Badge variant="destructive">Banned</Badge>}
+                        {/* <Badge variant="secondary">{user.role}</Badge>
+                        {user.isBanned && <Badge variant="destructive">Banned</Badge>} */}
                     </div>
-                    {!isCurrentUserProfile && (
-                        <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            className="mt-4"
-                            onClick={() => setIsReportDialogOpen(true)}
-                        >
-                            <Flag className="h-4 w-4 mr-2" /> Laporkan Pengguna
-                        </Button>
-                    )}
                 </div>
             </div>
 
@@ -199,7 +200,7 @@ export function UserProfileContent({ userId, onClose }: UserProfileContentProps)
                     </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="posts" className="mt-6">
+                <TabsContent value="posts" className="mt-4">
                     {posts.length === 0 ? (
                         <Card>
                             <CardContent className="p-8 text-center">
@@ -225,19 +226,19 @@ export function UserProfileContent({ userId, onClose }: UserProfileContentProps)
                     )}
                 </TabsContent>
 
-                <TabsContent value="info" className="mt-6 space-y-6">
+                <TabsContent value="info" className="mt-4 space-y-6 grid grid-cols-1 md:grid-cols-2 md:gap-4">
                     {/* Card Informasi Dasar */}
-                    <Card>
+                    <Card className="col-span-1 h-full">
                         <CardHeader>
                             <CardTitle className="text-lg flex items-center gap-2"><User className="h-5 w-5" /> Informasi Dasar</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {user.email && (
+                            {/* {user.email && (
                                 <div className="flex items-center gap-2">
                                     <Mail className="h-4 w-4 text-muted-foreground" />
                                     <span className="text-sm">{user.email}</span>
                                 </div>
-                            )}
+                            )} */}
                             {user.phone && (
                                 <div className="flex items-center gap-2">
                                     <Phone className="h-4 w-4 text-muted-foreground" />
@@ -260,7 +261,7 @@ export function UserProfileContent({ userId, onClose }: UserProfileContentProps)
                     </Card>
 
                     {/* Card Media Sosial */}
-                    <Card>
+                    <Card className="col-span-1 w-full">
                         <CardHeader>
                             <CardTitle className="text-lg flex items-center gap-2"><LinkIcon className="h-5 w-5" /> Media Sosial & Website</CardTitle>
                         </CardHeader>
