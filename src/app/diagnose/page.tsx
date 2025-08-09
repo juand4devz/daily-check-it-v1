@@ -348,10 +348,11 @@ export default function DiagnosaPage() {
             return (
               <Card
                 key={gejala.kode}
-                className={`group cursor-pointer transition-all duration-200 hover:shadow-lg border-2 p-0 overflow-hidden ${isSelected
-                  ? "bg-background dark:bg-background border-1 border-gray-300 shadow-2xl ring-1 ring-gray-400 scale-105"
-                  : "border-gray-200 border dark:border-gray-500 hover:border-gray-300"
-                  } ${isDisabled ? "opacity-50 cursor-not-allowed bg-background" : ""}`}
+                className={`group cursor-pointer transition-all duration-200 hover:shadow-md border p-0 overflow-hidden rounded-lg
+    ${isSelected
+                    ? "border-transparent ring-2 ring-offset-2 ring-indigo-500 dark:ring-indigo-400 shadow-xl scale-100"
+                    : "border-gray-300 dark:border-gray-600 hover:border-indigo-300 dark:hover:border-indigo-400 scale-95"}
+    ${isDisabled ? "opacity-50 cursor-not-allowed bg-background" : ""}`}
                 onClick={() => !isDisabled && handleGejalaChange(gejala, !isSelected)}
               >
                 <div className="relative">

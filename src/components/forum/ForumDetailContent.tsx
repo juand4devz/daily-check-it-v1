@@ -434,7 +434,7 @@ export default function ForumDetailContent({ postId, isModal = false }: { postId
                     content: content,
                     authorId: userId,
                     authorUsername: username,
-                    authorAvatar: avatar || "/placeholder.svg",
+                    authorAvatar: avatar || "",
                     parentId: parentId || null,
                     mentions: mentionedUserIds || [],
                     media: finalMediaForSubmission,
@@ -1039,7 +1039,7 @@ export default function ForumDetailContent({ postId, isModal = false }: { postId
                                                 onClick={(e) => e.stopPropagation()}
                                             >
                                                 <Avatar className="h-12 w-12 mr-3">
-                                                    <AvatarImage src={post.authorAvatar || "/placeholder.svg"} />
+                                                    <AvatarImage src={post.authorAvatar || ""} />
                                                     <AvatarFallback>{post.authorUsername?.[0] || '?'}</AvatarFallback>
                                                 </Avatar>
                                             </div>

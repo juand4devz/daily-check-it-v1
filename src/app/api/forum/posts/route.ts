@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
             content: body.content,
             authorId: session.user.id,
             authorUsername: session.user.username,
-            authorAvatar: session.user.avatar || "/placeholder.svg",
+            authorAvatar: session.user.avatar || "",
             category: body.category,
             type: body.type,
             tags: body.tags || [],

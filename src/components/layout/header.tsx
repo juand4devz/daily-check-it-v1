@@ -40,6 +40,7 @@ export function Header() {
     const router = useRouter()
     const pathname = usePathname();
     const { data: session, status } = useSession();
+    console.log(session)
 
     const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
     const [isNotificationPopoverOpen, setIsNotificationPopoverOpen] = useState(false);
@@ -180,7 +181,7 @@ export function Header() {
                                             <div className="h-full w-full bg-gradient-to-br from-blue-400 to-purple-500 opacity-40"></div>
                                         )}
                                         <Avatar className="h-8 w-8 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 border border-white">
-                                            <AvatarImage src={session.user.avatar || "/placeholder.svg"} alt="Profile" />
+                                            <AvatarImage src={session.user.avatar || ""} alt="Profile" />
                                             <AvatarFallback className="rounded-full">
                                                 {session.user.username?.[0]?.toUpperCase() || '?'}
                                             </AvatarFallback>

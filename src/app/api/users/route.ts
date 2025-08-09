@@ -15,8 +15,8 @@ async function checkAdmin() {
 }
 
 // --- GET Request Handler (untuk mengambil semua pengguna) ---
-export async function GET(request: Request) {
-    const authResult = await checkAdmin(request);
+export async function GET() {
+    const authResult = await checkAdmin();
     if (!authResult.isAuthorized) {
         return authResult.response;
     }

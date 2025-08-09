@@ -283,7 +283,7 @@ export async function register(
     }
 }
 
-export async function login(data: { email: string }): Promise<User & { password?: string } | null> {
+export async function login(data: { email: string }): Promise<User | null> {
     const usersCollectionRef = collection(clientDb, "users");
     const q = query(usersCollectionRef, where("email", "==", data.email));
     const snapshot = await getDocs(q);
@@ -293,9 +293,18 @@ export async function login(data: { email: string }): Promise<User & { password?
     }
 
     const userDoc = snapshot.docs[0];
-    const userData = userDoc.data();
+    const userData = userDoc.data() as User;
 
-    return { id: userDoc.id, ...userData } as User & { password?: string };
+    // PERBAIKAN: Pastikan properti `username` ada dan diisi dari `username` di database.
+    // Properti `avatar` juga harus diperiksa dan diisi dengan placeholder jika kosong.
+    const userWithoutPassword = {
+        ...userData,
+        id: userDoc.id,
+        username: userData.username, // Pastikan username diambil
+        avatar: userData.avatar || "/placeholder.svg", // Gunakan placeholder jika avatar kosong
+    };
+
+    return userWithoutPassword;
 }
 
 async function handleOAuthLogin(email: string, name: string, loginType: User['loginType'], avatarUrl: string | null | undefined): Promise<User> {

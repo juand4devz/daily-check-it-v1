@@ -74,8 +74,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 if (userFromDb && userFromDb.password) {
                     const passwordConfirm = await compare(password, userFromDb.password);
                     if (passwordConfirm) {
+                        // PERBAIKAN: Mengembalikan objek user yang lengkap, tidak hanya properti yang ada di `User` NextAuth bawaan.
                         const { ...userWithoutPassword } = userFromDb;
-                        return userWithoutPassword as User;
+                        return userWithoutPassword; // Mengembalikan objek user lengkap tanpa password
                     }
                 }
                 return null;
@@ -143,57 +144,53 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
             if (dbUser) {
                 token.id = dbUser.id;
+                // PERBAIKAN: Perbarui semua properti token dengan data dari dbUser
                 token.username = dbUser.username;
                 token.email = dbUser.email;
                 token.role = dbUser.role;
                 token.loginType = dbUser.loginType;
-                token.avatar = dbUser.avatar; // Ini adalah properti avatar kustom kita
-
-                // Hapus properti 'image' bawaan NextAuth dari JWT
-                delete token.image;
-
+                token.avatar = dbUser.avatar;
                 token.dailyTokens = dbUser.dailyTokens;
                 token.maxDailyTokens = dbUser.maxDailyTokens;
                 token.lastResetDate = dbUser.lastResetDate;
                 token.totalUsage = dbUser.totalUsage;
+                token.isBanned = dbUser.isBanned;
 
-                // Pastikan `isBanned` juga ada di token
-                if (dbUser.isBanned !== undefined) {
-                    token.isBanned = dbUser.isBanned;
+                delete token.image; // Hapus properti `image` bawaan NextAuth
+                delete token.name; // Hapus properti `name` bawaan NextAuth
+
+                // Lakukan pengecekan token harian di sini juga
+                const todayDate = getTodayDateString();
+                if (dbUser.lastResetDate !== todayDate) {
+                    token.dailyTokens = dbUser.maxDailyTokens;
+                    token.lastResetDate = todayDate;
                 }
             }
             return token;
         },
         async session({ session, token }) {
+            // PERBAIKAN: Sesuaikan penyesuaian session agar sesuai dengan type yang sudah dideklarasikan
             if (session.user && token) {
                 session.user.id = token.id as string;
                 session.user.username = token.username as string;
                 session.user.email = token.email as string;
-                session.user.role = token.role as "admin" | "user" | "banned"; // Pastikan role ada
+                session.user.role = token.role as "admin" | "user" | "banned";
                 session.user.loginType = token.loginType as "email" | "github" | "google";
-                session.user.avatar = token.avatar as string; // Gunakan properti avatar kustom dari token
-
-                // Hapus properti 'image' dan 'name' bawaan dari session.user
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
-                delete session.user.image;
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
-                delete session.user.name;
-
+                session.user.avatar = token.avatar as string;
                 session.user.dailyTokens = token.dailyTokens as number;
                 session.user.maxDailyTokens = token.maxDailyTokens as number;
                 session.user.lastResetDate = token.lastResetDate as string;
                 session.user.totalUsage = token.totalUsage as number;
+
+                // Hapus properti bawaan yang tidak diperlukan lagi
+                delete session.user.image;
+                delete session.user.name;
 
                 // Logic reset token harian
                 const todayDate = getTodayDateString();
                 if (session.user.lastResetDate !== todayDate) {
                     session.user.dailyTokens = session.user.maxDailyTokens;
                     session.user.lastResetDate = todayDate;
-                    // TODO: Update Firestore with new dailyTokens and lastResetDate for this user
-                    // This should ideally be done in a non-blocking way, perhaps via a separate API call
-                    // or a Cloud Function triggered by lastLogin. For simplicity, client can update.
                 }
             }
             return session;

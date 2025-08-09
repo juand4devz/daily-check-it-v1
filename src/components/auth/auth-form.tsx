@@ -1,3 +1,4 @@
+// components/auth/AuthForm.tsx
 "use client";
 
 import { cn } from "@/lib/utils";
@@ -32,7 +33,8 @@ export function AuthForm({ className, type, ...props }: AuthFormProps) {
         setIsLoading(true);
 
         const form = e.target as HTMLFormElement;
-        const name = (form.elements.namedItem("name") as HTMLInputElement)?.value;
+        // Perbaikan: Gunakan `username` dari input form
+        const username = (form.elements.namedItem("username") as HTMLInputElement)?.value;
         const email = (form.elements.namedItem("email") as HTMLInputElement).value;
         const password = (form.elements.namedItem("password") as HTMLInputElement).value;
 
@@ -40,7 +42,9 @@ export function AuthForm({ className, type, ...props }: AuthFormProps) {
             if (type === "register") {
                 const res = await fetch("/api/auth/register", {
                     method: "POST",
-                    body: JSON.stringify({ name, email, password }),
+                    // Perbaikan: Kirim `username` ke API
+                    body: JSON.stringify({ username, email, password }),
+                    headers: { 'Content-Type': 'application/json' }
                 });
 
                 if (res.ok) {
@@ -108,12 +112,12 @@ export function AuthForm({ className, type, ...props }: AuthFormProps) {
                     <form onSubmit={handleSubmit} className="mt-3 flex flex-col gap-3"> {/* Mengurangi margin-top dan gap */}
                         {type === "register" && (
                             <div className="grid gap-2">
-                                <Label htmlFor="name">Fullname</Label>
+                                <Label htmlFor="username">Username</Label>
                                 <Input
-                                    id="name"
-                                    name="name"
+                                    id="username"
+                                    name="username"
                                     type="text"
-                                    placeholder="Contoh: Juanda"
+                                    placeholder="Contoh: juanda123"
                                     required
                                 />
                             </div>
