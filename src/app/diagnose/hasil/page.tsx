@@ -54,7 +54,7 @@ export default function HasilDiagnosaPage() {
     try {
       const parsedData: StoredDiagnosisResult = JSON.parse(storedData);
       setDiagnosisData(parsedData);
-      setLoadingDuration(parsedData.loading_duration || 1500); // Gunakan durasi dari API, fallback ke 1.5s
+      setLoadingDuration(parsedData.loading_duration || 1000); // Gunakan durasi dari API, fallback ke 1.5s
 
       // Catatan: Komponen ModernLoading sekarang mengelola sendiri timer,
       // sehingga kita tidak perlu lagi setTimeout di sini.
@@ -108,7 +108,7 @@ export default function HasilDiagnosaPage() {
       router.push("/forum/new");
 
       // setIsLoadingForum(false);
-    }, 500); // Durasi 0.5 detik untuk loading tombol
+    }, 100); // Durasi 0.1 detik untuk loading tombol
 
     return () => clearTimeout(timer);
   }, [diagnosisData, router]);
@@ -142,7 +142,7 @@ export default function HasilDiagnosaPage() {
   }, []);
 
   if (isLoading || !diagnosisData) {
-    return <ModernLoading duration={loadingDuration || 1500} onComplete={handleLoadingComplete} />;
+    return <ModernLoading duration={loadingDuration || 1000} onComplete={handleLoadingComplete} />;
   }
 
   const topResults = diagnosisData.result.sort((a, b) => b.belief - a.belief).slice(0, 3);
@@ -156,8 +156,8 @@ export default function HasilDiagnosaPage() {
           Kembali ke Diagnosa
         </Button>
 
-        <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-          <ScanText className="h-10 w-10" />
+        <h1 className="text-lg md:text-3xl font-bold mb-2 flex items-center gap-2">
+          <ScanText className="h-14 w-14" />
           Hasil Diagnosa Kerusakan
         </h1>
         <p className="text-gray-600">
@@ -186,48 +186,55 @@ export default function HasilDiagnosaPage() {
                     <Card key={kerusakanDetail.kode} className="p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Badge variant="outline" className="text-xs">
-                              #{index + 1}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              {kerusakanDetail.kode}
-                            </Badge>
-
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Badge
-                                  {...getBeliefBadge(kerusakanDetail.belief)}
-                                  className={`flex items-center gap-1 px-2 py-1 rounded-sm text-xs font-medium cursor-pointer ${getBeliefBadge(kerusakanDetail.belief)
-                                    }`}
-                                >
-                                  <BowArrow className="w-3 h-3" />
-                                  {getBeliefBadge(kerusakanDetail.belief).text}
-                                </Badge>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Tingkat Kepercayaan</p>
-                              </TooltipContent>
-                            </Tooltip>
-
-                            {kerusakanDetail.tingkat_kerusakan && (
+                          <div className="flex flex-col md:flex-row justify-between items-start">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Badge variant="outline" className="text-xs">
+                                #{index + 1}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {kerusakanDetail.kode}
+                              </Badge>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Badge
-                                    className={`flex items-center gap-1 px-2 py-1 rounded-sm text-xs font-medium cursor-pointer ${getDifficultyColor(kerusakanDetail.tingkat_kerusakan)
+                                    {...getBeliefBadge(kerusakanDetail.belief)}
+                                    className={`flex items-center gap-1 px-2 py-1 rounded-sm text-xs font-medium cursor-pointer ${getBeliefBadge(kerusakanDetail.belief)
                                       }`}
                                   >
-                                    <LucideAlertTriangle className="w-3 h-3" />
-                                    {kerusakanDetail.tingkat_kerusakan}
+                                    <BowArrow className="w-3 h-3" />
+                                    {getBeliefBadge(kerusakanDetail.belief).text}
                                   </Badge>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                  <p>Tingkat Kerusakan</p>
+                                  <p>Tingkat Kepercayaan</p>
                                 </TooltipContent>
                               </Tooltip>
-                            )}
 
+                              {kerusakanDetail.tingkat_kerusakan && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge
+                                      className={`flex items-center gap-1 px-2 py-1 rounded-sm text-xs font-medium cursor-pointer ${getDifficultyColor(kerusakanDetail.tingkat_kerusakan)
+                                        }`}
+                                    >
+                                      <LucideAlertTriangle className="w-3 h-3" />
+                                      {kerusakanDetail.tingkat_kerusakan}
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Tingkat Kerusakan</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
+                            <div className="text-left md:text-right">
+                              <div className={`text-4xl font-bold ${getBeliefColor(kerusakanDetail.belief)}`}>
+                                {(kerusakanDetail.belief * 100).toFixed(1)}%
+                              </div>
+                              <div className="text-xs text-gray-500">Kepercayaan</div>
+                            </div>
                           </div>
+
                           <h3 className="font-semibold text-lg mb-2">{kerusakanDetail.nama}</h3>
 
                           {/* Deskripsi sudah dihandle oleh ReactMarkdown */}
@@ -263,12 +270,6 @@ export default function HasilDiagnosaPage() {
                               <div className="text-orange-600 dark:text-orange-900">{(kerusakanDetail.uncertainty * 100).toFixed(1)}%</div>
                             </div>
                           </div>
-                        </div>
-                        <div className="text-right">
-                          <div className={`text-2xl font-bold ${getBeliefColor(kerusakanDetail.belief)}`}>
-                            {(kerusakanDetail.belief * 100).toFixed(1)}%
-                          </div>
-                          <div className="text-xs text-gray-500">Kepercayaan</div>
                         </div>
                       </div>
 

@@ -144,7 +144,7 @@ export default function Navbar() {
                                 {link.name}
                             </Link>
                         ))}
-                        <div className="w-full max-w-xs mt-4">
+                        <div className="w-full max-w-xs mt-4 flex items-center justify-center">
                             <AuthButton />
                         </div>
                     </nav>

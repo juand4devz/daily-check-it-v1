@@ -251,7 +251,7 @@ export async function POST(request: NextRequest) {
     const dominantCategory = Object.entries(categoryCount).sort(([, a], [, b]) => b - a)[0]?.[0] || "Mixed";
 
     const elapsedTime = Date.now() - startTime;
-    const requiredDelay = 1500; // 1.5 seconds
+    const requiredDelay = 1000; // 1.0 seconds
     const delay = Math.max(0, requiredDelay - elapsedTime);
 
     await new Promise((resolve) => setTimeout(resolve, delay));

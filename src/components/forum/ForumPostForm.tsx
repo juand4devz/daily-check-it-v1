@@ -607,7 +607,7 @@ export function ForumPostForm({
 
     if (isLoadingPage || isLoadingInitialData) {
         return (
-            <div className={cn("container mx-auto px-4 py-8", isModal ? "max-w-full" : "w-full")}>
+            <div className={cn("px-4 py-8", isModal ? "max-w-full" : "w-full")}>
                 <div className="space-y-6">
                     <Skeleton className="h-8 w-64" />
                     <Card>
@@ -627,7 +627,7 @@ export function ForumPostForm({
     }
 
     return (
-        <div className={cn("p-4", isModal ? "px-0" : "mw-full")}>
+        <div className={cn("px-4 py-8", isModal ? "px-0" : "")}>
             {!isModal && (
                 <div className="flex-col items-center gap-4 mb-8">
                     <Button type="button" variant="ghost" onClick={() => router.back()}>
@@ -656,8 +656,8 @@ export function ForumPostForm({
 
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(handleSubmit)} className={cn("space-y-6", isModal && "px-4")}>
-                    <div className={cn("grid grid-cols-1 gap-6", showRightSidebar ? "lg:grid-cols-4" : "lg:grid-cols-1")}>
-                        <div className={cn("space-y-6", showRightSidebar ? "lg:col-span-3" : "lg:col-span-1")}>
+                    <div className={cn("grid grid-cols-1 gap-6", showRightSidebar ? "md:grid-cols-4" : "md:grid-cols-1")}>
+                        <div className={cn("space-y-6", showRightSidebar ? "md:col-span-3" : "md:col-span-1")}>
                             <Card>
                                 <CardHeader>
                                     <CardTitle>Informasi Dasar</CardTitle>
@@ -1065,7 +1065,7 @@ export function ForumPostForm({
                         </div>
 
                         {/* Right Sidebar */}
-                        <div className={cn("space-y-6 lg:sticky lg:top-8 h-fit max-w-[15rem]", !showRightSidebar && "hidden")}>
+                        <div className={cn("space-y-6 lg:sticky lg:top-8 h-fit col-span-1", !showRightSidebar && "hidden")}>
                             {selectedType && (
                                 <Card>
                                     <CardHeader>
