@@ -40,13 +40,6 @@ interface ImportKerusakanRequestBody {
 
 export async function POST(request: NextRequest) {
     try {
-
-        const body = await request.json().catch(() => null);
-
-        if (!body) {
-            return NextResponse.json({ error: "Permintaan tidak valid: body tidak berisi JSON yang benar." }, { status: 400 });
-        }
-
         const { data, replaceExisting }: ImportKerusakanRequestBody = await request.json();
         const now = new Date().toISOString();
         const collectionRef = adminDb.collection("kerusakan");
