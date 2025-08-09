@@ -1,11 +1,19 @@
+import { cn } from '@/lib/utils';
 import React from 'react';
 
-const DailyCekItLogo: React.FC = () => {
+// Mendefinisikan tipe props untuk komponen ini.
+// Props 'className' bersifat opsional, yang merupakan praktik yang baik.
+interface DailyCekItLogoProps {
+    className?: string;
+}
+
+// Perbaiki cara menerima props dengan tipe yang sudah didefinisikan.
+const DailyCekItLogo: React.FC<DailyCekItLogoProps> = ({ className }) => {
     return (
         <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 2236.96 476.92"
-            className="w-full h-auto"
+            className={cn("w-full h-auto", className)}
         >
             <g id="Layer_2" data-name="Layer 2">
                 <text

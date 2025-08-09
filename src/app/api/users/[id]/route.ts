@@ -20,13 +20,43 @@ export async function GET(
     request: NextRequest,
     { params }: { params: { id: string } }
 ) {
+    const session = await auth();
+    const { id } = await params;
+
+    // Periksa apakah pengguna yang login mencoba mengakses profilnya sendiri
+    if (session && session.user?.id === id) {
+        try {
+            if (!id) {
+                return NextResponse.json({ error: "ID pengguna diperlukan." }, { status: 400 });
+            }
+
+            const user = await getUserById(id);
+            if (!user) {
+                return NextResponse.json({ error: "Pengguna tidak ditemukan." }, { status: 404 });
+            }
+
+            // Hapus data sensitif yang tidak seharusnya terlihat oleh pengguna lain atau bahkan dirinya sendiri
+            const { ...rest } = user;
+            return NextResponse.json(rest, { status: 200 });
+
+        } catch (caughtError: unknown) {
+            console.error(`Terjadi kesalahan saat mengambil data pengguna ${id}:`, caughtError);
+            let errorMessage = "Gagal mengambil data pengguna dari database.";
+            if (caughtError instanceof Error) {
+                errorMessage = caughtError.message;
+            }
+            return NextResponse.json({ error: errorMessage }, { status: 500 });
+        }
+    }
+
+    // Jika bukan profilnya sendiri, jalankan pemeriksaan admin
     const authResult = await checkAdmin();
     if (!authResult.isAuthorized) {
         return authResult.response;
     }
 
+    // Logika untuk admin melihat profil orang lain
     try {
-        const { id } = await params;
         if (!id) {
             return NextResponse.json({ error: "ID pengguna diperlukan." }, { status: 400 });
         }
@@ -37,9 +67,9 @@ export async function GET(
         }
 
         const { ...rest } = user;
-        return NextResponse.json(rest);
+        return NextResponse.json(rest, { status: 200 });
     } catch (caughtError: unknown) {
-        console.error(`Terjadi kesalahan saat mengambil data pengguna ${params.id}:`, caughtError);
+        console.error(`Terjadi kesalahan saat mengambil data pengguna ${id}:`, caughtError);
         let errorMessage = "Gagal mengambil data pengguna dari database.";
         if (caughtError instanceof Error) {
             errorMessage = caughtError.message;

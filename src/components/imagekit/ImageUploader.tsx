@@ -233,8 +233,8 @@ export function ImageUploader({
             {!disabled && (
                 <div className={cn(
                     "absolute z-10 transition-opacity",
-                    type === "avatar" ? "right-2 -bottom-2" : "top-2 right-2",
-                    "group-hover:opacity-100 opacity-0" // Menyembunyikan tombol secara default, tampil saat hover
+                    type === "avatar" ? "-right-44 bottom-4" : "top-2 right-2",
+                    "group-hover:opacity-100 opacity-100 md:opacity-0" // Menyembunyikan tombol secara default, tampil saat hover
                 )}>
                     {fileToUpload ? (
                         // Opsi saat file baru dipilih
@@ -268,7 +268,7 @@ export function ImageUploader({
                                 <Button
                                     variant="secondary"
                                     size="icon"
-                                    className={cn("h-8 w-8", type === "avatar" && "rounded-full")}
+                                    className={cn("h-8 w-8", type === "avatar" && "rounded-full absolute bottom-0 right-44")}
                                 >
                                     <SquarePen className="h-4 w-4" />
                                     <span className="sr-only">Edit gambar</span>

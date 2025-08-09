@@ -16,10 +16,10 @@ import {
     ExternalLink,
     BookmarkPlus,
     BookmarkCheck,
-    Download,
+    // Download,
     Edit,
     Pin,
-    Archive,
+    // Archive,
     Trash2,
     Flag,
 } from "lucide-react";
@@ -103,12 +103,12 @@ export function PostActionsPopover({
                             )}
                         </DropdownMenuItem>
                     )}
-                    {post.media && post.media.length > 0 && (
+                    {/* {post.media && post.media.length > 0 && (
                         <DropdownMenuItem onSelect={(e) => { e.preventDefault(); handleGeneralAction("download"); }}>
                             <Download className="h-4 w-4 mr-2" />
                             Unduh Media
                         </DropdownMenuItem>
-                    )}
+                    )} */}
                     <DropdownMenuSeparator />
 
                     {isLoggedIn && (isPostAuthor || isAdmin) ? (
@@ -134,12 +134,12 @@ export function PostActionsPopover({
                                 </DropdownMenuItem>
                             )}
                             {/* Aksi Arsip Post (hanya admin, fitur akan datang) */}
-                            {isAdmin && (
+                            {/* {isAdmin && (
                                 <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onAction("archive"); }}>
                                     <Archive className="h-4 w-4 mr-2" />
                                     {post.isArchived ? "Buka Arsip" : "Arsipkan"}
                                 </DropdownMenuItem>
-                            )}
+                            )} */}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                                 onSelect={(e) => { e.preventDefault(); handleGeneralAction("delete"); }}

@@ -25,7 +25,7 @@ type AuthFormProps = React.ComponentPropsWithoutRef<"div"> & {
 export function AuthForm({ className, type, ...props }: AuthFormProps) {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
-    const callbackUrl = "/"; // ganti sesuai kebutuhanmu
+    const callbackUrl = "/forum-feed"; // ganti sesuai kebutuhanmu
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();

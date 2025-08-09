@@ -74,7 +74,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 if (userFromDb && userFromDb.password) {
                     const passwordConfirm = await compare(password, userFromDb.password);
                     if (passwordConfirm) {
-                        const { password, ...userWithoutPassword } = userFromDb;
+                        const { ...userWithoutPassword } = userFromDb;
                         return userWithoutPassword as User;
                     }
                 }

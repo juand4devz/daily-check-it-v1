@@ -14,7 +14,7 @@ interface MainLayoutProps {
 
 
 export default function GeneralLayout({ children }: MainLayoutProps) {
-    const disableSideheader = ["/login", "/register"]
+    const disableSideheader = ["/login", "/register", "/"]
 
     const pathname = usePathname();
 
@@ -34,9 +34,9 @@ export default function GeneralLayout({ children }: MainLayoutProps) {
                 >
                     <SidebarProvider>
                         {!disableSideheader.includes(pathname) && <SidebarNav />}
-                        <SidebarInset>
+                        <SidebarInset className="flex flex-col">
                             {!disableSideheader.includes(pathname) && <Header />}
-                            {/* <main className="flex-1 p-4"> */}
+                            {/* <main className="relative"> */}
                             {children}
                             {/* </main> */}
                         </SidebarInset>

@@ -603,8 +603,8 @@ export default function MassScopePage() {
             </div>
 
             {/* Legend */}
-            <Card className="mt-4 sm:mt-6">
-                <CardHeader className="pb-4">
+            <Card>
+                <CardHeader>
                     <CardTitle className="text-lg sm:text-xl">Keterangan</CardTitle>
                 </CardHeader>
                 <CardContent>

@@ -328,24 +328,24 @@ export function ReplyItem({
             id={`comment-${reply.id}`}
             ref={itemRef}
             className={cn(
-                reply.isSolution ? "border-green-200 border-2 bg-green-50/50 dark:bg-green-900/20" : "",
+                reply.isSolution ? "border-green-200 border bg-green-50/50 dark:bg-green-900/20" : "",
                 isHighlighted && "animate-highlight border-blue-500 border-2 shadow-lg",
-                "flex-col pt-3 pb-4"
+                "flex-col pt-1.5 md:pt-4 pb-1.5 md:pb-4 md:px-3"
             )}
         >
-            <CardContent className="px-3 ">
-                <div className="flex gap-3">
-                    <div className="flex-1">
+            <CardContent className="px-1 w-full">
+                <div className="flex gap-3 w-full">
+                    <div className="flex flex-col w-full">
                         <div className="flex items-center mb-4 gap-y-1">
                             {!isNested && (
-                                <div className="flex flex-col items-center mr-3">
+                                <div className="flex flex-col items-center mr-1">
                                     <Button
                                         type="button"
                                         variant="outline"
                                         size="icon"
                                         onClick={() => onVote(reply.id, "up", currentUserVoteStatus)}
                                         disabled={!currentUserId}
-                                        className={`h-7 w-7 transition-colors duration-200 ${currentUserVoteStatus === "up"
+                                        className={`h-6 w-6 transition-colors duration-200 ${currentUserVoteStatus === "up"
                                             ? "text-blue-500 hover:text-blue-600"
                                             : "text-gray-400 hover:text-gray-500"
                                             }`}
@@ -361,7 +361,7 @@ export function ReplyItem({
                                         size="icon"
                                         onClick={() => onVote(reply.id, "down", currentUserVoteStatus)}
                                         disabled={!currentUserId}
-                                        className={`h-7 w-7 p-0 transition-colors duration-200 ${currentUserVoteStatus === "down"
+                                        className={`h-6 w-6 p-0 transition-colors duration-200 ${currentUserVoteStatus === "down"
                                             ? "text-blue-500 hover:text-blue-600"
                                             : "text-gray-400 hover:text-gray-500"
                                             }`}
@@ -370,49 +370,54 @@ export function ReplyItem({
                                     </Button>
                                 </div>
                             )}
-                            <div className="flex items-center justify-between border p-4 w-full rounded-md">
-                                <div className="flex items-center gap-2 w-full">
-                                    <UserProfileClickPopover userId={reply.authorId}>
-                                        <div
-                                            className="flex items-center gap-2 cursor-pointer"
-                                            onMouseDown={(e) => e.stopPropagation()}
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            <Avatar className={cn(isNested ? "h-8 w-8 border border-gray-300" : "h-9 w-9 border-2 border-blue-400")}>
-                                                <AvatarImage src={reply.authorAvatar || "/placeholder.svg"} />
-                                                <AvatarFallback className={cn(isNested ? "bg-gray-100 text-gray-600" : "bg-blue-200 text-blue-800 font-semibold")}>{reply.authorUsername?.[0] || '?'}</AvatarFallback>
-                                            </Avatar>
-                                            <div className="flex flex-col ml-2">
-                                                <span className="font-medium hover:underline">
-                                                    {reply.authorUsername}
-                                                </span>
-                                                <span className="text-sm text-gray-500">
-                                                    {formatTimeAgo(reply.createdAt)}
-                                                </span>
+                            <div className="flex flex-col justify-between border py-4 w-full rounded-md">
+                                <div className="flex px-2">
+                                    <div className="flex items-center gap-2 w-full">
+                                        <UserProfileClickPopover userId={reply.authorId}>
+                                            <div
+                                                className="flex items-star cursor-pointer"
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <Avatar className={cn(isNested ? "h-8 w-8 border border-gray-300" : "h-9 w-9 border-2 border-blue-400")}>
+                                                    <AvatarImage src={reply.authorAvatar || "/placeholder.svg"} />
+                                                    <AvatarFallback className={cn(isNested ? "bg-gray-100 text-gray-600" : "bg-blue-200 text-blue-800 font-semibold")}>{reply.authorUsername?.[0] || '?'}</AvatarFallback>
+                                                </Avatar>
+                                                <div className="flex flex-col ml-2">
+                                                    <span className="font-medium text-xs sm:text-sm hover:underline">
+                                                        {reply.authorUsername}
+                                                    </span>
+                                                    <span className="text-xs md:text-sm text-gray-500">
+                                                        {formatTimeAgo(reply.createdAt)}
+                                                    </span>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </UserProfileClickPopover>
-                                    {reply.isSolution && (
-                                        <Badge className="bg-green-600 text-white">
-                                            <Award className="h-3 w-3 mr-1" />
-                                            Solusi
-                                        </Badge>
-                                    )}
-                                    {reply.isEdited && (
-                                        <Badge variant="outline" className="text-xs">
-                                            Diedit
-                                        </Badge>
-                                    )}
+                                        </UserProfileClickPopover>
+                                    </div>
+                                    <div className="flex gap-x-2 max-h-5">
+                                        {reply.isSolution && (
+                                            <Badge className="bg-green-600 text-white">
+                                                <Award className="h-3 w-3 mr-1 hidden md:block" />
+                                                Solusi
+                                            </Badge>
+                                        )}
+                                        {reply.isEdited && (
+                                            <Badge variant="outline" className="text-xs">
+                                                Diedit
+                                            </Badge>
+                                        )}
+                                        <CommentActionsPopover
+                                            reply={reply}
+                                            isAuthor={isReplyAuthor}
+                                            onAction={onCommentAction}
+                                            currentUserId={currentUserId}
+                                            isAdmin={isAdmin}
+                                            postId={postId}
+                                            postTitle={postTitle}
+                                        />
+                                    </div>
                                 </div>
-                                <CommentActionsPopover
-                                    reply={reply}
-                                    isAuthor={isReplyAuthor}
-                                    onAction={onCommentAction}
-                                    currentUserId={currentUserId}
-                                    isAdmin={isAdmin}
-                                    postId={postId}
-                                    postTitle={postTitle}
-                                />
+
                             </div>
                         </div>
 
@@ -483,17 +488,17 @@ export function ReplyItem({
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => onMarkAsSolution(reply.id, reply.isSolution, currentUserId!, isCurrentUserPostAuthor, isAdmin)}
-                                        className={`h-6 px-2 text-xs ${reply.isSolution ? "text-green-600 hover:text-red-700" : "text-gray-600 hover:text-green-700"}`}
+                                        className={`h-6 px-0 md:px-2 text-xs ${reply.isSolution ? "text-green-600 hover:text-red-700" : "text-gray-600 hover:text-green-700"}`}
                                         disabled={!currentUserId}
                                     >
                                         {reply.isSolution ? (
                                             <>
-                                                <X className="h-3 w-3 mr-1" />
+                                                <X className="h-3 w-3 mr-1 hidden md:block" />
                                                 Batalkan Solusi
                                             </>
                                         ) : (
                                             <>
-                                                <CheckCircle className="h-3 w-3 mr-1" />
+                                                <CheckCircle className="h-3 w-3 mr-1 hidden md:block" />
                                                 Tandai Solusi
                                             </>
                                         )}
@@ -645,7 +650,7 @@ export function ReplyItem({
                                                 )}
 
                                                 <div className="flex items-center justify-between mt-3">
-                                                    <div className="text-xs text-gray-500">Tekan Ctrl+Enter untuk mengirim cepat</div>
+                                                    <div className="text-xs text-gray-500 hidden md:block">Tekan Ctrl+Enter untuk mengirim cepat</div>
                                                     <div className="flex gap-2">
                                                         <Button
                                                             type="button"

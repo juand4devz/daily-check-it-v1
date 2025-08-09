@@ -27,11 +27,11 @@ export function PostThumbnail({ post, isLoading }: PostThumbnailProps) {
     const gradient = getRandomGradient(post.id);
 
     return (
-        <div className="relative w-full h-64 rounded-lg overflow-hidden group">
+        <div className="relative w-full h-44 md:h-60 rounded-lg overflow-hidden group">
             {hasThumbnail ? (
                 <Image
-                    height={500}
-                    width={500}
+                    height={200}
+                    width={200}
                     src={post.thumbnail!}
                     alt={post.title}
                     className="w-full h-full object-cover transition-transform group-hover:scale-105"
@@ -45,16 +45,16 @@ export function PostThumbnail({ post, isLoading }: PostThumbnailProps) {
                 </div>
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
-            <div className="absolute bottom-4 left-4 right-4 text-white">
-                <Badge variant="secondary" className="bg-black/50 text-white border-0 mb-2">
-                    {post.category}
-                </Badge>
+            <div className="absolute bottom-0 left-0 right-0 text-white bg-black/30 p-3">
                 <h2 className="text-xl font-bold line-clamp-2">{post.title}</h2>
             </div>
             {post.media && post.media.length > 0 && (
                 <div className="absolute top-4 right-4">
                     <Badge variant="secondary" className="bg-black/50 text-white border-0">
                         {post.media.length === 1 ? '1 media' : `+${post.media.length} media`}
+                    </Badge>
+                    <Badge variant="secondary" className="bg-black/50 text-white border-0 ml-2">
+                        {post.category}
                     </Badge>
                 </div>
             )}

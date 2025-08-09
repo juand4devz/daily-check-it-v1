@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import {
     Home,
     Users,
-    Wrench,
     LogOut,
     LucideIcon,
     Drone,
@@ -14,8 +13,9 @@ import {
     Bell,
     TagIcon,
     Waypoints,
-    Flag,
     ScanSearch,
+    LandPlot,
+    SigmaSquare,
 } from "lucide-react";
 import {
     Sidebar,
@@ -61,7 +61,7 @@ interface NavGroup {
 const mainNavigation: NavItem[] = [
     {
         title: "Home",
-        href: "/",
+        href: "/forum-feed",
         icon: Home,
         exactMatch: true,
     },
@@ -91,7 +91,7 @@ const adminNavigation: NavItem[] = [
     {
         title: "Knowledge Management",
         href: "/admin/symptoms",
-        icon: Wrench,
+        icon: SigmaSquare,
         subItems: [
             {
                 title: "Symptoms",
@@ -119,7 +119,7 @@ const adminNavigation: NavItem[] = [
     {
         title: "Reports",
         href: "/admin/reports",
-        icon: Flag,
+        icon: LandPlot,
         exactMatch: true,
     },
 ];

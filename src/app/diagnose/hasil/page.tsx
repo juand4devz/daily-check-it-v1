@@ -12,10 +12,11 @@ import {
   TrendingUp,
   ChevronDown,
   Clock,
-  DollarSign,
   AlertCircle,
   Loader2,
   ScanText,
+  LucideAlertTriangle,
+  BowArrow,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -24,6 +25,7 @@ import { ModernLoading } from "@/components/diagnosis/modern-loading";
 import Image from "next/image";
 import { StoredDiagnosisResult, Gejala } from "@/types/diagnose";
 import { toast } from "sonner";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function HasilDiagnosaPage() {
   const router = useRouter();
@@ -182,7 +184,7 @@ export default function HasilDiagnosaPage() {
 
                   return (
                     <Card key={kerusakanDetail.kode} className="p-4">
-                      <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <Badge variant="outline" className="text-xs">
@@ -191,14 +193,40 @@ export default function HasilDiagnosaPage() {
                             <Badge variant="outline" className="text-xs">
                               {kerusakanDetail.kode}
                             </Badge>
-                            <Badge {...getBeliefBadge(kerusakanDetail.belief)}>
-                              {getBeliefBadge(kerusakanDetail.belief).text}
-                            </Badge>
+
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge
+                                  {...getBeliefBadge(kerusakanDetail.belief)}
+                                  className={`flex items-center gap-1 px-2 py-1 rounded-sm text-xs font-medium cursor-pointer ${getBeliefBadge(kerusakanDetail.belief)
+                                    }`}
+                                >
+                                  <BowArrow className="w-3 h-3" />
+                                  {getBeliefBadge(kerusakanDetail.belief).text}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Tingkat Kepercayaan</p>
+                              </TooltipContent>
+                            </Tooltip>
+
                             {kerusakanDetail.tingkat_kerusakan && (
-                              <Badge className={getDifficultyColor(kerusakanDetail.tingkat_kerusakan)}>
-                                {kerusakanDetail.tingkat_kerusakan}
-                              </Badge>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge
+                                    className={`flex items-center gap-1 px-2 py-1 rounded-sm text-xs font-medium cursor-pointer ${getDifficultyColor(kerusakanDetail.tingkat_kerusakan)
+                                      }`}
+                                  >
+                                    <LucideAlertTriangle className="w-3 h-3" />
+                                    {kerusakanDetail.tingkat_kerusakan}
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Tingkat Kerusakan</p>
+                                </TooltipContent>
+                              </Tooltip>
                             )}
+
                           </div>
                           <h3 className="font-semibold text-lg mb-2">{kerusakanDetail.nama}</h3>
 
@@ -210,7 +238,6 @@ export default function HasilDiagnosaPage() {
                           <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">
                             {kerusakanDetail.estimasi_biaya && (
                               <div className="flex items-center gap-1">
-                                <DollarSign className="h-4 w-4" />
                                 {kerusakanDetail.estimasi_biaya}
                               </div>
                             )}
@@ -222,7 +249,7 @@ export default function HasilDiagnosaPage() {
                             )}
                           </div>
 
-                          <div className="grid grid-cols-3 gap-2 text-xs mb-3">
+                          <div className="grid grid-cols-3 gap-2 text-xs">
                             <div className="bg-blue-50 dark:bg-blue-100/75 font-bold p-2 rounded">
                               <div className="font-medium text-gray-800">Belief</div>
                               <div className="text-blue-600 dark:text-blue-900">{(kerusakanDetail.belief * 100).toFixed(1)}%</div>
@@ -245,9 +272,9 @@ export default function HasilDiagnosaPage() {
                         </div>
                       </div>
 
-                      <Progress value={kerusakanDetail.belief * 100} className="mb-3" />
+                      <Progress value={kerusakanDetail.belief * 100} />
 
-                      <div className="mt-3">
+                      <div className="">
                         <Button
                           variant="outline"
                           className="w-full justify-between bg-transparent"
@@ -337,14 +364,14 @@ export default function HasilDiagnosaPage() {
               <div className="space-y-3">
                 {selectedGejalaDetailsToDisplay.length > 0 ? (
                   selectedGejalaDetailsToDisplay.map((gejala) => (
-                    <div key={gejala.kode} className="flex flex-col items-start gap-2 p-3 bg-blue-50 dark:bg-background rounded-lg">
+                    <Card key={gejala.kode} className="flex flex-col items-start gap-2 p-3 rounded-lg">
                       {gejala.gambar && gejala.gambar !== "" ? (
                         <Image
                           height={500}
                           width={500}
                           src={gejala.gambar}
                           alt={gejala.nama || gejala.kode}
-                          className="h-20 w-full object-cover rounded-md"
+                          className="h-42 w-full object-cover rounded-md"
                         />
                       ) : (
                         <div className="h-20 w-full bg-gray-200 dark:bg-gray-700 rounded-md flex items-center justify-center text-xs text-gray-500">
@@ -369,7 +396,7 @@ export default function HasilDiagnosaPage() {
                           <p className="text-xs text-gray-400 mt-1">Detail gejala tidak tersedia.</p>
                         )}
                       </div>
-                    </div>
+                    </Card>
                   ))
                 ) : (
                   <p className="text-sm text-gray-500 text-center">Tidak ada detail gejala yang tersedia.</p>

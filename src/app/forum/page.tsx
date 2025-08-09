@@ -298,7 +298,7 @@ export default function ForumPage() {
     return (
         <div className="px-4 py-8 w-full">
             {/* Header */}
-            <div className="flex justify-between items-center gap-4 mb-8">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8">
                 <div className="flex flex-col">
                     <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
                         <Waypoints className="h-14 w-14 mr-3" />
@@ -306,8 +306,8 @@ export default function ForumPage() {
                     </h1>
                     <p className="text-gray-600">Berbagi pengetahuan, pengalaman, dan solusi bersama komunitas</p>
                 </div>
-                <div className="block lg:hidden">
-                    <Button size="sm" onClick={() => router.push("/forum/new")}>
+                <div className="block lg:hidden md:w-32">
+                    <Button className="w-full" size="sm" onClick={() => router.push("/forum/new")}>
                         <Plus className="mr-2 h-4 w-4" />
                         Buat Diskusi
                     </Button>
@@ -335,7 +335,7 @@ export default function ForumPage() {
                                 {/* Filter Controls */}
                                 <div className="flex flex-wrap gap-4">
                                     <Select value={selectedType} onValueChange={(value) => handleFilterChange("type", value)}>
-                                        <SelectTrigger className="w-40">
+                                        <SelectTrigger className="w-full md:w-40">
                                             <SelectValue placeholder="Tipe Diskusi" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -349,7 +349,7 @@ export default function ForumPage() {
                                     </Select>
 
                                     <Select value={selectedCategory} onValueChange={(value) => handleFilterChange("category", value)}>
-                                        <SelectTrigger className="w-40">
+                                        <SelectTrigger className="w-full md:w-40">
                                             <SelectValue placeholder="Kategori" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -364,7 +364,7 @@ export default function ForumPage() {
 
                                     {selectedType === "pertanyaan" && (
                                         <Select value={selectedStatus} onValueChange={(value) => handleFilterChange("status", value)}>
-                                            <SelectTrigger className="w-40">
+                                            <SelectTrigger className="w-full md:w-40">
                                                 <SelectValue placeholder="Status" />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -376,7 +376,7 @@ export default function ForumPage() {
                                     )}
 
                                     <Select value={sortBy} onValueChange={(value) => handleFilterChange("sort", value)}>
-                                        <SelectTrigger className="w-40">
+                                        <SelectTrigger className="w-full md:w-40">
                                             <SelectValue placeholder="Urutkan" />
                                         </SelectTrigger>
                                         <SelectContent>

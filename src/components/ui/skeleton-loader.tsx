@@ -13,11 +13,11 @@ export function ForumListSkeleton() {
         <div className="lg:col-span-3 space-y-6">
           <Card className="p-0">
             <CardContent className="p-4 space-y-4">
-              <Skeleton className="h-10 w-full" />
               <div className="flex flex-wrap gap-2">
-                <Skeleton className="h-10 w-40" />
-                <Skeleton className="h-10 w-40" />
-                <Skeleton className="h-10 w-40" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full md:w-40" />
+                <Skeleton className="h-10 w-full md:w-40" />
+                <Skeleton className="h-10 w-full md:w-40" />
               </div>
             </CardContent>
           </Card>

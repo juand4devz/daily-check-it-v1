@@ -89,7 +89,7 @@ export function UserProfileClickPopover({ children, userId }: UserProfileClickPo
                         <p className="text-sm">Error: {error}</p>
                     </div>
                 ) : userData ? (
-                    <Card className="border-none shadow-none">
+                    <Card className="border-none shadow-none p-0">
                         <div className="relative h-20 w-full rounded-t-md">
                             {userData.banner ? (
                                 <Image

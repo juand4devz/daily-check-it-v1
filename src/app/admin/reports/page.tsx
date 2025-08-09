@@ -533,7 +533,7 @@ export default function AdminReportsPage() {
 
     if (status === "loading" || (status === "authenticated" && loading)) {
         return (
-            <div className="container mx-auto px-4 py-8">
+            <div className="w-full px-4 py-8">
                 <Skeleton className="h-10 w-48 mb-6" />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <Skeleton className="h-24" />
@@ -640,18 +640,20 @@ export default function AdminReportsPage() {
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                         <Card>
-                            <CardHeader className="flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between space-y-0">
-                                <CardTitle>Laporan Masuk</CardTitle>
-                                <Select value={chartTimeframe} onValueChange={(value: "day" | "week" | "month") => setChartTimeframe(value)}>
-                                    <SelectTrigger className="w-[120px]">
-                                        <SelectValue placeholder="Waktu" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="day">Harian</SelectItem>
-                                        <SelectItem value="week">Mingguan</SelectItem>
-                                        <SelectItem value="month">Bulanan</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                            <CardHeader>
+                                <div className="flex items-center justify-between w-full">
+                                    <CardTitle>Laporan Masuk</CardTitle>
+                                    <Select value={chartTimeframe} onValueChange={(value: "day" | "week" | "month") => setChartTimeframe(value)}>
+                                        <SelectTrigger className="w-[120px]">
+                                            <SelectValue placeholder="Waktu" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="day">Harian</SelectItem>
+                                            <SelectItem value="week">Mingguan</SelectItem>
+                                            <SelectItem value="month">Bulanan</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </CardHeader>
                             <CardContent>
                                 <div className="h-[300px]">

@@ -60,6 +60,7 @@ import { collection, query, where, orderBy, onSnapshot, doc } from "firebase/fir
 import { upload, ImageKitAbortError, ImageKitInvalidRequestError, ImageKitServerError, ImageKitUploadNetworkError } from "@imagekit/next";
 import { Progress } from "@/components/ui/progress";
 import { RelatedPosts } from "@/components/forum/RelatedPosts";
+import { UserProfileClickPopover } from "../user/UserProfileClickPopover";
 
 interface UploadedFileState {
     file: File | null;
@@ -791,16 +792,34 @@ export default function ForumDetailContent({ postId, isModal = false }: { postId
                     case "edit":
                         break;
                     case "delete":
-                        if (confirm("Apakah Anda yakin ingin menghapus post ini?")) {
-                            const response = await fetch(`/api/forum/posts/${post.id}`, { method: "DELETE" });
-                            const data = await response.json();
-                            if (response.ok && data.status) {
-                                toast.success("Post berhasil dihapus", { description: data.message });
-                                router.push("/forum");
-                            } else {
-                                toast.error("Gagal menghapus post", { description: data.message });
-                            }
-                        }
+                        toast("Apakah Anda yakin ingin menghapus post ini?", {
+                            description: "Aksi ini akan menghapus post secara permanen.",
+                            duration: 5000,
+                            action: {
+                                label: "Hapus",
+                                onClick: async () => {
+                                    try {
+                                        const response = await fetch(`/api/forum/posts/${post.id}`, { method: "DELETE" });
+                                        const data = await response.json();
+                                        if (response.ok && data.status) {
+                                            toast.success("Post berhasil dihapus", { description: data.message });
+                                            router.push("/forum");
+                                        } else {
+                                            toast.error("Gagal menghapus post", { description: data.message });
+                                        }
+                                    } catch (error) {
+                                        console.error(error);
+                                        toast.error("Error", { description: "Gagal melakukan aksi" });
+                                    }
+                                },
+                            },
+                            cancel: {
+                                label: "Batal",
+                                onClick: () => {
+                                    toast.info("Penghapusan dibatalkan.");
+                                },
+                            },
+                        });
                         break;
                     case "pin":
                     case "archive":
@@ -899,15 +918,33 @@ export default function ForumDetailContent({ postId, isModal = false }: { postId
                         toast.info("Fitur edit komentar akan segera tersedia.");
                         break;
                     case "delete":
-                        if (confirm("Apakah Anda yakin ingin menghapus komentar ini?")) {
-                            const response = await fetch(`/api/forum/posts/${post.id}/replies/${replyId}`, { method: "DELETE" });
-                            const data = await response.json();
-                            if (response.ok && data.status) {
-                                toast.success("Komentar dihapus", { description: data.message });
-                            } else {
-                                toast.error("Gagal menghapus komentar", { description: data.message });
-                            }
-                        }
+                        toast("Apakah Anda yakin ingin menghapus komentar ini?", {
+                            description: "Aksi ini akan menghapus komentar secara permanen.",
+                            duration: 5000,
+                            action: {
+                                label: "Hapus",
+                                onClick: async () => {
+                                    try {
+                                        const response = await fetch(`/api/forum/posts/${post.id}/replies/${replyId}`, { method: "DELETE" });
+                                        const data = await response.json();
+                                        if (response.ok && data.status) {
+                                            toast.success("Komentar dihapus", { description: data.message });
+                                        } else {
+                                            toast.error("Gagal menghapus komentar", { description: data.message });
+                                        }
+                                    } catch (error) {
+                                        console.error(error);
+                                        toast.error("Error", { description: "Gagal melakukan aksi" });
+                                    }
+                                },
+                            },
+                            cancel: {
+                                label: "Batal",
+                                onClick: () => {
+                                    toast.info("Penghapusan dibatalkan.");
+                                },
+                            },
+                        });
                         break;
                     default:
                         break;
@@ -988,53 +1025,63 @@ export default function ForumDetailContent({ postId, isModal = false }: { postId
 
             <div className={cn("grid gap-6", isModal ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-3")}>
                 <div className={cn("col-span-2 space-y-6", isModal && "col-span-1")}>
-                    <Card className="overflow-hidden">
-                        <CardHeader className="pb-4">
+                    <Card className="overflow-hidden p-0">
+                        <CardHeader className="px-3 md:px-4 pt-3 md:pt-4">
                             {loadingPost ? (
                                 <PostHeaderSkeleton />
                             ) : post ? (
                                 <>
-                                    <div className="flex items-start justify-between">
-                                        <Avatar className="h-12 w-12 mr-3">
-                                            <AvatarImage src={post.authorAvatar || "/placeholder.svg"} />
-                                            <AvatarFallback>{post.authorUsername?.[0] || '?'}</AvatarFallback>
-                                        </Avatar>
-                                        <div className="flex-1">
-                                            <p className="font-semibold">{post.authorUsername}</p>
+                                    <div className="flex justify-between items-center">
+                                        <UserProfileClickPopover userId={post.authorId}>
+                                            <div
+                                                className="flex items-star cursor-pointer"
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <Avatar className="h-12 w-12 mr-3">
+                                                    <AvatarImage src={post.authorAvatar || "/placeholder.svg"} />
+                                                    <AvatarFallback>{post.authorUsername?.[0] || '?'}</AvatarFallback>
+                                                </Avatar>
+                                            </div>
+                                        </UserProfileClickPopover>
+                                        <div className="flex flex-col justify-between w-full">
+                                            <div className="flex justify-between items-start">
+                                                <p className="font-semibold">{post.authorUsername}</p>
+                                                <div className="flex items-center gap-x-2">
+                                                    <Badge variant={post.isResolved ? "default" : "secondary"} className="shrink-0">
+                                                        {post.isResolved ? (
+                                                            <>
+                                                                <CheckCircle className="h-3 w-3 mr-1" />
+                                                                Selesai
+                                                            </>
+                                                        ) : (
+                                                            "Belum Selesai"
+                                                        )}
+                                                    </Badge>
+                                                    {post.isPinned && (
+                                                        <Badge variant="outline" className="shrink-0">
+                                                            <Pin className="h-3 w-3 mr-1" />
+                                                            Pinned
+                                                        </Badge>
+                                                    )}
+                                                    <PostActionsPopover
+                                                        post={post}
+                                                        isBookmarked={isBookmarked}
+                                                        isPostAuthor={isPostAuthor}
+                                                        onAction={handlePostAction}
+                                                        isAdmin={isAdmin}
+                                                        isLoggedIn={!!userId}
+                                                    />
+                                                </div>
+                                            </div>
                                             <p className="text-sm text-gray-500">{formatTimeAgo(post.createdAt)}</p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant={post.isResolved ? "default" : "secondary"} className="shrink-0">
-                                                {post.isResolved ? (
-                                                    <>
-                                                        <CheckCircle className="h-3 w-3 mr-1" />
-                                                        Selesai
-                                                    </>
-                                                ) : (
-                                                    "Belum Selesai"
-                                                )}
-                                            </Badge>
-                                            {post.isPinned && (
-                                                <Badge variant="outline" className="shrink-0">
-                                                    <Pin className="h-3 w-3 mr-1" />
-                                                    Pinned
-                                                </Badge>
-                                            )}
-                                            <PostActionsPopover
-                                                post={post}
-                                                isBookmarked={isBookmarked}
-                                                isPostAuthor={isPostAuthor}
-                                                onAction={handlePostAction}
-                                                isAdmin={isAdmin}
-                                                isLoggedIn={!!userId}
-                                            />
                                         </div>
                                     </div>
 
                                     <div className="mt-4">
                                         <h1 className="text-2xl font-bold mb-3 leading-tight">{post.title}</h1>
                                         <div className="flex flex-wrap gap-2">
-                                            <Badge variant="outline">{post.category}</Badge>
+                                            <Badge className="bg-blue-100 dark:bg-blue-500 text-black dark:text-white">{post.category}</Badge>
                                             {post.tags.map((tag, index) => (
                                                 <Badge key={index} variant="secondary" className="text-xs">
                                                     #{tag}
@@ -1046,7 +1093,7 @@ export default function ForumDetailContent({ postId, isModal = false }: { postId
                             ) : null}
                         </CardHeader>
 
-                        <CardContent>
+                        <CardContent className="px-2 md:px-4 pb-2 md:pb-4">
                             {loadingPost ? (
                                 <PostContentSkeleton />
                             ) : post ? (
@@ -1080,11 +1127,11 @@ export default function ForumDetailContent({ postId, isModal = false }: { postId
                                             </Button>
                                             <div className="flex items-center gap-1 text-sm text-gray-500">
                                                 <MessageSquare className="h-4 w-4" />
-                                                {post.replies} balasan
+                                                {post.replies} <span className="hidden md:block">balasan</span>
                                             </div>
                                             <div className="flex items-center gap-1 text-sm text-gray-500">
                                                 <Eye className="h-4 w-4" />
-                                                {views.toLocaleString()} views
+                                                {views.toLocaleString()} <span className="hidden md:block">views</span>
                                             </div>
                                             <span className="flex items-center gap-1 text-sm text-gray-500">
                                                 <BookOpenText className="h-4 w-4" />
@@ -1108,8 +1155,8 @@ export default function ForumDetailContent({ postId, isModal = false }: { postId
                         </CardContent>
                     </Card>
 
-                    <Card>
-                        <CardHeader>
+                    <Card className="p-3">
+                        <CardHeader className="p-0">
                             <div className="flex items-center gap-2">
                                 <MessageSquare className="h-5 w-5" />
                                 <span className="font-semibold">
@@ -1117,8 +1164,8 @@ export default function ForumDetailContent({ postId, isModal = false }: { postId
                                 </span>
                             </div>
                         </CardHeader>
-                        <CardContent>
-                            <div>
+                        <CardContent className="p-0">
+                            <div className="w-full">
                                 <div ref={highlightCommentRef} className="space-y-4">
                                     {loadingPost ? (
                                         Array.from({ length: 3 }).map((_, i) => <CommentSkeleton key={i} />)

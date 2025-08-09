@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { Bot, Send, Camera, Upload, Info, Loader2, X, AlertTriangle, Sparkles, Copy, Check, Shuffle, BrushCleaning, Crown } from "lucide-react"
+import { Send, Camera, Info, Loader2, X, AlertTriangle, Sparkles, Copy, Check, Shuffle, BrushCleaning, Crown, ImageUp, Brain } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { toast } from "sonner"
@@ -32,7 +32,7 @@ interface Message {
 }
 
 const formSchema = z.object({
-    message: z.string().max(300, "Pesan maksimal 300 karakter").optional(),
+    message: z.string().max(400, "Pesan maksimal 400 karakter").optional(),
 })
 
 const ALL_EXAMPLE_QUESTIONS = [
@@ -121,7 +121,7 @@ const CopyButton: React.FC<{ content: string; className?: string }> = ({ content
             variant="ghost"
             size="sm"
             onClick={handleCopy}
-            className={`cursor-pointer h-7 w-7 p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 ${className}`}
+            className={`cursor-pointer h-7 w-7 p-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-gray-100 ${className}`}
             title={copied ? "Berhasil disalin!" : "Salin pesan"}
         >
             {copied ? (
@@ -550,7 +550,7 @@ export default function AIChatPage() {
     const isDisabled = isLoading || isProcessingImage || !session?.user?.id || (userTokenData?.dailyTokens ?? 0) <= 0 || isFetchingTokens;
 
     return (
-        <Card className="m-0 md:m-4 px-0 md:px-40 py-8 max-w-full">
+        <Card className="flex-1 flex flex-col min-h-0 rounded-none bg-background px-6 lg:px-36 xl:px-60 2xl:px-72 border-0">
             {/* Offline Warning */}
             {showOfflineWarning && (
                 <Alert className="mb-6 border-orange-200 bg-orange-50">
@@ -563,17 +563,17 @@ export default function AIChatPage() {
             )}
 
             {/* Main Chat Area */}
-            <div className="shadow-sm min-h-[600px] flex flex-col">
+            <div className=" flex flex-col">
                 {/* Header with AI Introduction */}
-                <div className="p-6 bg-transparent relative">
+                <div className="relative mt-5">
                     <div className="flex items-start gap-4">
                         <div className="flex-1 min-w-0">
-                            <div className="space-y-2">
-                                <p className="font-medium flex items-center gap-2">
-                                    <Bot className="h-5 w-5 text-blue-600" />
+                            <div className="space-y-2 mb-8">
+                                <p className="font-semibold text-sm flex items-center gap-2">
+                                    <Brain className="h-4 w-4 text-blue-600" />
                                     Hai! Saya Asisten Teknisi AI
                                 </p>
-                                <p className="text-sm text-muted-foreground">
+                                <p className="text-sm">
                                     Saya dapat membantu Anda dengan masalah komputer, laptop, dan perangkat teknologi lainnya.
                                     {showOfflineWarning
                                         ? " Saat ini dalam mode offline dengan bantuan dasar."
@@ -581,81 +581,87 @@ export default function AIChatPage() {
                                 </p>
                             </div>
                         </div>
-                        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                            <DialogTrigger asChild>
-                                <Button variant="outline" size="sm" className="gap-2 flex-shrink-0 bg-transparent absolute bottom-0 right-6">
-                                    <Info className="h-4 w-4" />
-                                    <span className="hidden sm:inline">Info</span>
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-[425px]">
-                                <DialogHeader>
-                                    <DialogTitle>Tentang Asisten Teknisi AI</DialogTitle>
-                                </DialogHeader>
-                                <div className="space-y-4 text-sm max-h-[60vh] overflow-y-auto">
-                                    <div>
-                                        <h4 className="font-semibold mb-2">Kemampuan</h4>
-                                        <ul className="list-disc list-inside space-y-1">
-                                            <li>Troubleshooting komputer dan laptop</li>
-                                            <li>Analisis gambar perangkat teknologi</li>
-                                            <li>Panduan perbaikan step-by-step</li>
-                                            <li>Tips maintenance dan optimasi</li>
-                                            <li>Rekomendasi hardware dan software</li>
-                                        </ul>
-                                    </div>
-                                    <div>
-                                        <h4 className="font-semibold mb-2">Mode Offline</h4>
-                                        <p>
-                                            Jika layanan AI tidak tersedia atau Anda belum login, sistem akan memberikan bantuan dasar berdasarkan pengetahuan
-                                            troubleshooting yang tersimpan.
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <h4 className="font-semibold mb-2">Tips Penggunaan</h4>
-                                        <ul className="list-disc list-inside space-y-1">
-                                            <li>Deskripsikan masalah dengan detail</li>
-                                            <li>Upload foto jika ada masalah visual</li>
-                                            <li>Sebutkan merk dan model perangkat</li>
-                                            <li>Jelaskan kapan masalah mulai terjadi</li>
-                                        </ul>
-                                    </div>
-                                    <div>
-                                        <h4 className="font-semibold mb-2">Peringatan</h4>
-                                        <p>
-                                            Selalu backup data penting sebelum melakukan perbaikan. Konsultasi dengan teknisi profesional
-                                            untuk masalah yang kompleks.
-                                        </p>
-                                    </div >
-                                </div >
-                                <div className="flex justify-end">
-                                    <Button onClick={() => setIsDialogOpen(false)}>Mengerti</Button>
-                                </div>
-                            </DialogContent>
-                        </Dialog>
                     </div >
                 </div >
 
                 {/* Example Questions (only show when no messages) */}
                 {messages.length === 0 && (
-                    <div className="p-6 border-b">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-semibold">CONTOH PERTANYAAN</h3>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setExampleQuestions(getRandomQuestions())}
-                                className="text-xs"
-                                disabled={isDisabled} // Disable example questions if input disabled
-                            >
-                                <Shuffle className="h-3 w-3 mr-1" />
-                                Acak Lagi
-                            </Button>
+                    <div className="pb-10">
+                        <div className="flex items-center justify-between mb-2 mt-8 md:mt-8">
+                            <h3 className="text-xs font-semibold">CONTOH PERTANYAAN</h3>
+                            <div className="flex gap-x-3">
+                                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button variant="ghost" size="sm" className="gap-2 flex-shrink-0 bg-transparent">
+                                            <Info className="h-4 w-4" />
+                                            <span className="hidden sm:inline">Info</span>
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-[425px]">
+                                        <DialogHeader>
+                                            <DialogTitle>Tentang Asisten Teknisi AI</DialogTitle>
+                                        </DialogHeader>
+                                        <ScrollArea>
+                                            <div className="space-y-4 text-sm max-h-[60vh]">
+                                                <div>
+                                                    <h4 className="font-semibold mb-2">Kemampuan</h4>
+                                                    <ul className="list-disc list-inside space-y-1">
+                                                        <li>Troubleshooting komputer dan laptop</li>
+                                                        <li>Analisis gambar perangkat teknologi</li>
+                                                        <li>Panduan perbaikan step-by-step</li>
+                                                        <li>Tips maintenance dan optimasi</li>
+                                                        <li>Rekomendasi hardware dan software</li>
+                                                    </ul>
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-semibold mb-2">Mode Offline</h4>
+                                                    <p>
+                                                        Jika layanan AI tidak tersedia atau Anda belum login, sistem akan memberikan bantuan dasar berdasarkan pengetahuan
+                                                        troubleshooting yang tersimpan.
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-semibold mb-2">Tips Penggunaan</h4>
+                                                    <ul className="list-disc list-inside space-y-1">
+                                                        <li>Deskripsikan masalah dengan detail</li>
+                                                        <li>Upload foto jika ada masalah visual</li>
+                                                        <li>Sebutkan merk dan model perangkat</li>
+                                                        <li>Jelaskan kapan masalah mulai terjadi</li>
+                                                    </ul>
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-semibold mb-2">Peringatan</h4>
+                                                    <p>
+                                                        Selalu backup data penting sebelum melakukan perbaikan. Konsultasi dengan teknisi profesional
+                                                        untuk masalah yang kompleks.
+                                                    </p>
+                                                </div >
+                                            </div >
+                                            <ScrollBar orientation="vertical" />
+                                        </ScrollArea>
+                                        <div className="flex justify-end">
+                                            <Button size="sm" className="h-8" onClick={() => setIsDialogOpen(false)}>Mengerti</Button>
+                                        </div>
+                                    </DialogContent>
+                                </Dialog>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setExampleQuestions(getRandomQuestions())}
+                                    className="text-xs"
+                                    disabled={isDisabled} // Disable example questions if input disabled
+                                >
+                                    <Shuffle className="h-3 w-3 m-0 md:mr-1" />
+                                    <span className="hidden md:block">Acak Lagi</span>
+                                </Button>
+                            </div>
+
                         </div>
-                        <div className="space-y-3">
+                        <div className="space-y-5 h-full">
                             {exampleQuestions.map((question, index) => (
                                 <Card
                                     key={index}
-                                    className="p-4 cursor-pointer hover:bg-muted/50 transition-colors w-fit h-10 flex items-center justify-center rounded-bl-none rounded-tl-2xl"
+                                    className="cursor-pointer hover:bg-muted/100 hover:scale-105 transition-colors w-fit h-8 p-0 flex items-center justify-center rounded-bl-none rounded-tl-2xl px-2 py-5 md:px-4"
                                     onClick={() => handleExampleClick(question)}
                                     tabIndex={isDisabled ? -1 : 0} // Disable focus if input disabled
                                     aria-disabled={isDisabled}
@@ -668,130 +674,129 @@ export default function AIChatPage() {
                 )}
 
                 {/* Chat Messages */}
-                <ScrollArea className="flex-1 p-6">
-                    <div className="space-y-6">
-                        {messages.map((message) => {
-                            const modelInfo = message.model ? getModelBadgeInfo(message.model) : null;
-                            return (
-                                <div key={message.id} className="space-y-2">
-                                    {message.role === "assistant" ? (
-                                        <div className="flex gap-3 group">
-                                            <div className="flex-1 min-w-0 relative">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <Bot className="h-4 w-4 text-blue-600" />
-                                                    <span className="text-sm font-medium">Asisten Teknisi</span>
-                                                    {modelInfo && (
-                                                        <Badge variant={modelInfo.variant} className={`text-xs gap-1 ${modelInfo.color}`}>
-                                                            {modelInfo.icon && <modelInfo.icon className="h-3 w-3" />}
-                                                            {message.model}
-                                                        </Badge>
-                                                    )}
-                                                    {isLoading && (
-                                                        <div className="flex gap-3">
-                                                            <div className="flex-1">
-                                                                <div className="flex items-center gap-2">
-                                                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                                                    <span className="text-sm text-muted-foreground">
-                                                                        {showOfflineWarning ? "Memproses dengan bantuan offline..." : "Sedang menganalisis..."}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    <span className="text-xs text-muted-foreground">{message.timestamp.toLocaleTimeString()}</span>
-                                                </div>
-                                                <div className="relative">
-                                                    <div className="prose prose-sm max-w-none dark:prose-invert">
-                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
-                                                    </div>
-                                                    <div className="absolute -top-6 right-0">
-                                                        <CopyButton content={message.content} />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="flex justify-end">
-                                            <div className="max-w-[80%] space-y-2 group">
-                                                {message.image && (
-                                                    <div className="flex justify-end">
-                                                        <Image
-                                                            height={500}
-                                                            width={500}
-                                                            src={message.image || "/placeholder.svg"}
-                                                            alt="Uploaded"
-                                                            className="max-w-xs rounded-lg border"
-                                                        />
-                                                    </div>
+                <div className="space-y-6">
+                    {messages.map((message) => {
+                        const modelInfo = message.model ? getModelBadgeInfo(message.model) : null;
+                        return (
+                            <div key={message.id} className="space-y-2">
+                                {message.role === "assistant" ? (
+                                    <div className="flex gap-3 group">
+                                        <div className="flex-1 min-w-0 relative">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <Brain className="h-4 w-4 text-blue-600" />
+                                                <span className="text-sm font-medium">Asisten Teknisi</span>
+                                                {modelInfo && (
+                                                    <Badge variant={modelInfo.variant} className={`text-xs gap-1 ${modelInfo.color}`}>
+                                                        {modelInfo.icon && <modelInfo.icon className="h-3 w-3" />}
+                                                        {message.model}
+                                                    </Badge>
                                                 )}
-                                                <div className="relative">
-                                                    <div className="bg-primary rounded-tr-none rounded-tb-2xl text-primary-foreground rounded-lg px-4 py-2">
-                                                        <p className="text-sm">{message.content}</p>
-                                                    </div>
-                                                    <div className="absolute -top-6 right-1">
-                                                        <CopyButton
-                                                            content={message.content}
-                                                            className="hover:bg-white/20 text-white/70 hover:text-white"
-                                                        />
+                                                <span className="text-xs text-muted-foreground">{message.timestamp.toLocaleTimeString()}</span>
+                                            </div>
+                                            {isLoading && (
+                                                <div className="flex gap-3">
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                                            <span className="text-sm text-muted-foreground">
+                                                                {showOfflineWarning ? "Memproses dengan bantuan offline..." : "Sedang menganalisis..."}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div className="flex justify-end">
-                                                    <span className="text-xs text-muted-foreground">{message.timestamp.toLocaleTimeString()}</span>
+                                            )}
+                                            <div className="relative">
+                                                <div className="prose prose-sm max-w-none dark:prose-invert">
+                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                                                </div>
+                                                <div className="absolute -top-6 right-0">
+                                                    <CopyButton content={message.content} />
                                                 </div>
                                             </div>
                                         </div>
-                                    )}
-                                </div>
-                            )
-                        })}
-                    </div>
-                    <div ref={messagesEndRef} />
-                </ScrollArea>
-
-                {/* Input Section */}
-                <div className="p-6 border-t">
-                    {/* Selected Image Preview */}
-                    {selectedImage && (
-                        <div className="mb-4">
-                            <div className="relative inline-block">
-                                <Image width="500" height="500" src={selectedImage || "/placeholder.svg"} alt="Selected" className="max-w-xs rounded-lg border" />
-                                <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
-                                    onClick={() => setSelectedImage(null)}
-                                    disabled={isDisabled} // Disable remove image button if input disabled
-                                >
-                                    <X className="h-3 w-3" />
-                                </Button>
+                                    </div>
+                                ) : (
+                                    <div className="flex justify-end">
+                                        <div className="max-w-[80%] space-y-2 group">
+                                            {message.image && (
+                                                <div className="flex justify-end">
+                                                    <Image
+                                                        height={200}
+                                                        width={200}
+                                                        src={message.image || "/placeholder.svg"}
+                                                        alt="Uploaded"
+                                                        className="max-w-xs rounded-lg border"
+                                                    />
+                                                </div>
+                                            )}
+                                            <div className="relative">
+                                                <div className="bg-primary rounded-tr-none rounded-tb-2xl text-primary-foreground rounded-lg px-4 py-2">
+                                                    <p className="text-sm">{message.content}</p>
+                                                </div>
+                                                <div className="absolute -top-6 right-1">
+                                                    <CopyButton
+                                                        content={message.content}
+                                                        className="hover:bg-white/20 text-white/70 hover:text-white"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-end">
+                                                <span className="text-xs text-muted-foreground">{message.timestamp.toLocaleTimeString()}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    )}
+                        )
+                    })}
+                </div>
+                <div ref={messagesEndRef} />
+            </div>
 
-                    {/* Image Processing Indicator */}
-                    {isProcessingImage && (
-                        <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Memproses gambar...
-                        </div>
-                    )}
+            {/* Input Section */}
+            <div className="sticky bottom-0">
+                {/* Image Processing Indicator */}
+                {isProcessingImage && (
+                    <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Memproses gambar...
+                    </div>
+                )}
 
-                    <Form {...form}>
-                        <form onSubmit={form.handleSubmit(handleSendMessage)} className="space-y-4">
+                <Form {...form}>
+                    <div className="max-w-4xl">
+                        <form onSubmit={form.handleSubmit(handleSendMessage)} className="relative">
                             <FormField
                                 control={form.control}
                                 name="message"
                                 render={({ field }) => (
                                     <FormItem>
                                         <FormControl>
-                                            <div className="relative">
+                                            <div>
+                                                {/* Selected Image Preview */}
+                                                {selectedImage && (
+                                                    <div>
+                                                        <div className="relative inline-block">
+                                                            <Image width="200" height="200" src={selectedImage || "/placeholder.svg"} alt="Selected" className="max-w-xs rounded-lg border" />
+                                                            <Button
+                                                                variant="destructive"
+                                                                size="sm"
+                                                                className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
+                                                                onClick={() => setSelectedImage(null)}
+                                                                disabled={isDisabled} // Disable remove image button if input disabled
+                                                            >
+                                                                <X className="h-3 w-3" />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 {/* Token Display - Conditional Rendering for loading/unauthenticated */}
                                                 {isFetchingTokens ? (
                                                     <div className="flex items-center justify-between text-xs bg-blue-50 dark:bg-gray-700 p-2 rounded mb-2 animate-pulse">
                                                         <Loader2 className="h-4 w-4 animate-spin mr-2" /> <span>Memuat token...</span>
                                                     </div>
                                                 ) : (
-                                                    <div className="flex items-center justify-between text-xs bg-blue-50 dark:bg-zinc-700 p-2 rounded mb-2">
+                                                    <div className="flex items-center justify-between text-xs bg-blue-50 dark:bg-zinc-700 p-2 mb-2 rounded-xl">
                                                         <span>
                                                             Token tersisa: <strong>{userTokenData?.dailyTokens ?? 'N/A'}</strong>/{userTokenData?.maxDailyTokens ?? 'N/A'}
                                                         </span>
@@ -799,79 +804,83 @@ export default function AIChatPage() {
                                                     </div>
                                                 )}
 
-                                                <Textarea
-                                                    {...field}
-                                                    ref={textareaRef}
-                                                    placeholder={
-                                                        selectedImage
-                                                            ? "Opsional: Tambahkan pertanyaan tentang gambar..."
-                                                            : "Tanyakan sesuatu tentang teknologi komputer..."
-                                                    }
-                                                    className="min-h-[80px] pr-32 resize-none"
-                                                    disabled={isDisabled} // Menggunakan kondisi isDisabled gabungan
-                                                    onKeyPress={handleKeyPress}
-                                                    maxLength={300}
-                                                />
-
-                                                {/* Character Counter */}
-                                                <div className="absolute -bottom-5 right-0 text-xs text-muted-foreground">
-                                                    {field.value?.length || 0}/300
-                                                </div>
-
-                                                {/* Input Buttons */}
-                                                <div className="absolute bottom-2 left-2 right-2 flex justify-between items-end">
-                                                    <div className="flex gap-1">
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={handleClearChat}
-                                                            disabled={isDisabled || messages.length === 0} // Disable clear chat if input disabled or no messages
-                                                            className="h-8 w-8 p-0"
-                                                            title="Clear chat history"
-                                                        >
-                                                            <BrushCleaning className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
-
-                                                    <div className="flex gap-1">
-                                                        {isMobile && (
+                                                <div className="relative flex flex-col items-end gap-2 rounded-2xl border bg-background p-2 shadow-sm focus-within:ring-2 focus-within:ring-ring">
+                                                    <ScrollArea className="relative w-full">
+                                                        <Textarea
+                                                            {...field}
+                                                            ref={textareaRef}
+                                                            placeholder={
+                                                                selectedImage
+                                                                    ? "Opsional: Tambahkan pertanyaan tentang gambar..."
+                                                                    : "Tanyakan sesuatu tentang teknologi komputer..."
+                                                            }
+                                                            className="min-h-[60px] max-h-[200px] resize-none w-full border-0 bg-transparent px-3 py-2 text-sm focus-visible:ring-0 focus-visible:ring-offset-0"
+                                                            disabled={isDisabled} // Menggunakan kondisi isDisabled gabungan
+                                                            onKeyPress={handleKeyPress}
+                                                            maxLength={400}
+                                                        />
+                                                        {/* Character Counter */}
+                                                        <div className="absolute bottom-2 right-2 text-muted-foreground text-xs">
+                                                            {field.value?.length || 0}/400
+                                                        </div>
+                                                        <ScrollBar orientation="vertical" />
+                                                    </ScrollArea>
+                                                    {/* Input Buttons */}
+                                                    <div className="flex justify-between items-center w-full">
+                                                        <div className="flex gap-x-2 items-center">
                                                             <Button
                                                                 type="button"
                                                                 variant="ghost"
                                                                 size="sm"
-                                                                onClick={() => cameraInputRef.current?.click()}
-                                                                disabled={isDisabled} // Menggunakan kondisi isDisabled gabungan
-                                                                className="h-8 w-8 p-0"
-                                                                title="Take photo"
+                                                                onClick={handleClearChat}
+                                                                disabled={isDisabled || messages.length === 0} // Disable clear chat if input disabled or no messages
+                                                                className="h-7 md:h-10 w-7 md:w-10 hover:scale-110 cursor-pointer"
+                                                                title="Clear chat history"
                                                             >
-                                                                <Camera className="h-4 w-4" />
+                                                                <BrushCleaning className="h-4 w-4" />
                                                             </Button>
-                                                        )}
+                                                        </div>
 
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => fileInputRef.current?.click()}
-                                                            disabled={isDisabled} // Menggunakan kondisi isDisabled gabungan
-                                                            className="h-8 w-8 p-0"
-                                                            title="Upload image"
-                                                        >
-                                                            <Upload className="h-4 w-4" />
-                                                        </Button>
+                                                        <div className="flex gap-3 items-center">
+                                                            {isMobile && (
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => cameraInputRef.current?.click()}
+                                                                    disabled={isDisabled} // Menggunakan kondisi isDisabled gabungan
+                                                                    className="h-7 md:h-8 w-7 md:w-8 hover:scale-110 cursor-pointer"
+                                                                    title="Take photo"
+                                                                >
+                                                                    <Camera className="h-4 w-4" />
+                                                                </Button>
+                                                            )}
 
-                                                        <Button
-                                                            type="submit"
-                                                            disabled={
-                                                                isDisabled ||
-                                                                (!field.value?.trim() && !selectedImage) // Additional condition: must have text or image
-                                                            }
-                                                            className="h-8 w-8 p-0"
-                                                            title="Send message"
-                                                        >
-                                                            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                                                        </Button>
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => fileInputRef.current?.click()}
+                                                                disabled={isDisabled} // Menggunakan kondisi isDisabled gabungan
+                                                                className="h-7 md:h-8 w-7 md:w-8 hover:scale-110 cursor-pointer"
+                                                                title="Upload image"
+                                                            >
+                                                                <ImageUp className="h-4 w-4" />
+                                                            </Button>
+
+                                                            <Button
+                                                                type="submit"
+                                                                size="icon"
+                                                                disabled={
+                                                                    isDisabled ||
+                                                                    (!field.value?.trim() && !selectedImage) // Additional condition: must have text or image
+                                                                }
+                                                                className="rounded-lg h-8 md:h-9 w-8 md:w-9 hover:scale-105 cursor-pointer"
+                                                                title="Send message"
+                                                            >
+                                                                {isLoading ? <Loader2 className="animate-spin" /> : <Send />}
+                                                            </Button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -881,18 +890,18 @@ export default function AIChatPage() {
                                 )}
                             />
                         </form>
-                    </Form>
-                    {/* Hidden File Inputs */}
-                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                    <input
-                        ref={cameraInputRef}
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                    />
-                </div>
+                    </div>
+                </Form>
+                {/* Hidden File Inputs */}
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                />
             </div>
         </Card>
     )

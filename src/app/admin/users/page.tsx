@@ -517,9 +517,12 @@ export default function UsersPage() {
     return (
         <div className="mx-2 md:mx-4 py-6 space-y-6">
             <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold">Kelola Pengguna</h1>
-                    <p className="text-muted-foreground">Kelola pengguna sistem dan atur peran mereka.</p>
+                <div className="flex">
+                    <Users className="h-14 w-14 mr-2" />
+                    <div>
+                        <h1 className="text-3xl font-bold">Kelola Pengguna</h1>
+                        <p className="text-muted-foreground">Kelola pengguna sistem dan atur peran mereka.</p>
+                    </div>
                 </div>
             </div>
             <Tabs defaultValue="statistics" className="w-full">
