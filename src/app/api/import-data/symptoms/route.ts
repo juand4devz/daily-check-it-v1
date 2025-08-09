@@ -2,8 +2,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/firebase-admin";
 
-export const dynamic = 'force-dynamic';
-
 // --- Interfaces (ensure these are consistent with your /types.ts) ---
 interface Gejala {
     id: string; // Firestore document ID
@@ -38,6 +36,12 @@ interface ImportGejalaRequestBody {
 
 export async function POST(request: NextRequest) {
     try {
+        const body = await request.json().catch(() => null);
+
+        if (!body) {
+            return NextResponse.json({ error: "Permintaan tidak valid: body tidak berisi JSON yang benar." }, { status: 400 });
+        }
+
         const { data, replaceExisting }: ImportGejalaRequestBody = await request.json();
         const now = new Date().toISOString();
         const collectionRef = adminDb.collection("gejala");
