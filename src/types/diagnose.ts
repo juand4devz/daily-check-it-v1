@@ -181,3 +181,21 @@ export interface MediaFileTemp {
     uploadedUrl: string | undefined; // Final ImageKit URL after upload
     filename?: string;
 }
+
+export type ImportItem<T> = Partial<Omit<T, 'id'>> & { id?: string };
+
+// Tipe respons yang konsisten untuk API import
+export interface ImportApiResponse {
+    message: string;
+    importedCount: number;
+    replacedCount: number;
+    skippedCount: number;
+    errors: string[];
+    warnings: string[];
+}
+
+// Tipe untuk body request import
+export interface ImportRequestBody<T> {
+    data: ImportItem<T>[];
+    replaceExisting: boolean;
+}
