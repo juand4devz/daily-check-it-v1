@@ -1,6 +1,8 @@
-// app/api/import-data/gejala/route.ts
+// app/api/import-data/symptoms/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase/firebase-admin";
+
+export const dynamic = 'force-dynamic';
 
 // --- Interfaces (ensure these are consistent with your /types.ts) ---
 interface Gejala {
