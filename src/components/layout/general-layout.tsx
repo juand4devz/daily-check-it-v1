@@ -14,7 +14,7 @@ interface MainLayoutProps {
 
 
 export default function GeneralLayout({ children }: MainLayoutProps) {
-    const disableSideheader = ["/login", "/register", "/"]
+    const disableSideheader = ["/login", "/register", "/", "/banned"]
 
     const pathname = usePathname();
 

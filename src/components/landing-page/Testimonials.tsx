@@ -9,70 +9,70 @@ import Marquee from "@/components/ui/marquee"; // Import komponen Marquee yang b
 
 const testimonials = [
     {
-        name: "Sarah J.",
-        content: "DailyCek.It telah mengubah cara kami menangani dukungan teknis. Diagnosa AI menghemat banyak waktu dan basis pengetahuannya adalah tambang emas.",
+        name: "Produk A",
+        content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Praesent eget tincidunt magna, at ullamcorper tortor.",
+        avatar: "PA",
+        link: "https://example.com/product/a"
+    },
+    {
+        name: "Layanan B",
+        content: "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam.",
+        avatar: "LB",
+        link: "https://example.com/service/b"
+    },
+    {
+        name: "Fitur C",
+        content: "Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos.",
+        avatar: "FC",
+        link: "https://example.com/feature/c"
+    },
+    {
+        name: "Paket D",
+        content: "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
+        avatar: "PD",
+        link: "https://example.com/package/d"
+    },
+    {
+        name: "Solusi E",
+        content: "Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
+        avatar: "SE",
+        link: "https://example.com/solution/e"
+    },
+    {
+        name: "Modul F",
+        content: "Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex ea commodi consequatur.",
+        avatar: "MF",
+        link: "https://example.com/module/f"
+    },
+    {
+        name: "Alat G",
+        content: "Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur.",
+        avatar: "AG",
+        link: "https://example.com/tool/g"
+    },
+    {
+        name: "Platform H",
+        content: "At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti.",
+        avatar: "PH",
+        link: "https://example.com/platform/h"
+    },
+    {
+        name: "Aplikasi I",
+        content: "Eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.",
+        avatar: "AI",
+        link: "https://example.com/app/i"
+    },
+    {
+        name: "Sistem J",
+        content: "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt.",
         avatar: "SJ",
-        link: "https://forms.gle/your-form-link"
+        link: "https://example.com/system/j"
     },
     {
-        name: "David C.",
-        content: "Sebagai seseorang yang tidak terlalu paham teknologi, platform ini sangat membantu. Diagnosa langkah-demi-langkah membantu saya memperbaiki laptop saya.",
-        avatar: "DC",
-        link: "https://forms.gle/your-form-link"
-    },
-    {
-        name: "Aisha R.",
-        content: "Saya mendapatkan solusi untuk masalah teknis yang kompleks di DailyCek.It. Basis pengetahuannya adalah sumber daya yang luar biasa untuk setiap masalah.",
-        avatar: "AR",
-        link: "https://forms.gle/your-form-link"
-    },
-    {
-        name: "Budi S.",
-        content: "Aplikasi yang sangat membantu untuk mendiagnosa masalah laptop saya. Terima kasih DailyCek.It!",
-        avatar: "BS",
-        link: "https://forms.gle/your-form-link"
-    },
-    {
-        name: "Dewi A.",
-        content: "Akhirnya ada platform yang bisa membantu saya memahami masalah teknis tanpa harus ke teknisi. Sangat direkomendasikan!",
-        avatar: "DA",
-        link: "https://forms.gle/your-form-link"
-    },
-    {
-        name: "Ahmad F.",
-        content: "Fitur diagnosa mandiri sangat berguna. Berhasil memperbaiki masalah koneksi WiFi saya dalam waktu 10 menit saja.",
-        avatar: "AF",
-        link: "https://forms.gle/your-form-link"
-    },
-    {
-        name: "Citra K.",
-        content: "Sangat mudah digunakan dan informatif. Saya tidak perlu lagi panik setiap kali ada masalah dengan perangkat saya.",
-        avatar: "CK",
-        link: "https://forms.gle/your-form-link"
-    },
-    {
-        name: "Eko P.",
-        content: "Dukungan AI-nya brilian! Ini seperti memiliki teknisi pribadi yang selalu siap membantu 24/7.",
-        avatar: "EP",
-        link: "https://forms.gle/your-form-link"
-    },
-    {
-        name: "Fitri G.",
-        content: "Saya suka bagaimana DailyCek.It memberikan panduan yang jelas. Saya belajar banyak dari solusi yang tersedia.",
-        avatar: "FG",
-        link: "https://forms.gle/your-form-link"
-    },
-    {
-        name: "Hadi W.",
-        content: "Desain responsifnya luar biasa. Saya bisa mengakses semua fitur dengan mudah dari ponsel saya.",
-        avatar: "HW",
-        link: "https://forms.gle/your-form-link"
-    },
-    {
-        name: "Indah L.",
-        content: "Basis pengetahuannya sangat lengkap. Saya selalu menemukan jawaban untuk pertanyaan teknis saya di sini.",
-        avatar: "IL",
-        link: "https://forms.gle/your-form-link"
+        name: "Komponen K",
+        content: "Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe eveniet ut et voluptates repudiandae sint et molestiae non recusandae.",
+        avatar: "KK",
+        link: "https://example.com/component/k"
     }
 ];
 
