@@ -3,16 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
 import { getUserById } from "@/lib/firebase/service";
 import { getGejalaById, updateGejala, deleteGejala } from "@/lib/firebase/diagnose-service";
-import { z } from "zod";
+import { Gejala } from "@/types/diagnose";
 
-// Skema Zod untuk validasi data gejala
-const gejalaSchema = z.object({
-    kode: z.string().min(1, { message: "Kode gejala tidak boleh kosong." }),
-    nama: z.string().min(1, { message: "Nama gejala tidak boleh kosong." }),
-    // Tambahkan validasi untuk properti lain jika diperlukan
-}).partial();
-
-// --- GET Request Handler (for fetching a single symptom by ID) ---
+// --- GET Request Handler ---
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
     const session = await auth();
     if (!session?.user?.id) {
@@ -20,8 +13,10 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     }
 
     try {
+        // Akses params secara asinkron dengan await
         const { id } = await params;
-        if (!id) {
+
+        if (!id || id.trim() === '') {
             return NextResponse.json({ status: false, statusCode: 400, message: "ID gejala diperlukan." }, { status: 400 });
         }
 
@@ -39,7 +34,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     }
 }
 
-// --- PUT Request Handler (for updating a symptom by ID) ---
+// --- PUT Request Handler ---
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
     const session = await auth();
     if (!session?.user?.id) {
@@ -51,31 +46,25 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     }
 
     try {
+        // Akses params secara asinkron dengan await
         const { id } = await params;
-        if (!id) {
+
+        if (!id || id.trim() === '') {
             return NextResponse.json({ status: false, statusCode: 400, message: "ID gejala diperlukan untuk pembaruan." }, { status: 400 });
         }
 
-        const body = await request.json();
-        const validation = gejalaSchema.safeParse(body);
+        const body: Partial<Gejala> = await request.json();
 
-        if (!validation.success) {
-            return NextResponse.json({
-                status: false,
-                statusCode: 400,
-                message: "Validasi gagal.",
-                errors: validation.error.formErrors.fieldErrors,
-            }, { status: 400 });
+        if (!body.nama || body.nama.trim() === '') {
+            return NextResponse.json({ status: false, statusCode: 400, message: "Nama gejala tidak boleh kosong." }, { status: 400 });
         }
-
-        const updatedGejalaData = validation.data;
 
         const gejalaToUpdate = await getGejalaById(id);
         if (!gejalaToUpdate) {
             return NextResponse.json({ status: false, statusCode: 404, message: "Gejala tidak ditemukan untuk diperbarui." }, { status: 404 });
         }
 
-        await updateGejala(id, updatedGejalaData);
+        await updateGejala(id, body);
 
         return NextResponse.json({ status: true, statusCode: 200, message: "Gejala berhasil diperbarui." }, { status: 200 });
     } catch (caughtError: unknown) {
@@ -97,8 +86,10 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
     }
 
     try {
+        // Akses params secara asinkron dengan await
         const { id } = await params;
-        if (!id) {
+
+        if (!id || id.trim() === '') {
             return NextResponse.json({ status: false, statusCode: 400, message: "ID gejala diperlukan untuk penghapusan." }, { status: 400 });
         }
 

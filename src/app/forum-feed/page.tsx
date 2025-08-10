@@ -23,10 +23,10 @@ import {
 const HeroSection = ({ onStartDiagnosis, onAIassistance }: { onStartDiagnosis: () => void; onAIassistance: () => void; }) => (
     <div className="text-center mb-12 py-12 px-4 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-zinc-900 dark:to-blue-950 rounded-xl shadow-lg animate-fade-in">
         <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100 mb-2">
-            Komunitas yang Saling Membantu
+            Pengguna yang Saling Mendukung
         </h1>
         <p className="text-md text-gray-600 dark:text-gray-300 max-w-xl mx-auto mb-6">
-            Diskusikan masalah Anda, dapatkan wawasan, atau jelajahi berbagai topik menarik dari para ahli dan pengguna lain.
+            Diskusikan masalah Anda, dapatkan wawasan, atau jelajahi berbagai topik menarik bersama para ahli dan pengguna lainnya.
         </p>
         <div className="flex justify-center gap-3">
             <Button size="sm" onClick={onStartDiagnosis}>

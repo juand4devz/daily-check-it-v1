@@ -3,15 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "../../../../../../auth";
 import { getUserById } from "@/lib/firebase/service";
 import { getKerusakanById, updateKerusakan, deleteKerusakan } from "@/lib/firebase/diagnose-service";
-import { z } from "zod";
-
-// Skema Zod untuk validasi data kerusakan
-const kerusakanSchema = z.object({
-    kode: z.string().min(1, { message: "Kode kerusakan tidak boleh kosong." }),
-    nama: z.string().min(1, { message: "Nama kerusakan tidak boleh kosong." }),
-    deskripsi: z.string().min(1, { message: "Deskripsi kerusakan tidak boleh kosong." }),
-    prior_probability: z.number().min(0.01, { message: "Prior probability harus lebih dari 0." }).max(0.5, { message: "Prior probability tidak boleh lebih dari 0.5." }).optional(),
-}).partial();
+import { Kerusakan } from "@/types/diagnose";
 
 // --- GET Request Handler (for fetching a single damage by ID) ---
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
@@ -22,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
     try {
         const { id } = await params;
-        if (!id) {
+        if (!id || id.trim() === '') {
             return NextResponse.json({ status: false, statusCode: 400, message: "ID kerusakan diperlukan." }, { status: 400 });
         }
 
@@ -53,32 +45,25 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
     try {
         const { id } = await params;
-        if (!id) {
+        if (!id || id.trim() === '') {
             return NextResponse.json({ status: false, statusCode: 400, message: "ID kerusakan diperlukan untuk pembaruan." }, { status: 400 });
         }
 
-        const body = await request.json();
-        const validation = kerusakanSchema.safeParse(body);
+        const body: Partial<Kerusakan> = await request.json();
 
-        if (!validation.success) {
-            return NextResponse.json({
-                status: false,
-                statusCode: 400,
-                message: "Validasi gagal.",
-                errors: validation.error.formErrors.fieldErrors,
-            }, { status: 400 });
+        // Validasi minimal untuk nama kerusakan
+        if (!body.nama || body.nama.trim() === '') {
+            return NextResponse.json({ status: false, statusCode: 400, message: "Nama kerusakan tidak boleh kosong." }, { status: 400 });
         }
-
-        const updatedKerusakanData = validation.data;
 
         const kerusakanToUpdate = await getKerusakanById(id);
         if (!kerusakanToUpdate) {
             return NextResponse.json({ status: false, statusCode: 404, message: "Kerusakan tidak ditemukan untuk diperbarui." }, { status: 404 });
         }
 
-        await updateKerusakan(id, updatedKerusakanData);
+        await updateKerusakan(id, body);
 
-        return NextResponse.json({ status: true, statusCode: 200, message: "Kerusakan berhasil diperbarui." });
+        return NextResponse.json({ status: true, statusCode: 200, message: "Kerusakan berhasil diperbarui." }, { status: 200 });
     } catch (caughtError: unknown) {
         console.error("Error updating kerusakan:", caughtError);
         const errorMessage = "Server error when updating kerusakan.";
@@ -99,7 +84,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
     try {
         const { id } = await params;
-        if (!id) {
+        if (!id || id.trim() === '') {
             return NextResponse.json({ status: false, statusCode: 400, message: "ID kerusakan diperlukan untuk penghapusan." }, { status: 400 });
         }
 
@@ -110,7 +95,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
         await deleteKerusakan(id);
 
-        return NextResponse.json({ status: true, statusCode: 200, message: "Kerusakan berhasil dihapus." });
+        return NextResponse.json({ status: true, statusCode: 200, message: "Kerusakan berhasil dihapus." }, { status: 200 });
     } catch (caughtError: unknown) {
         console.error("Error deleting kerusakan:", caughtError);
         const errorMessage = "Terjadi kesalahan server saat menghapus kerusakan.";

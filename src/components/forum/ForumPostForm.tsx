@@ -252,7 +252,7 @@ export function ForumPostForm({
                 reader.onload = () => resolve(reader.result as string);
                 reader.readAsDataURL(file);
             } else {
-                resolve("/placeholder.svg"); // Fallback for unsupported types
+                resolve(""); // Fallback for unsupported types
             }
         });
     };
@@ -542,7 +542,7 @@ export function ForumPostForm({
 
 
     const handleSubmit = async (values: FormSchema) => {
-        if (!userId || !username || !avatar) {
+        if (!userId || !username) {
             toast.error("Data pengguna tidak lengkap. Harap refresh atau login ulang.");
             if (isModal && onClose) {
                 onClose();
@@ -592,7 +592,7 @@ export function ForumPostForm({
             media: finalMediaForSubmission,
             authorId: userId!,
             authorUsername: username!,
-            authorAvatar: avatar || "/placeholder.svg",
+            authorAvatar: avatar || "",
         };
 
         await parentOnSubmit(postData, initialData?.id);
@@ -726,7 +726,7 @@ export function ForumPostForm({
                                                                             <TypeIcon className="h-4 w-4" />
                                                                             <div className="text-left">
                                                                                 <div className="font-medium">{forumType.name}</div>
-                                                                                <div className="text-[10px] text-gray-500">{forumType.description}</div>
+                                                                                <div className="text-[8px] lg:text-xs text-gray-500">{forumType.description}</div>
                                                                             </div>
                                                                         </div>
                                                                     </SelectItem>

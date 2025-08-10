@@ -113,7 +113,7 @@ export default function ForumDetailContent({ postId, isModal = false }: { postId
 
         const preview: { id: string; url: string; filename: string; uploading?: boolean; progress?: number; uploadedUrl?: string; type?: "image" | "video"; } = {
             id: mainCommentUploadState.uploadedData?.id || mainCommentUploadState.file?.name || 'temp',
-            url: mainCommentUploadState.uploadedData?.url || mainCommentUploadState.previewUrl || '/placeholder.svg',
+            url: mainCommentUploadState.uploadedData?.url || mainCommentUploadState.previewUrl || '',
             filename: mainCommentUploadState.uploadedData?.filename || mainCommentUploadState.file?.name || 'media',
             uploading: mainCommentUploadState.uploading,
             progress: mainCommentUploadState.progress,
@@ -405,7 +405,7 @@ export default function ForumDetailContent({ postId, isModal = false }: { postId
 
     const handleSubmitReply = useCallback(
         async (content: string, mediaFilesInput: ForumMedia[], parentId?: string, mentionedUserIds?: string[]) => {
-            if (submittingReply || !userId || !username || !avatar || !post) {
+            if (submittingReply || !userId || !username || !post) {
                 if (!userId) toast.error("Anda harus login untuk berkomentar.");
                 return;
             }

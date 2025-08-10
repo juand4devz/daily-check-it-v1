@@ -804,83 +804,91 @@ export default function AIChatPage() {
                                                     </div>
                                                 )}
 
-                                                <div className="relative flex flex-col items-end gap-2 rounded-2xl border bg-background p-2 shadow-sm focus-within:ring-2 focus-within:ring-ring">
-                                                    <ScrollArea className="relative w-full">
-                                                        <Textarea
-                                                            {...field}
-                                                            ref={textareaRef}
-                                                            placeholder={
-                                                                selectedImage
-                                                                    ? "Opsional: Tambahkan pertanyaan tentang gambar..."
-                                                                    : "Tanyakan sesuatu tentang teknologi komputer..."
-                                                            }
-                                                            className="min-h-[60px] max-h-[200px] resize-none w-full border-0 bg-transparent px-3 py-2 text-sm focus-visible:ring-0 focus-visible:ring-offset-0"
-                                                            disabled={isDisabled} // Menggunakan kondisi isDisabled gabungan
-                                                            onKeyPress={handleKeyPress}
-                                                            maxLength={400}
-                                                        />
-                                                        {/* Character Counter */}
-                                                        <div className="absolute bottom-2 right-2 text-muted-foreground text-xs">
-                                                            {field.value?.length || 0}/400
-                                                        </div>
-                                                        <ScrollBar orientation="vertical" />
-                                                    </ScrollArea>
-                                                    {/* Input Buttons */}
-                                                    <div className="flex justify-between items-center w-full">
-                                                        <div className="flex gap-x-2 items-center">
-                                                            <Button
-                                                                type="button"
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={handleClearChat}
-                                                                disabled={isDisabled || messages.length === 0} // Disable clear chat if input disabled or no messages
-                                                                className="h-7 md:h-10 w-7 md:w-10 hover:scale-110 cursor-pointer"
-                                                                title="Clear chat history"
-                                                            >
-                                                                <BrushCleaning className="h-4 w-4" />
-                                                            </Button>
-                                                        </div>
+                                                <div className="flex flex-col gap-2">
+                                                    <div className="relative flex flex-col items-end gap-2 rounded-2xl border bg-background p-2 shadow-sm focus-within:ring-2 focus-within:ring-ring">
+                                                        <ScrollArea className="relative w-full">
+                                                            <Textarea
+                                                                {...field}
+                                                                ref={textareaRef}
+                                                                placeholder={
+                                                                    selectedImage
+                                                                        ? "Opsional: Tambahkan pertanyaan tentang gambar..."
+                                                                        : "Tanyakan sesuatu tentang teknologi komputer..."
+                                                                }
+                                                                className="min-h-[60px] max-h-[200px] resize-none w-full border-0 bg-transparent px-3 py-2 text-sm focus-visible:ring-0 focus-visible:ring-offset-0"
+                                                                disabled={isDisabled}
+                                                                onKeyPress={handleKeyPress}
+                                                                maxLength={400}
+                                                            />
+                                                            {/* Character Counter */}
+                                                            <div className="absolute bottom-2 right-2 text-muted-foreground text-xs">
+                                                                {field.value?.length || 0}/400
+                                                            </div>
+                                                            <ScrollBar orientation="vertical" />
+                                                        </ScrollArea>
 
-                                                        <div className="flex gap-3 items-center">
-                                                            {isMobile && (
+                                                        {/* Input Buttons */}
+                                                        <div className="flex justify-between items-center w-full">
+                                                            <div className="flex gap-x-2 items-center">
                                                                 <Button
                                                                     type="button"
                                                                     variant="ghost"
                                                                     size="sm"
-                                                                    onClick={() => cameraInputRef.current?.click()}
-                                                                    disabled={isDisabled} // Menggunakan kondisi isDisabled gabungan
-                                                                    className="h-7 md:h-8 w-7 md:w-8 hover:scale-110 cursor-pointer"
-                                                                    title="Take photo"
+                                                                    onClick={handleClearChat}
+                                                                    disabled={isDisabled || messages.length === 0}
+                                                                    className="h-7 md:h-10 w-7 md:w-10 hover:scale-110 cursor-pointer"
+                                                                    title="Clear chat history"
                                                                 >
-                                                                    <Camera className="h-4 w-4" />
+                                                                    <BrushCleaning className="h-4 w-4" />
                                                                 </Button>
-                                                            )}
+                                                            </div>
 
-                                                            <Button
-                                                                type="button"
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() => fileInputRef.current?.click()}
-                                                                disabled={isDisabled} // Menggunakan kondisi isDisabled gabungan
-                                                                className="h-7 md:h-8 w-7 md:w-8 hover:scale-110 cursor-pointer"
-                                                                title="Upload image"
-                                                            >
-                                                                <ImageUp className="h-4 w-4" />
-                                                            </Button>
+                                                            <div className="flex gap-3 items-center">
+                                                                {isMobile && (
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        onClick={() => cameraInputRef.current?.click()}
+                                                                        disabled={isDisabled}
+                                                                        className="h-7 md:h-8 w-7 md:w-8 hover:scale-110 cursor-pointer"
+                                                                        title="Take photo"
+                                                                    >
+                                                                        <Camera className="h-4 w-4" />
+                                                                    </Button>
+                                                                )}
 
-                                                            <Button
-                                                                type="submit"
-                                                                size="icon"
-                                                                disabled={
-                                                                    isDisabled ||
-                                                                    (!field.value?.trim() && !selectedImage) // Additional condition: must have text or image
-                                                                }
-                                                                className="rounded-lg h-8 md:h-9 w-8 md:w-9 hover:scale-105 cursor-pointer"
-                                                                title="Send message"
-                                                            >
-                                                                {isLoading ? <Loader2 className="animate-spin" /> : <Send />}
-                                                            </Button>
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    onClick={() => fileInputRef.current?.click()}
+                                                                    disabled={isDisabled}
+                                                                    className="h-7 md:h-8 w-7 md:w-8 hover:scale-110 cursor-pointer"
+                                                                    title="Upload image"
+                                                                >
+                                                                    <ImageUp className="h-4 w-4" />
+                                                                </Button>
+
+                                                                <Button
+                                                                    type="submit"
+                                                                    size="icon"
+                                                                    disabled={
+                                                                        isDisabled ||
+                                                                        (!field.value?.trim() && !selectedImage)
+                                                                    }
+                                                                    className="rounded-lg h-8 md:h-9 w-8 md:w-9 hover:scale-105 cursor-pointer"
+                                                                    title="Send message"
+                                                                >
+                                                                    {isLoading ? <Loader2 className="animate-spin" /> : <Send />}
+                                                                </Button>
+                                                            </div>
                                                         </div>
+                                                    </div>
+
+                                                    {/* Keterangan ekstra kecil tentang AI di luar card */}
+                                                    <div className="w-full text-xs text-muted-foreground text-center">
+                                                        AI dapat melakukan kesalahan. Pertimbangkan untuk mengecek ulang informasi penting.
                                                     </div>
                                                 </div>
                                             </div>

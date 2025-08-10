@@ -13,7 +13,7 @@ export default function NewForumPostPage() {
   const { data: session, status } = useSession();
   const userId = session?.user?.id;
   const username = session?.user?.username;
-  const avatar = session?.user?.avatar;
+  // const avatar = session?.user?.avatar;
   const router = useRouter();
 
   const [diagnosisData, setDiagnosisData] = useState<DiagnosisData | null>(null);
@@ -47,7 +47,7 @@ export default function NewForumPostPage() {
     postData: Omit<ForumPost, 'id' | 'createdAt' | 'updatedAt' | 'likes' | 'likedBy' | 'replies' | 'views' | 'isResolved' | 'isPinned' | 'isArchived'>,
     postId?: string // Not used for new post, but required by prop signature
   ) => {
-    if (!userId || !username || !avatar) {
+    if (!userId || !username) {
       toast.error("Data pengguna tidak lengkap. Harap refresh atau login ulang.");
       return;
     }
@@ -78,7 +78,7 @@ export default function NewForumPostPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [userId, username, avatar, router]);
+  }, [userId, username, router]);
 
 
   return (

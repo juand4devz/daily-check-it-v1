@@ -268,7 +268,7 @@ export function PostCard({
                             onClick={(e) => e.stopPropagation()}
                         >
                             <Avatar className="h-8 w-8">
-                                <AvatarImage src={post.authorAvatar || "/placeholder.svg"} />
+                                <AvatarImage src={post.authorAvatar || ""} />
                                 <AvatarFallback>{post.authorUsername?.[0] || '?'}</AvatarFallback>
                             </Avatar>
                             <div className="flex-1 min-w-0">

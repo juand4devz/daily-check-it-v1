@@ -177,7 +177,7 @@ export function ImageUploader({
     }, [onImageUrlChange]);
 
     const renderImage = () => {
-        const srcToDisplay = previewUrl || currentImageUrl || "/placeholder.svg";
+        const srcToDisplay = previewUrl || currentImageUrl || "";
 
         if (type === "avatar") {
             return (
@@ -192,7 +192,7 @@ export function ImageUploader({
                     className="h-48 w-full rounded-t-lg bg-gray-200 dark:bg-gray-700 bg-cover bg-center flex items-center justify-center text-muted-foreground"
                     style={{ backgroundImage: `url(${srcToDisplay})` }}
                 >
-                    {(!srcToDisplay || srcToDisplay === "/placeholder.svg") && (
+                    {(!srcToDisplay || srcToDisplay === "/") && (
                         <span className="text-sm">No Banner Image</span>
                     )}
                 </div>
@@ -204,7 +204,7 @@ export function ImageUploader({
                         "relative w-full h-48 bg-muted flex items-center justify-center overflow-hidden rounded-md"
                     )}
                 >
-                    {srcToDisplay && srcToDisplay !== "/placeholder.svg" ? (
+                    {srcToDisplay && srcToDisplay !== "/" ? (
                         <Image src={srcToDisplay} alt={imageAlt} fill style={{ objectFit: "cover" }} sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" />
                     ) : (
                         <span className="text-sm text-muted-foreground">No Image</span>

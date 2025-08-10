@@ -13,7 +13,6 @@ import remarkGfm from "remark-gfm";
 import {
     ChevronUp,
     ChevronDown,
-    MessageSquare,
     Award,
     CheckCircle,
     X,
@@ -22,8 +21,8 @@ import {
     Copy,
     Link as LinkIcon,
     Image as ImageIcon,
-    Video,
     Smile,
+    ImageUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -127,8 +126,7 @@ export function ReplyItem({
             uploading: fileItem.uploading,
             progress: fileItem.progress,
             uploadedUrl: fileItem.uploadedMediaData?.url,
-            // PERBAIKAN: Pastikan fileItem.file ada sebelum mengakses .type
-            type: fileItem.file ? (fileItem.file.type.startsWith('image/') ? 'image' : fileItem.file.type.startsWith('video/') ? 'video' : undefined) : undefined,
+            type: 'image' as const,
         }));
     }, [inlineReplyMediaFiles]);
 
@@ -172,8 +170,8 @@ export function ReplyItem({
         }
 
         const file = files[0];
-        if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
-            toast.error("Hanya file gambar atau video yang diizinkan.");
+        if (!file.type.startsWith('image/')) {
+            toast.error("Hanya file gambar yang diizinkan.");
             return;
         }
 
@@ -322,7 +320,6 @@ export function ReplyItem({
         }
     };
 
-
     return (
         <Card
             id={`comment-${reply.id}`}
@@ -380,8 +377,17 @@ export function ReplyItem({
                                                 onClick={(e) => e.stopPropagation()}
                                             >
                                                 <Avatar className={cn(isNested ? "h-8 w-8 border border-gray-300" : "h-9 w-9 border-2 border-blue-400")}>
-                                                    <AvatarImage src={reply.authorAvatar || "/placeholder.svg"} />
-                                                    <AvatarFallback className={cn(isNested ? "bg-gray-100 text-gray-600" : "bg-blue-200 text-blue-800 font-semibold")}>{reply.authorUsername?.[0] || '?'}</AvatarFallback>
+                                                    <AvatarImage src={reply.authorAvatar || ""} />
+                                                    <AvatarFallback
+                                                        className={cn(
+                                                            "flex h-full w-full items-center justify-center rounded-full border-2",
+                                                            isNested
+                                                                ? "border-gray-300 bg-gray-100 text-gray-600 text-xs font-medium"
+                                                                : "border-blue-400 bg-blue-100 text-blue-800 text-sm font-semibold"
+                                                        )}
+                                                    >
+                                                        {reply.authorUsername?.[0] || '?'}
+                                                    </AvatarFallback>
                                                 </Avatar>
                                                 <div className="flex flex-col ml-2">
                                                     <span className="font-medium text-xs sm:text-sm hover:underline">
@@ -425,7 +431,7 @@ export function ReplyItem({
                             isNested ? (
                                 "prose prose-sm max-w-none dark:prose-invert"
                             ) : (
-                                "prose prose-sm max-w-none dark:prose-invert mb-2"
+                                "prose prose-sm max-w-none dark:prose-invert m-2"
                             )
                         }>
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>{highlightMentions(displayedContent)}</ReactMarkdown>
@@ -445,14 +451,12 @@ export function ReplyItem({
                         {!isNested && (
                             <div className="flex justify-between items-center gap-2 text-sm">
                                 <div className="flex space-x-2">
-                                    {/* Tombol Popover Reaksi Utama */}
                                     <EmojiReactionPopover
                                         onSelect={(selectedReactionKey) => onReaction(reply.id, selectedReactionKey, currentUserReaction)}
                                         currentUserReaction={currentUserReaction}
                                         replyReactions={reply.reactions || {}}
                                         disabled={!currentUserId}
                                     />
-                                    {/* Tampilkan reaksi-reaksi lain dari pengguna lain */}
                                     {EMOJI_REACTIONS.map((reaction) => {
                                         const count = reply.reactions?.[reaction.key]?.length || 0;
                                         const isReactedByCurrentUser = currentUserReaction === reaction.key;
@@ -480,14 +484,12 @@ export function ReplyItem({
                                         );
                                     })}
                                 </div>
-
-                                {/* Tombol Tandai Solusi (kondisional) */}
-                                {canMarkSolution && ( // Hanya tampil jika pengguna berhak (penulis post) DAN postnya adalah 'pertanyaan'
+                                {canMarkSolution && (
                                     <Button
                                         type="button"
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() => onMarkAsSolution(reply.id, reply.isSolution, currentUserId!, isCurrentUserPostAuthor, isAdmin)}
+                                        onClick={() => onMarkAsSolution(reply.id, !!reply.isSolution, currentUserId!, isCurrentUserPostAuthor, isAdmin)}
                                         className={`h-6 px-0 md:px-2 text-xs ${reply.isSolution ? "text-green-600 hover:text-red-700" : "text-gray-600 hover:text-green-700"}`}
                                         disabled={!currentUserId}
                                     >
@@ -562,7 +564,6 @@ export function ReplyItem({
                                 </Button>
                             </div>
                         )}
-
                         {!isNested && currentUserId && (
                             <div className="pt-4">
                                 <div className="flex items-start gap-3">
@@ -595,15 +596,7 @@ export function ReplyItem({
                                                     value={inlineReplyContent}
                                                     onChange={handleMarkdownEditorChange}
                                                     onMediaFilesChange={handleInlineMediaFilesChange}
-                                                    mediaPreviews={inlineReplyMediaPreviews.map(p => ({
-                                                        id: p.id,
-                                                        url: p.previewUrl,
-                                                        filename: p.file?.name || 'media',
-                                                        uploading: p.uploading,
-                                                        progress: p.progress,
-                                                        uploadedUrl: p.uploadedMediaData?.url,
-                                                        type: p.file?.type.startsWith('image/') ? 'image' : p.file?.type.startsWith('video/') ? 'video' : undefined,
-                                                    }))}
+                                                    mediaPreviews={inlineReplyMediaPreviews}
                                                     placeholder={`Balas komentar...`}
                                                     rows={3}
                                                     disabled={isSubmittingReply || inlineReplyMediaFiles.some(f => f.uploading)}
@@ -612,7 +605,7 @@ export function ReplyItem({
                                                     onRemoveMedia={handleRemoveInlineMedia}
                                                     allAvailableMentions={allAvailableMentions}
                                                     disableMediaPreviewInWriteTab={false}
-                                                    showMediaPreviewInPreviewTab={false}
+                                                    showMediaPreviewInPreviewTab={true}
                                                     showMediaInsertActions={true}
                                                 />
                                                 {showMentionPopover && filteredMentions.length > 0 && (

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { MapPin, Calendar, Clock, AlertTriangle } from "lucide-react";
+import { MapPin, Calendar, Clock, AlertTriangle, UserX } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
 
@@ -36,6 +36,12 @@ export function UserProfileClickPopover({ children, userId }: UserProfileClickPo
             const fetchUser = async () => {
                 try {
                     const response = await fetch(`/api/forum/users/${userId}`);
+                    if (response.status === 404) {
+                        // Menangani kasus 404 (Not Found) secara spesifik
+                        setError("Pengguna tidak ditemukan.");
+                        toast.error("Profil pengguna tidak ditemukan.");
+                        return;
+                    }
                     if (!response.ok) {
                         const errorText = await response.text();
                         throw new Error(errorText || "Gagal memuat data pengguna.");
@@ -69,8 +75,8 @@ export function UserProfileClickPopover({ children, userId }: UserProfileClickPo
                 className="w-72 p-0"
                 align="start"
                 sideOffset={10}
-                onMouseDown={(e) => e.stopPropagation()} // FIX: Tambahkan ini untuk menghentikan perambatan event
-                onClick={(e) => e.stopPropagation()} // FIX: Tambahkan ini juga sebagai jaring pengaman
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
             >
                 {loading ? (
                     <div className="p-4 flex flex-col items-center gap-3">
@@ -85,8 +91,17 @@ export function UserProfileClickPopover({ children, userId }: UserProfileClickPo
                     </div>
                 ) : error ? (
                     <div className="p-4 text-center text-red-500">
-                        <AlertTriangle className="h-10 w-10 mx-auto mb-2" />
-                        <p className="text-sm">Error: {error}</p>
+                        {error === "Pengguna tidak ditemukan." ? (
+                            <UserX className="h-10 w-10 mx-auto mb-2 text-red-500" />
+                        ) : (
+                            <AlertTriangle className="h-10 w-10 mx-auto mb-2 text-red-500" />
+                        )}
+                        <p className="text-sm font-semibold">{error}</p>
+                        {error === "Pengguna tidak ditemukan." && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Profil mungkin telah dihapus atau tidak tersedia.
+                            </p>
+                        )}
                     </div>
                 ) : userData ? (
                     <Card className="border-none shadow-none p-0">
@@ -104,8 +119,10 @@ export function UserProfileClickPopover({ children, userId }: UserProfileClickPo
                                 </div>
                             )}
                             <Avatar className="absolute -bottom-8 left-1/2 -translate-x-1/2 h-16 w-16 border-2 border-background shadow-md">
-                                <AvatarImage src={userData.avatar || "/placeholder.svg"} alt={userData.username} />
-                                <AvatarFallback className="text-2xl">{userData.username[0]}</AvatarFallback>
+                                <AvatarImage src={userData.avatar || ""} alt={userData.username} />
+                                <AvatarFallback className="flex h-full w-full items-center justify-center bg-gray-200 text-gray-800 text-2xl font-semibold">
+                                    {userData.username?.[0] || '?'}
+                                </AvatarFallback>
                             </Avatar>
                         </div>
 
@@ -137,7 +154,7 @@ export function UserProfileClickPopover({ children, userId }: UserProfileClickPo
                                 variant="secondary"
                                 className="w-full mt-4"
                                 onClick={(e) => {
-                                    e.stopPropagation(); // FIX: Tambahkan ini untuk mencegah klik merambat
+                                    e.stopPropagation();
                                     router.push(`/users/${userData.id}`);
                                     setIsOpen(false);
                                 }}

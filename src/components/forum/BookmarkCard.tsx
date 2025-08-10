@@ -29,10 +29,10 @@ import {
 } from "lucide-react";
 import type { ForumPost } from "@/types/forum";
 import {
-    formatTimeAgo,
     getRandomGradient,
     getCategoryIcon,
 } from "@/lib/utils/forum-utils";
+import { formatTimeAgo } from "@/lib/utils/date-utils";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -138,7 +138,7 @@ export function BookmarkCard({ post, viewMode, isSelected, bulkDeleteMode, onTog
                                     </h3>
                                     <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
                                         <Avatar className="h-4 w-4">
-                                            <AvatarImage src={post.authorAvatar || "/placeholder.svg"} />
+                                            <AvatarImage src={post.authorAvatar || ""} />
                                             <AvatarFallback className="text-xs">{post.authorUsername[0]}</AvatarFallback>
                                         </Avatar>
                                         <span>{post.authorUsername}</span>
@@ -329,7 +329,7 @@ export function BookmarkCard({ post, viewMode, isSelected, bulkDeleteMode, onTog
             <CardContent className="p-4">
                 <div className="flex items-start gap-3 mb-3">
                     <Avatar className="h-8 w-8">
-                        <AvatarImage src={post.authorAvatar || "/placeholder.svg"} />
+                        <AvatarImage src={post.authorAvatar || ""} />
                         <AvatarFallback>{post.authorUsername[0]}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">

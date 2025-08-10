@@ -197,7 +197,7 @@ export function ImageUploader({
 
     // Render komponen gambar berdasarkan tipe (avatar, banner, general)
     const renderImage = () => {
-        const srcToDisplay = previewUrl || currentImageUrl || "/placeholder.svg"; // Fallback placeholder
+        const srcToDisplay = previewUrl || currentImageUrl || ""; // Fallback placeholder
 
         if (type === "avatar") {
             return (
@@ -212,7 +212,7 @@ export function ImageUploader({
                     className="h-48 w-full rounded-t-lg bg-gray-200 dark:bg-gray-700 bg-cover bg-center flex items-center justify-center text-muted-foreground"
                     style={{ backgroundImage: `url(${srcToDisplay})` }}
                 >
-                    {(!srcToDisplay || srcToDisplay === "/placeholder.svg") && (
+                    {(!srcToDisplay || srcToDisplay === "") && (
                         <span className="text-sm">No Banner Image</span>
                     )}
                 </div>
@@ -224,7 +224,7 @@ export function ImageUploader({
                         "relative w-full h-48 bg-muted flex items-center justify-center overflow-hidden rounded-md",
                     )}
                 >
-                    {srcToDisplay && srcToDisplay !== "/placeholder.svg" ? (
+                    {srcToDisplay && srcToDisplay !== "" ? (
                         <img src={srcToDisplay} alt={imageAlt} className="object-cover w-full h-full" />
                     ) : (
                         <span className="text-sm text-muted-foreground">No Image</span>

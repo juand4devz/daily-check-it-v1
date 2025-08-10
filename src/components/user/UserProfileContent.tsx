@@ -18,7 +18,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import {
     User,
-    // Mail,
     Phone,
     MapPin,
     Globe,
@@ -30,14 +29,15 @@ import {
     Link as LinkIcon,
     Calendar,
     Clock,
-    Flag, // For reporting user
+    Flag,
     AlertTriangle,
+    UserX, // Ikon baru untuk pengguna tidak ditemukan
 } from "lucide-react";
 import { PostCard } from "@/components/forum/PostCard";
-import { ReportDialog } from "@/components/shared/ReportDialog"; // Tetap impor untuk kasus report
+import { ReportDialog } from "@/components/shared/ReportDialog";
 import Image from "next/image";
 
-import { formatDateTime } from "@/lib/utils/date-utils"; // Import formatTimeAgo for last login in profile
+import { formatDateTime } from "@/lib/utils/date-utils";
 import { User as UserType } from "@/types/types";
 import { ForumPost } from "@/types/forum";
 
@@ -59,7 +59,7 @@ export function UserProfileContent({ userId, onClose }: UserProfileContentProps)
     const [profileData, setProfileData] = useState<UserProfileData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isReportDialogOpen, setIsReportDialogOpen] = useState(false); // State untuk dialog laporan
+    const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
 
     // --- EFFECT: Fetch User Profile Data ---
     useEffect(() => {
@@ -74,10 +74,15 @@ export function UserProfileContent({ userId, onClose }: UserProfileContentProps)
             setError(null);
             try {
                 const response = await fetch(`/api/forum/users/${userId}`);
+                if (response.status === 404) {
+                    // Menangani kasus 404 (Not Found) secara spesifik
+                    setError("not_found");
+                    return;
+                }
                 if (!response.ok) {
                     const errorText = await response.text();
                     console.error(`API Error Response: ${response.status} - ${errorText}`);
-                    throw new Error("Failed to fetch user profile.");
+                    throw new Error("Gagal memuat profil pengguna.");
                 }
                 const data = await response.json();
                 if (data.status) {
@@ -88,7 +93,7 @@ export function UserProfileContent({ userId, onClose }: UserProfileContentProps)
                 }
             } catch (err) {
                 console.error(`Error fetching profile for user ID ${userId}:`, err);
-                setError((err as Error).message);
+                setError("Gagal memuat profil pengguna.");
                 toast.error("Error", { description: "Terjadi kesalahan saat memuat profil pengguna." });
             } finally {
                 setLoading(false);
@@ -123,14 +128,28 @@ export function UserProfileContent({ userId, onClose }: UserProfileContentProps)
         );
     }
 
+    // Tampilan Error yang Ditingkatkan
     if (error || !profileData) {
+        let title = "Profil Pengguna Tidak Ditemukan";
+        let message = `Pengguna dengan ID "${userId}" tidak ada atau telah dihapus.`;
+        let icon = <UserX className="h-16 w-16 text-muted-foreground mx-auto mb-4" />;
+
+        if (error !== "not_found") {
+            title = "Terjadi Kesalahan";
+            message = error || "Gagal memuat profil pengguna.";
+            icon = <AlertTriangle className="h-16 w-16 text-yellow-500 mx-auto mb-4" />;
+        }
+
         return (
-            <div className="text-center p-8 w-full">
-                <AlertTriangle className="h-16 w-16 text-yellow-500 mx-auto mb-4" />
-                <h2 className="text-2xl font-bold mb-2">Profil Pengguna Tidak Ditemukan</h2>
-                <p className="text-muted-foreground mb-4">Pengguna dengan ID &quot;{userId}&quot; tidak ada atau telah dihapus.</p>
-                {onClose && <Button type="button" onClick={onClose}>Tutup</Button>}
-                {!onClose && <Button type="button" onClick={() => router.push("/")}>Kembali ke Beranda</Button>}
+            <div className="text-center p-8 w-full rounded-lg bg-card text-card-foreground shadow-lg">
+                {icon}
+                <h2 className="text-2xl font-bold mb-2">{title}</h2>
+                <p className="text-muted-foreground mb-4">{message}</p>
+                {onClose ? (
+                    <Button type="button" onClick={onClose} variant="secondary">Tutup</Button>
+                ) : (
+                    <Button type="button" onClick={() => router.push("/forum-feed")} variant="secondary">Kembali ke Beranda</Button>
+                )}
             </div>
         );
     }
@@ -171,7 +190,7 @@ export function UserProfileContent({ userId, onClose }: UserProfileContentProps)
             {/* Profile Header & Info (Avatar, Name, Bio, Badges) */}
             <div className="flex flex-col md:flex-row items-center md:items-start gap-6 -mt-16 mb-8 z-10 relative px-4 sm:px-0">
                 <Avatar className="h-32 w-32 md:h-40 md:w-40 border-4 border-background shadow-lg flex-shrink-0">
-                    <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.username} />
+                    <AvatarImage src={user.avatar || "/"} alt={user.username} />
                     <AvatarFallback className="text-5xl">{user.username[0]}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 space-y-3 text-center md:text-left mt-10 md:mt-20">
@@ -183,8 +202,8 @@ export function UserProfileContent({ userId, onClose }: UserProfileContentProps)
                                 <MapPin className="h-3 w-3" /> {user.location}
                             </Badge>
                         )}
-                        {/* <Badge variant="secondary">{user.role}</Badge>
-                        {user.isBanned && <Badge variant="destructive">Banned</Badge>} */}
+                        <Badge variant="secondary">{user.role}</Badge>
+                        {user.isBanned && <Badge variant="destructive">Banned</Badge>}
                     </div>
                 </div>
             </div>
@@ -193,7 +212,7 @@ export function UserProfileContent({ userId, onClose }: UserProfileContentProps)
             <Tabs defaultValue="posts" className="w-full px-4 sm:px-0">
                 <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="posts">
-                        <MessageSquare className="h-4 w-4 mr-2" /> Forum Posts ({posts.length})
+                        <MessageSquare className="h-4 w-4 mr-2 hidden md:block" /> Forum Posts ({posts.length})
                     </TabsTrigger>
                     <TabsTrigger value="info">
                         <User className="h-4 w-4 mr-2" /> Informasi & Sosial
@@ -233,12 +252,6 @@ export function UserProfileContent({ userId, onClose }: UserProfileContentProps)
                             <CardTitle className="text-lg flex items-center gap-2"><User className="h-5 w-5" /> Informasi Dasar</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {/* {user.email && (
-                                <div className="flex items-center gap-2">
-                                    <Mail className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-sm">{user.email}</span>
-                                </div>
-                            )} */}
                             {user.phone && (
                                 <div className="flex items-center gap-2">
                                     <Phone className="h-4 w-4 text-muted-foreground" />

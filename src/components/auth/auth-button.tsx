@@ -14,7 +14,7 @@ export function AuthButton({ type }: AuthButtonProps) {
         try {
             const res = await signIn(type, {
                 redirect: false,
-                callbackUrl: "/",
+                callbackUrl: "/forum-feed",
             });
 
             if (!res?.error) {

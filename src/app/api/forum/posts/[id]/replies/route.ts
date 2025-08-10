@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 // POST: add new reply
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
     const session = await auth();
-    if (!session?.user?.id || !session?.user?.username || !session?.user?.avatar) {
+    if (!session?.user?.id || !session?.user?.username) {
         return NextResponse.json({ status: false, statusCode: 401, message: "Unauthorized: User not authenticated." }, { status: 401 });
     }
 
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             content: content,
             authorId: session.user.id,
             authorUsername: session.user.username,
-            authorAvatar: session.user.avatar || "/placeholder.svg",
+            authorAvatar: session.user.avatar || "",
             parentId: parentId || null,
             mentions: mentionedUserIds, // Simpan ID pengguna yang di-mention
             media: media || [],

@@ -301,7 +301,7 @@ export async function login(data: { email: string }): Promise<User | null> {
         ...userData,
         id: userDoc.id,
         username: userData.username, // Pastikan username diambil
-        avatar: userData.avatar || "/placeholder.svg", // Gunakan placeholder jika avatar kosong
+        avatar: userData.avatar || "", // Gunakan placeholder jika avatar kosong
     };
 
     return userWithoutPassword;

@@ -242,12 +242,11 @@ export default function DiagnosaPage() {
           <Info className="h-4 w-4" />
           <AlertDescription>
             <div className="flex items-center justify-between">
-              <span>
-                Maksimal pemilihan gejala:{" "}
-                <strong>{apiMaxGejala}</strong> gejala
+              <span className="text-sm">
+                Maksimal pemilihan <strong>{apiMaxGejala}</strong>  gejala:
               </span>
               <span
-                className={`font-semibold ${selectedGejala.length >= apiMaxGejala
+                className={`font-semibold ml-1 ${selectedGejala.length >= apiMaxGejala
                   ? "text-red-600"
                   : "text-blue-600"
                   }`}

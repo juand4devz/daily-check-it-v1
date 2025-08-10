@@ -255,8 +255,8 @@ export default function NotificationsPage() {
     if (loading) {
         return (
             <div className="mx-2 md:mx-4 py-6 space-y-6">
-                <div className="flex items-center justify-between">
-                    <Skeleton className="h-8 w-64" />
+                <div className="flex flex-col md:flex-row md:justify-between">
+                    <Skeleton className="h-9 w-44 mb-2" />
                     <div className="flex gap-2">
                         <Skeleton className="h-9 w-32" />
                         <Skeleton className="h-9 w-28" />
@@ -265,7 +265,7 @@ export default function NotificationsPage() {
                 <Card>
                     <CardHeader>
                         <Skeleton className="h-6 w-48" />
-                        <Skeleton className="h-4 w-96" />
+                        <Skeleton className="h-4 w-full" />
                     </CardHeader>
                     <CardContent>
                         <Skeleton className="h-10 w-full mb-6" />
@@ -289,12 +289,15 @@ export default function NotificationsPage() {
 
     return (
         <div className="mx-2 md:mx-4 py-6 space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold">Notifikasi</h1>
-                    <p className="text-muted-foreground">Kelola notifikasi dan pemberitahuan Anda</p>
+            <div className="flex flex-col md:flex-row items-center justify-between">
+                <div className="flex items-center">
+                    <Bell className="h-14 w-14" />
+                    <div>
+                        <h1 className="text-3xl font-bold">Notifikasi</h1>
+                        <p className="text-muted-foreground">Kelola notifikasi dan pemberitahuan Anda</p>
+                    </div>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 mt-4">
                     {unreadCount > 0 && (
                         <Button onClick={markAllAsRead} variant="outline" size="sm">
                             <CheckCheck className="h-4 w-4 mr-2" />
@@ -324,9 +327,9 @@ export default function NotificationsPage() {
                 <CardContent>
                     <Tabs value={activeTab} onValueChange={setActiveTab}>
                         <TabsList className="grid w-full grid-cols-3">
-                            <TabsTrigger value="all">Semua ({notifications.length})</TabsTrigger>
-                            <TabsTrigger value="unread">Belum Dibaca ({unreadCount})</TabsTrigger>
-                            <TabsTrigger value="read">Sudah Dibaca ({readCount})</TabsTrigger>
+                            <TabsTrigger value="all" className="text-xs md:text-md">Semua ({notifications.length})</TabsTrigger>
+                            <TabsTrigger value="unread" className="text-xs md:text-md">Belum Dibaca ({unreadCount})</TabsTrigger>
+                            <TabsTrigger value="read" className="text-xs md:text-md">Sudah Dibaca ({readCount})</TabsTrigger>
                         </TabsList>
 
                         <TabsContent value={activeTab} className="mt-6">

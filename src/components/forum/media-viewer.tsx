@@ -37,7 +37,7 @@ export function MediaViewer({ media, className = "" }: MediaViewerProps) {
           <Image
             height={500}
             width={500}
-            src={item.url || "/placeholder.svg"}
+            src={item.url || ""}
             alt={`Media ${item.filename || 'item'} ${index + 1}`} // Gunakan item.filename
             className="w-full h-48 object-cover transition-transform group-hover:scale-105"
           />

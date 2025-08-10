@@ -28,7 +28,7 @@ export function MentionPicker({ users, query, onSelect, className = "" }: Mentio
           onClick={() => onSelect(user)}
         >
           <Avatar className="h-6 w-6 mr-2">
-            <AvatarImage src={user.avatar || "/placeholder.svg"} />
+            <AvatarImage src={user.avatar || ""} />
             <AvatarFallback>{user.name[0]}</AvatarFallback>
           </Avatar>
           <span className="text-sm">{user.name}</span>

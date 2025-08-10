@@ -30,7 +30,7 @@ export interface ForumPost {
     content: string;
     authorId: string; // Reference to User.id
     authorUsername: string; // Denormalized for display
-    authorAvatar: string; // Denormalized for display
+    authorAvatar?: string; // Denormalized for display
     category: string;
     type: string;
     tags: string[];
@@ -54,7 +54,7 @@ export interface ForumReply {
     content: string;
     authorId: string;
     authorUsername: string;
-    authorAvatar: string;
+    authorAvatar?: string;
     createdAt: string;
     updatedAt: string;
     upvotes: number;

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
-import { ThemeToggle } from "@/components/theme-toggle"; // Tetap impor
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "../ui/button";
 import {
     DropdownMenu,
@@ -24,7 +24,7 @@ import {
     DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import { signIn, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { SignOut } from "../auth/auth-button";
 import { Bell, User as UserIcon, Calendar, Clock, MapPin } from "lucide-react";
 import { Popover, PopoverTrigger } from "@/components/ui/popover";
@@ -35,12 +35,12 @@ import { clientDb } from "@/lib/firebase/firebase-client";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { User as UserType } from "@/types/types";
 import { formatDateTime } from "@/lib/utils/date-utils";
+import { AuthDialog } from "../auth/AuthDialog";
 
 export function Header() {
     const router = useRouter()
     const pathname = usePathname();
     const { data: session, status } = useSession();
-    console.log(session)
 
     const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
     const [isNotificationPopoverOpen, setIsNotificationPopoverOpen] = useState(false);
@@ -94,25 +94,34 @@ export function Header() {
         }
     }, [session, userProfileData]);
 
-
     const generateBreadcrumbs = () => {
-        const segments = pathname.split("/").filter(Boolean)
-        const mainSegment = segments[0] || "home"
-        const mainLabel = mainSegment.charAt(0).toUpperCase() + mainSegment.slice(1)
-        const restSegments = segments.slice(1)
+        const segments = pathname.split("/").filter(Boolean);
+        if (segments.length === 0) return null;
+
+        const isMainSegmentAdmin = segments[0] === "admin";
+        const restSegments = segments.slice(1);
 
         return (
             <BreadcrumbList>
                 <BreadcrumbItem>
-                    <BreadcrumbLink href={`/${mainSegment}`}>{mainLabel}</BreadcrumbLink>
+                    {/* Tentukan apakah link 'Admin' harus dapat diklik atau tidak */}
+                    {isMainSegmentAdmin && restSegments.length > 0 ? (
+                        <BreadcrumbPage className="text-foreground/50 cursor-not-allowed">
+                            {segments[0].charAt(0).toUpperCase() + segments[0].slice(1)}
+                        </BreadcrumbPage>
+                    ) : (
+                        <BreadcrumbLink href={`/${segments[0]}`}>
+                            {segments[0].charAt(0).toUpperCase() + segments[0].slice(1)}
+                        </BreadcrumbLink>
+                    )}
                 </BreadcrumbItem>
 
                 {restSegments.length > 0 && (
                     <span className="hidden md:flex">
                         {restSegments.map((segment, index) => {
-                            const href = `/${[mainSegment, ...restSegments.slice(0, index + 1)].join("/")}`
-                            const label = segment.charAt(0).toUpperCase() + segment.slice(1)
-                            const isLast = index === restSegments.length - 1
+                            const href = `/${[segments[0], ...restSegments.slice(0, index + 1)].join("/")}`;
+                            const label = segment.charAt(0).toUpperCase() + segment.slice(1);
+                            const isLast = index === restSegments.length - 1;
 
                             return (
                                 <React.Fragment key={href}>
@@ -125,13 +134,13 @@ export function Header() {
                                         )}
                                     </BreadcrumbItem>
                                 </React.Fragment>
-                            )
+                            );
                         })}
                     </span>
                 )}
             </BreadcrumbList>
-        )
-    }
+        );
+    };
 
     return (
         <header className="sticky top-0 z-50 flex h-14 items-center gap-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
@@ -141,10 +150,8 @@ export function Header() {
                 <Breadcrumb>{generateBreadcrumbs()}</Breadcrumb>
 
                 <div className="ml-auto flex items-center gap-2">
-                    {/* NEW: ThemeToggle dipindahkan ke sini, di samping ikon notifikasi */}
                     <ThemeToggle />
 
-                    {/* Notification Icon */}
                     {session && userId && (
                         <Popover open={isNotificationPopoverOpen} onOpenChange={setIsNotificationPopoverOpen}>
                             <PopoverTrigger asChild>
@@ -204,7 +211,7 @@ export function Header() {
                                         </div>
                                     )}
                                     <Avatar className="absolute -bottom-6 left-2 h-16 w-16 border-2 border-background">
-                                        <AvatarImage src={session.user.avatar || "/placeholder.svg"} alt="Profile" />
+                                        <AvatarImage src={session.user.avatar || ""} alt="Profile" />
                                         <AvatarFallback>{session.user.username?.[0]?.toUpperCase() || '?'}</AvatarFallback>
                                     </Avatar>
                                 </div>
@@ -238,16 +245,13 @@ export function Header() {
                                         <DropdownMenuSeparator />
                                     </>
                                 )}
-                                {/* Theme Toggle TIDAK LAGI DI SINI */}
                                 <DropdownMenuItem onSelect={() => { /* noop */ }}>
                                     <SignOut />
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     ) : (
-                        <Button type="button" onClick={() => signIn()} variant="secondary">
-                            Login
-                        </Button>
+                        <AuthDialog initialType="login" />
                     )}
                 </div>
             </div>

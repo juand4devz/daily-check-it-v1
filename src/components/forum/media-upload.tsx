@@ -41,7 +41,7 @@ export function MediaUpload({ onUpload, disabled = false, maxFiles = 5, maxSize 
         reader.onload = () => resolve(reader.result as string)
         reader.readAsDataURL(file)
       } else {
-        resolve("/placeholder.svg?height=100&width=100")
+        resolve("")
       }
     })
   }

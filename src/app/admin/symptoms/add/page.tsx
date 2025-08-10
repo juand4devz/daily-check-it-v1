@@ -7,6 +7,7 @@ import { Gejala, Kerusakan, ApiResponse } from "@/types/diagnose";
 import { SymptomForm } from "@/components/admin/SymptomForm.tsx";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AddGejalaPage() {
   const router = useRouter();
@@ -114,13 +115,13 @@ export default function AddGejalaPage() {
 
   if (isLoadingData) {
     return (
-      <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="w-full px-4 py-8">
         <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 dark:bg-zinc-800 rounded w-1/4 mb-4"></div>
-          <div className="h-10 bg-gray-200 dark:bg-zinc-800 rounded w-1/2"></div>
+          <Skeleton className="h-8 rounded w-1/4 mb-4"></Skeleton>
+          <Skeleton className="h-10 rounded w-1/2"></Skeleton>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="h-96 bg-gray-200 dark:bg-zinc-800 rounded"></div>
-            <div className="h-96 bg-gray-200 dark:bg-zinc-800 rounded"></div>
+            <Skeleton className="h-96 rounded"></Skeleton>
+            <Skeleton className="h-96 rounded"></Skeleton>
           </div>
         </div>
       </div>

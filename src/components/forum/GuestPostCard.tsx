@@ -98,7 +98,7 @@ export function GuestPostCard({ post, onClick }: GuestPostCardProps) {
                 <CardContent className="p-4">
                     <div className="flex items-start gap-3 mb-3">
                         <Avatar className="h-8 w-8">
-                            <AvatarImage src={post.authorAvatar || "/placeholder.svg"} />
+                            <AvatarImage src={post.authorAvatar || ""} />
                             <AvatarFallback>{post.authorUsername?.[0] || "?"}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
