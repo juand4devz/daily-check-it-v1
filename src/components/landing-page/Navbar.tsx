@@ -5,12 +5,11 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { Menu, X } from "lucide-react";
-import JustLogo from "../logo/JustLogo";
-import DailyCekItLogo from "../logo/DailyCek";
 import { ThemeToggle } from "../theme-toggle";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton"; // Import komponen Skeleton
+import Logo from "../ui/logos";
 
 export default function Navbar() {
     const [scrolled, setScrolled] = useState(false);
@@ -81,15 +80,7 @@ export default function Navbar() {
             <div className="container mx-auto px-4 py-2">
                 <div className="flex w-full items-center justify-between">
                     {/* Logo & Nama Aplikasi */}
-                    <Link href="/" className="flex gap-2 items-center">
-                        <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-zinc-900 text-white">
-                            <JustLogo className="" />
-                        </div>
-                        <div className="flex flex-col gap-0.5 leading-none">
-                            <DailyCekItLogo className="max-h-8" />
-                        </div>
-                    </Link>
-
+                    <Logo />
                     {/* Kontainer Utama Navigasi & Aksi */}
                     <div className="flex items-center gap-2">
                         {/* Desktop Navigation */}

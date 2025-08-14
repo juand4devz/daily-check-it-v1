@@ -15,7 +15,7 @@ interface MentionPickerProps {
   className?: string
 }
 
-export function MentionPicker({ users, query, onSelect, className = "" }: MentionPickerProps) {
+export function MentionPicker({ users, onSelect, className = "" }: MentionPickerProps) {
   if (users.length === 0) return null
 
   return (

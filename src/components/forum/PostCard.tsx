@@ -34,6 +34,16 @@ import { cn } from "@/lib/utils";
 import { ReportDialog } from "@/components/shared/ReportDialog";
 import { UserProfileClickPopover } from "@/components/user/UserProfileClickPopover";
 import { PostActionsPopover } from "@/components/forum/PostActionsPopover";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface PostCardProps {
     post: ForumPost;
@@ -61,6 +71,7 @@ export function PostCard({
     const [likeCount, setLikeCount] = useState<number>(initialLikeCount);
     const [isBookmarked, setIsBookmarked] = useState<boolean>(initialIsBookmarked);
     const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
     useEffect(() => {
         setIsLiked(initialIsLiked);
@@ -75,6 +86,26 @@ export function PostCard({
     }, [initialIsBookmarked]);
 
     const isAuthor = post.authorId === userId;
+
+    const handleDeletePost = async () => {
+        try {
+            const deleteRes = await fetch(`/api/forum/posts/${post.id}`, { method: 'DELETE' });
+            const deleteData = await deleteRes.json();
+            if (deleteRes.ok && deleteData.status) {
+                toast.success("Post berhasil dihapus", { description: deleteData.message });
+                onPostAction?.(post.id, "delete");
+                router.push("/forum");
+            } else {
+                toast.error("Gagal menghapus post", { description: deleteData.message });
+            }
+        } catch (error) {
+            console.error("Error deleting post:", error);
+            toast.error("Error", {
+                description: "Gagal menghapus post",
+            });
+        }
+        setIsDeleteDialogOpen(false);
+    };
 
     const handleAction = async (action: string) => {
         try {
@@ -130,17 +161,7 @@ export function PostCard({
                     window.open(`${window.location.origin}/forum/${post.id}`, "_blank");
                     break;
                 case "delete":
-                    if (confirm("Apakah Anda yakin ingin menghapus post ini?")) {
-                        const deleteRes = await fetch(`/api/forum/posts/${post.id}`, { method: 'DELETE' });
-                        const deleteData = await deleteRes.json();
-                        if (deleteRes.ok && deleteData.status) {
-                            toast.success("Post berhasil dihapus", { description: deleteData.message });
-                            onPostAction?.(post.id, action);
-                            router.push("/forum");
-                        } else {
-                            toast.error("Gagal menghapus post", { description: deleteData.message });
-                        }
-                    }
+                    setIsDeleteDialogOpen(true);
                     break;
                 case "pin":
                 case "archive":
@@ -201,8 +222,8 @@ export function PostCard({
                 >
                     {post.thumbnail ? (
                         <Image
-                            height={500}
-                            width={500}
+                            height={300}
+                            width={300}
                             src={post.thumbnail}
                             alt={post.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -242,8 +263,8 @@ export function PostCard({
                     {/* Popover Aksi */}
                     <div
                         className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
                     >
                         <PostActionsPopover
                             post={post}
@@ -264,12 +285,12 @@ export function PostCard({
                     <UserProfileClickPopover userId={post.authorId}>
                         <div
                             className="flex items-start gap-3 mb-3 cursor-pointer"
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onClick={(e) => e.stopPropagation()}
+                            onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                            onClick={(e: React.MouseEvent) => e.stopPropagation()}
                         >
                             <Avatar className="h-8 w-8">
                                 <AvatarImage src={post.authorAvatar || ""} />
-                                <AvatarFallback>{post.authorUsername?.[0] || '?'}</AvatarFallback>
+                                <AvatarFallback className="uppercase">{post.authorUsername?.[0] || '?'}</AvatarFallback>
                             </Avatar>
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium">{post.authorUsername}</p>
@@ -297,8 +318,8 @@ export function PostCard({
                                     key={index}
                                     variant="outline"
                                     className="text-xs cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-950"
-                                    onMouseDown={(e) => e.stopPropagation()}
-                                    onClick={(e) => {
+                                    onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                                    onClick={(e: React.MouseEvent) => {
                                         e.stopPropagation();
                                         onTagClick?.(tag);
                                     }}
@@ -321,8 +342,8 @@ export function PostCard({
                                 variant="ghost"
                                 size="sm"
                                 className={cn("h-6 px-2 text-xs", isLiked ? "text-red-500 hover:text-red-600" : "hover:text-red-500")}
-                                onMouseDown={(e) => e.stopPropagation()}
-                                onClick={(e) => {
+                                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                                onClick={(e: React.MouseEvent) => {
                                     e.stopPropagation();
                                     handleAction("like");
                                 }}
@@ -348,8 +369,8 @@ export function PostCard({
                             variant="ghost"
                             size="sm"
                             className="h-6 px-2 text-xs"
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
+                            onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                            onClick={(e: React.MouseEvent) => {
                                 e.stopPropagation();
                                 handleAction("share-link");
                             }}
@@ -382,6 +403,24 @@ export function PostCard({
                 entityAuthorId={post.authorId}
                 entityAuthorUsername={post.authorUsername}
             />
+
+            {/* AlertDialog untuk konfirmasi penghapusan */}
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Apakah Anda yakin?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Aksi ini tidak bisa dibatalkan. Ini akan menghapus post Anda secara permanen.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Batal</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDeletePost}>
+                            Hapus
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Card>
     );
 }

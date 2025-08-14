@@ -25,7 +25,7 @@ import {
   WifiOff,
   ScanSearch,
 } from "lucide-react";
-import Image from "next/image";
+import { Image } from '@imagekit/next';
 import Fuse from "fuse.js";
 import { Gejala, Kerusakan, StoredDiagnosisResult } from "@/types/diagnose";
 import { toast } from "sonner";
@@ -227,8 +227,8 @@ export default function DiagnosaPage() {
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
-          <ScanSearch className="h-10 w-10" />
-          Sistem Diagnosa Kerusakan Komputer
+          <ScanSearch className="h-18 md:h-10 w-18 md:w-10" />
+          <span className="text-2xl">Sistem Diagnosa Kerusakan Komputer</span>
         </h1>
         <p className="text-gray-600">
           Pilih gejala yang dialami perangkat Anda untuk mendapatkan diagnosa
@@ -357,10 +357,11 @@ export default function DiagnosaPage() {
                 <div className="relative">
                   <div className="aspect-video relative overflow-hidden rounded-t-lg">
                     <Image
-                      height={500}
-                      width={500}
+                      height={300}
+                      width={300}
                       src={gejala.gambar || "/placeholder.svg"}
                       alt={gejala.nama}
+                      loading="lazy"
                       className={`w-full h-full object-cover transition-all duration-200 ${isDisabled ? "grayscale" : "group-hover:scale-105"}`}
                     />
 

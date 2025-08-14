@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
-function VideoModal({ isOpen, onClose, videoId, title }: { isOpen: boolean; onClose: () => void; videoId: string; title: string; }) {
+function VideoModal({ isOpen, onClose, title }: { isOpen: boolean; onClose: () => void; videoId: string; title: string; }) {
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogTitle className="hidden" />

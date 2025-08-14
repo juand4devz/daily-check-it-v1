@@ -38,9 +38,8 @@ import { useSession, signOut } from "next-auth/react";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Skeleton } from "../ui/skeleton";
 import { ScrollArea } from "../ui/scroll-area";
-import JustLogo from "../logo/JustLogo";
-import DailyCekItLogo from "../logo/DailyCek";
 import { toast } from "sonner";
+import Logo from "../ui/logos";
 
 // --- Tipe untuk Struktur Navigasi ---
 interface NavItem {
@@ -288,14 +287,7 @@ export function SidebarNav({ className, ...props }: SidebarNavProps) {
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href="/">
-                                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-zinc-900 text-white">
-                                    <JustLogo />
-                                </div>
-                                <div className="flex flex-col gap-0.5 leading-none">
-                                    <DailyCekItLogo />
-                                </div>
-                            </Link>
+                            <Logo />
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>

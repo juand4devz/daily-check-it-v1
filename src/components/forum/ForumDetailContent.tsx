@@ -24,8 +24,6 @@ import {
     Eye,
     CheckCircle,
     Pin,
-    Bookmark,
-    BookmarkCheck,
     Share2,
     AlertTriangle,
     BookOpenText,
@@ -35,7 +33,6 @@ import { cn } from "@/lib/utils";
 import {
     ForumPost,
     ForumReply,
-    EMOJI_REACTIONS,
     ForumMedia,
     EmojiReactionKey,
 } from "@/types/forum";
@@ -49,7 +46,6 @@ import { PostThumbnail } from "@/components/forum/PostThumbnail";
 import { PostStats } from "@/components/forum/PostStats";
 import { QuickActions } from "@/components/forum/QuickActions";
 import { PostActionsPopover } from "@/components/forum/PostActionsPopover";
-import { ForumPostEditDialog } from "@/components/forum/ForumPostEditDialog";
 
 import { useUserState } from "@/lib/utils/useUserState";
 import { buildReplyTree, flattenReplies } from "@/lib/utils/forum-utils";
@@ -104,9 +100,9 @@ export default function ForumDetailContent({ postId, isModal = false }: { postId
     const isLiked = post ? (userState.postLikes?.[post.id] === true) : false;
     const isBookmarked = post ? (userState.bookmarks?.includes(post.id) === true) : false;
 
-    const handleEditPostSuccess = useCallback((updatedPostId: string) => {
-        toast.success("Postingan berhasil diperbarui.");
-    }, []);
+    // const handleEditPostSuccess = useCallback((updatedPostId: string) => {
+    //     toast.success("Postingan berhasil diperbarui.");
+    // }, []);
 
     const mainCommentMediaPreviews = useMemo(() => {
         if (!mainCommentUploadState.file && !mainCommentUploadState.uploadedData) return [];
@@ -1040,7 +1036,7 @@ export default function ForumDetailContent({ postId, isModal = false }: { postId
                                             >
                                                 <Avatar className="h-12 w-12 mr-3">
                                                     <AvatarImage src={post.authorAvatar || ""} />
-                                                    <AvatarFallback>{post.authorUsername?.[0] || '?'}</AvatarFallback>
+                                                    <AvatarFallback className="uppercase">{post.authorUsername?.[0] || '?'}</AvatarFallback>
                                                 </Avatar>
                                             </div>
                                         </UserProfileClickPopover>

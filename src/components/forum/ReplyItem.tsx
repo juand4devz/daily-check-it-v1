@@ -5,8 +5,6 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -18,11 +16,6 @@ import {
     X,
     Loader2,
     Send,
-    Copy,
-    Link as LinkIcon,
-    Image as ImageIcon,
-    Smile,
-    ImageUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -30,7 +23,6 @@ import {
     EMOJI_REACTIONS,
     ForumMedia,
     EmojiReactionKey,
-    ForumPost,
 } from "@/types/forum";
 import { formatTimeAgo } from "@/lib/utils/date-utils";
 import { MarkdownEditor } from "./markdown-editor";
@@ -38,7 +30,6 @@ import { Input } from "@/components/ui/input";
 import { MediaViewer } from "./media-viewer";
 import { UserProfileClickPopover } from "@/components/user/UserProfileClickPopover";
 import { Card, CardContent } from "@/components/ui/card";
-import { useRouter } from "next/navigation";
 
 import { EmojiReactionPopover } from "./EmojiReactionPopover";
 import { CommentActionsPopover } from "./CommentActionsPopover";
@@ -113,7 +104,6 @@ export function ReplyItem({
     uploadMediaToImageKit,
     allAvailableMentions,
 }: ReplyItemProps) {
-    const router = useRouter();
     const [isInlineReplyExpanded, setIsInlineReplyExpanded] = useState(false);
     const [inlineReplyContent, setInlineReplyContent] = useState<string>("");
 
@@ -380,7 +370,7 @@ export function ReplyItem({
                                                     <AvatarImage src={reply.authorAvatar || ""} />
                                                     <AvatarFallback
                                                         className={cn(
-                                                            "flex h-full w-full items-center justify-center rounded-full border-2",
+                                                            "flex h-full w-full items-center justify-center rounded-full border-2 uppercase",
                                                             isNested
                                                                 ? "border-gray-300 bg-gray-100 text-gray-600 text-xs font-medium"
                                                                 : "border-blue-400 bg-blue-100 text-blue-800 text-sm font-semibold"

@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -21,6 +20,8 @@ import * as z from "zod"
 import Image from "next/image"
 import { useSession } from "next-auth/react"
 import type { UserTokenData } from "@/types/types"
+// Import library untuk kompresi gambar
+import imageCompression from "browser-image-compression"
 
 interface Message {
     id: string
@@ -148,7 +149,7 @@ export default function AIChatPage() {
     const cameraInputRef = useRef<HTMLInputElement>(null)
     const messagesEndRef = useRef<HTMLDivElement>(null)
     const [userTokenData, setUserTokenData] = useState<UserTokenData | null>(null)
-    const [isFetchingTokens, setIsFetchingTokens] = useState(true) // State untuk menandakan sedang fetch token
+    const [isFetchingTokens, setIsFetchingTokens] = useState(true)
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -197,15 +198,12 @@ export default function AIChatPage() {
         }
     }, [messages])
 
-    // --- Load dan manage token data dari API ---
-    // Dipanggil hanya saat pertama kali komponen dimuat atau saat sesi berubah
     const fetchUserTokens = useCallback(async () => {
         if (status === "loading") {
-            setIsFetchingTokens(true); // Masih loading sesi, set fetching token true
+            setIsFetchingTokens(true);
             return;
         }
 
-        // Jika tidak terautentikasi, set data token null dan tampilkan warning
         if (!session || !session.user || !session.user.id) {
             setUserTokenData(null);
             setIsFetchingTokens(false);
@@ -223,18 +221,17 @@ export default function AIChatPage() {
             }
             const fetchedTokenData: UserTokenData = await response.json();
             setUserTokenData(fetchedTokenData);
-            setShowOfflineWarning(false); // Clear warning if tokens loaded successfully
+            setShowOfflineWarning(false);
         } catch (err) {
             console.error("Error fetching user tokens:", err);
-            setShowOfflineWarning(true); // Fallback to "offline" if fetching fails
+            setShowOfflineWarning(true);
             setUserTokenData(null);
             toast.error("Gagal memuat data token. Fitur AI mungkin terbatas.");
         } finally {
             setIsFetchingTokens(false);
         }
-    }, [session, status]); // Dependencies untuk useCallback: session dan status
+    }, [session, status]);
 
-    // Effect untuk memanggil fetchUserTokens saat komponen mount atau sesi/status berubah
     useEffect(() => {
         fetchUserTokens();
     }, [fetchUserTokens]);
@@ -253,13 +250,11 @@ export default function AIChatPage() {
 
         if (!finalMessage && !selectedImage) return
 
-        // Check if user is authenticated
         if (!session?.user?.id) {
             toast.error("Anda harus login untuk menggunakan fitur AI ini.");
             return;
         }
 
-        // Check token availability BEFORE sending request
         if (!userTokenData || userTokenData.dailyTokens <= 0) {
             toast.error("Token harian Anda sudah habis! Token akan direset jam 7 pagi WIB.");
             return;
@@ -281,7 +276,6 @@ export default function AIChatPage() {
         setSelectedImage(null)
 
         try {
-            // --- Decrement token via API ---
             const decrementResponse = await fetch("/api/user-tokens", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -290,20 +284,17 @@ export default function AIChatPage() {
 
             if (!decrementResponse.ok) {
                 const errorData = await decrementResponse.json();
-                // If token decrement fails, revert user message and show error
                 setMessages((prev) => prev.filter((msg) => msg.id !== userMessage.id));
                 toast.error(errorData.message || "Gagal mengurangi token. Pesan tidak terkirim.");
-                // Revert token state immediately (client-side) to reflect the failed decrement
                 setUserTokenData(prev => prev ? {
                     ...prev,
                     dailyTokens: prev.dailyTokens + 1,
                     totalUsage: Math.max(0, prev.totalUsage - 1),
                 } : null);
                 setIsLoading(false);
-                return; // Stop execution if token decrement failed
+                return;
             }
             const updatedTokenResult: UserTokenData = await decrementResponse.json();
-            // Update token state with response from API
             setUserTokenData(prev => prev ? {
                 ...prev,
                 dailyTokens: updatedTokenResult.dailyTokens,
@@ -311,8 +302,6 @@ export default function AIChatPage() {
                 lastResetDate: updatedTokenResult.lastResetDate,
             } : null);
 
-
-            // Prepare conversation history for API - include all previous messages
             const conversationHistory = messages.map((msg) => ({
                 role: msg.role,
                 content: msg.content,
@@ -428,14 +417,12 @@ export default function AIChatPage() {
             setShowOfflineWarning(true)
             toast.error(errorMessage)
 
-            // Revert token if AI generation failed (but token decrement already successful)
             setUserTokenData(prev => prev ? {
                 ...prev,
                 dailyTokens: prev.dailyTokens + 1,
                 totalUsage: Math.max(0, prev.totalUsage - 1),
             } : null);
 
-            // Add a fallback assistant message if there's an error
             setMessages((prev) => {
                 const lastMessage = prev[prev.length - 1];
                 if (lastMessage?.role === "assistant" && lastMessage.id === (Date.now() + 1).toString()) {
@@ -478,11 +465,19 @@ export default function AIChatPage() {
         setIsProcessingImage(true)
 
         try {
+            // Mengompres gambar sebelum diunggah
+            const options = {
+                maxSizeMB: 1,           // Ukuran maksimum 1MB
+                maxWidthOrHeight: 1920, // Dimensi maksimum 1920px
+                useWebWorker: true,     // Menggunakan Web Worker untuk performa yang lebih baik
+            }
+            const compressedFile = await imageCompression(file, options)
+
             const reader = new FileReader()
             reader.onload = (e) => {
                 const result = e.target?.result as string
                 setSelectedImage(result)
-                toast.success("Gambar berhasil diupload")
+                toast.success("Gambar berhasil diunggah")
                 setIsProcessingImage(false)
                 form.setValue("message", "");
                 textareaRef.current?.focus();
@@ -491,7 +486,7 @@ export default function AIChatPage() {
                 toast.error("Gagal membaca file gambar")
                 setIsProcessingImage(false)
             }
-            reader.readAsDataURL(file)
+            reader.readAsDataURL(compressedFile)
         } catch (error) {
             console.error("Error processing image:", error)
             toast.error("Gagal memproses gambar. Silakan coba lagi.")
@@ -546,12 +541,10 @@ export default function AIChatPage() {
         }
     };
 
-    // Kondisi untuk menonaktifkan input dan tombol
     const isDisabled = isLoading || isProcessingImage || !session?.user?.id || (userTokenData?.dailyTokens ?? 0) <= 0 || isFetchingTokens;
 
     return (
         <Card className="flex-1 flex flex-col min-h-0 rounded-none bg-background px-6 lg:px-36 xl:px-60 2xl:px-72 border-0">
-            {/* Offline Warning */}
             {showOfflineWarning && (
                 <Alert className="mb-6 border-orange-200 bg-orange-50">
                     <AlertTriangle className="h-4 w-4 text-orange-600" />
@@ -562,9 +555,7 @@ export default function AIChatPage() {
                 </Alert>
             )}
 
-            {/* Main Chat Area */}
             <div className=" flex flex-col">
-                {/* Header with AI Introduction */}
                 <div className="relative mt-5">
                     <div className="flex items-start gap-4">
                         <div className="flex-1 min-w-0">
@@ -584,7 +575,6 @@ export default function AIChatPage() {
                     </div >
                 </div >
 
-                {/* Example Questions (only show when no messages) */}
                 {messages.length === 0 && (
                     <div className="pb-10">
                         <div className="flex items-center justify-between mb-2 mt-8 md:mt-8">
@@ -605,13 +595,13 @@ export default function AIChatPage() {
                                             <div className="space-y-4 text-sm max-h-[60vh]">
                                                 <div>
                                                     <h4 className="font-semibold mb-2">Kemampuan</h4>
-                                                    <ul className="list-disc list-inside space-y-1">
+                                                    <div className="list-disc list-inside space-y-1">
                                                         <li>Troubleshooting komputer dan laptop</li>
                                                         <li>Analisis gambar perangkat teknologi</li>
                                                         <li>Panduan perbaikan step-by-step</li>
                                                         <li>Tips maintenance dan optimasi</li>
                                                         <li>Rekomendasi hardware dan software</li>
-                                                    </ul>
+                                                    </div>
                                                 </div>
                                                 <div>
                                                     <h4 className="font-semibold mb-2">Mode Offline</h4>
@@ -622,12 +612,13 @@ export default function AIChatPage() {
                                                 </div>
                                                 <div>
                                                     <h4 className="font-semibold mb-2">Tips Penggunaan</h4>
-                                                    <ul className="list-disc list-inside space-y-1">
+                                                    <div className="list-disc list-inside space-y-1">
                                                         <li>Deskripsikan masalah dengan detail</li>
                                                         <li>Upload foto jika ada masalah visual</li>
                                                         <li>Sebutkan merk dan model perangkat</li>
                                                         <li>Jelaskan kapan masalah mulai terjadi</li>
-                                                    </ul>
+                                                        <li>Selalu backup data penting sebelum melakukan perbaikan</li>
+                                                    </div>
                                                 </div>
                                                 <div>
                                                     <h4 className="font-semibold mb-2">Peringatan</h4>
@@ -649,21 +640,20 @@ export default function AIChatPage() {
                                     size="sm"
                                     onClick={() => setExampleQuestions(getRandomQuestions())}
                                     className="text-xs"
-                                    disabled={isDisabled} // Disable example questions if input disabled
+                                    disabled={isDisabled}
                                 >
                                     <Shuffle className="h-3 w-3 m-0 md:mr-1" />
                                     <span className="hidden md:block">Acak Lagi</span>
                                 </Button>
                             </div>
-
                         </div>
                         <div className="space-y-5 h-full">
                             {exampleQuestions.map((question, index) => (
                                 <Card
                                     key={index}
-                                    className="cursor-pointer hover:bg-muted/100 hover:scale-105 transition-colors w-fit h-8 p-0 flex items-center justify-center rounded-bl-none rounded-tl-2xl px-2 py-5 md:px-4"
+                                    className="text-xs md:text-md cursor-pointer hover:bg-muted/100 hover:scale-105 transition-all ease-in-out duration-200 w-fit p-0 flex items-center justify-center rounded-bl-none rounded-tl-2xl px-2 py-2 md:py-3 md:px-3"
                                     onClick={() => handleExampleClick(question)}
-                                    tabIndex={isDisabled ? -1 : 0} // Disable focus if input disabled
+                                    tabIndex={isDisabled ? -1 : 0}
                                     aria-disabled={isDisabled}
                                 >
                                     <p className="text-sm">{question}</p>
@@ -673,7 +663,6 @@ export default function AIChatPage() {
                     </div>
                 )}
 
-                {/* Chat Messages */}
                 <div className="space-y-6">
                     {messages.map((message) => {
                         const modelInfo = message.model ? getModelBadgeInfo(message.model) : null;
@@ -753,9 +742,7 @@ export default function AIChatPage() {
                 <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Section */}
             <div className="sticky bottom-0">
-                {/* Image Processing Indicator */}
                 {isProcessingImage && (
                     <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -773,24 +760,6 @@ export default function AIChatPage() {
                                     <FormItem>
                                         <FormControl>
                                             <div>
-                                                {/* Selected Image Preview */}
-                                                {selectedImage && (
-                                                    <div>
-                                                        <div className="relative inline-block">
-                                                            <Image width="200" height="200" src={selectedImage || "/placeholder.svg"} alt="Selected" className="max-w-xs rounded-lg border" />
-                                                            <Button
-                                                                variant="destructive"
-                                                                size="sm"
-                                                                className="absolute -top-2 -right-2 h-6 w-6 rounded-full p-0"
-                                                                onClick={() => setSelectedImage(null)}
-                                                                disabled={isDisabled} // Disable remove image button if input disabled
-                                                            >
-                                                                <X className="h-3 w-3" />
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {/* Token Display - Conditional Rendering for loading/unauthenticated */}
                                                 {isFetchingTokens ? (
                                                     <div className="flex items-center justify-between text-xs bg-blue-50 dark:bg-gray-700 p-2 rounded mb-2 animate-pulse">
                                                         <Loader2 className="h-4 w-4 animate-spin mr-2" /> <span>Memuat token...</span>
@@ -804,9 +773,25 @@ export default function AIChatPage() {
                                                     </div>
                                                 )}
 
-                                                <div className="flex flex-col gap-2">
+                                                <div className="flex flex-col">
                                                     <div className="relative flex flex-col items-end gap-2 rounded-2xl border bg-background p-2 shadow-sm focus-within:ring-2 focus-within:ring-ring">
                                                         <ScrollArea className="relative w-full">
+                                                            {selectedImage && (
+                                                                <div>
+                                                                    <div className="relative inline-block">
+                                                                        <Image width="200" height="200" src={selectedImage} alt="Selected" className="max-w-xs rounded-lg border" />
+                                                                        <Button
+                                                                            variant="destructive"
+                                                                            size="sm"
+                                                                            className="absolute top-1 right-1 h-5 w-5 rounded-full p-0"
+                                                                            onClick={() => setSelectedImage(null)}
+                                                                            disabled={isDisabled}
+                                                                        >
+                                                                            <X className="h-3 w-3" />
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+                                                            )}
                                                             <Textarea
                                                                 {...field}
                                                                 ref={textareaRef}
@@ -820,14 +805,12 @@ export default function AIChatPage() {
                                                                 onKeyPress={handleKeyPress}
                                                                 maxLength={400}
                                                             />
-                                                            {/* Character Counter */}
                                                             <div className="absolute bottom-2 right-2 text-muted-foreground text-xs">
                                                                 {field.value?.length || 0}/400
                                                             </div>
                                                             <ScrollBar orientation="vertical" />
                                                         </ScrollArea>
 
-                                                        {/* Input Buttons */}
                                                         <div className="flex justify-between items-center w-full">
                                                             <div className="flex gap-x-2 items-center">
                                                                 <Button
@@ -886,8 +869,7 @@ export default function AIChatPage() {
                                                         </div>
                                                     </div>
 
-                                                    {/* Keterangan ekstra kecil tentang AI di luar card */}
-                                                    <div className="w-full text-xs text-muted-foreground text-center">
+                                                    <div className="w-full text-[10px] my-2 md:text-xs text-muted-foreground text-center text-shadow-black shadow-2xl">
                                                         AI dapat melakukan kesalahan. Pertimbangkan untuk mengecek ulang informasi penting.
                                                     </div>
                                                 </div>
@@ -900,7 +882,6 @@ export default function AIChatPage() {
                         </form>
                     </div>
                 </Form>
-                {/* Hidden File Inputs */}
                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                 <input
                     ref={cameraInputRef}

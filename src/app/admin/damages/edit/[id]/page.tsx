@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Loader2, ArrowLeft, AlertTriangle } from "lucide-react";
+import { ArrowLeft, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Kerusakan, Gejala, ApiResponse } from "@/types/diagnose";
 import { DamageForm } from "@/components/admin/DamageForm";

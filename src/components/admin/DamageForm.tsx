@@ -281,6 +281,7 @@ export function DamageForm({
                 URL.revokeObjectURL(objectUrl);
             }
         } catch (error) {
+            console.error(error)
             setMediaFiles(prev => prev.filter(m => m.id !== tempId));
             URL.revokeObjectURL(objectUrl);
         }

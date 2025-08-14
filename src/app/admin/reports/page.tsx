@@ -46,7 +46,6 @@ import {
     MessageSquare,
     Clock,
     Link,
-    Ban,
     BarChart,
     RefreshCcw,
     Calendar,
@@ -239,7 +238,7 @@ export default function AdminReportsPage() {
     }, [allReports]);
 
     const aggregateReports = useCallback((reports: Report[], timeframe: "day" | "week" | "month") => {
-        const counts: Record<string, number> = {};
+        // const counts: Record<string, number> = {};
         const dates: Date[] = reports.map(r => new Date(r.createdAt));
         if (dates.length === 0) {
             return { data: [], dateRange: null };

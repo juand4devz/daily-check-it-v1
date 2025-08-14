@@ -11,12 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Save, X, Eye, Loader2, RefreshCw, Upload, Image as ImageIcon, Video, Link, Copy, Plus, ChevronDown, Check } from "lucide-react";
+import { ArrowLeft, Save, X, Loader2, RefreshCw, Upload, Plus, ChevronDown, Check } from "lucide-react";
 import { toast } from "sonner";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { Gejala, Kerusakan, MassFunctionEntry, KerusakanOption } from "@/types/diagnose";
+import { Gejala, Kerusakan, MassFunctionEntry } from "@/types/diagnose";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { Progress } from "@/components/ui/progress";
@@ -30,14 +27,6 @@ import {
     CommandList,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-    Accordion,
-    AccordionContent,
-    AccordionItem,
-    AccordionTrigger,
-} from "@/components/ui/accordion";
-import Fuse from "fuse.js";
-import { upload } from "@imagekit/next";
 
 const categories = [
     "Power", "Display", "Hardware", "System", "Performance", "Cooling",
@@ -77,7 +66,6 @@ export function SymptomForm({
     pageTitle,
     pageDescription,
     submitButtonText,
-    existingGejalaCodes,
 }: SymptomFormProps) {
     const router = useRouter();
     const { data: session } = useSession();
@@ -263,6 +251,7 @@ export function SymptomForm({
                 URL.revokeObjectURL(objectUrl);
             }
         } catch (error) {
+            console.error(error)
             setMediaFile(null);
             setFormData(prev => ({ ...prev, gambar: "" }));
             URL.revokeObjectURL(objectUrl);

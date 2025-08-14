@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { Mail } from "lucide-react";
-import JustLogo from "../logo/JustLogo";
-import DailyCekItLogo from "../logo/DailyCek";
+import Logo from "../ui/logos";
 
 export default function Footer() {
     const currentYear = new Date().getFullYear();
@@ -37,42 +36,35 @@ export default function Footer() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
                     {/* First column - Brand */}
                     <div className="md:col-span-1">
-                        <Link href="/" className="flex gap-2 items-center">
-                            <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-zinc-900 text-white">
-                                <JustLogo className="" />
-                            </div>
-                            <div className="flex flex-col gap-0.5 leading-none">
-                                <DailyCekItLogo className="max-h-8" />
-                            </div>
-                        </Link>
+                        <Logo />
                         <p className="text-foreground/70 text-sm mb-4">
-                            DailyCek.It - Solusi terpadu Anda untuk diagnosa teknologi dan panduan perbaikan yang akurat.
+                            DailyCek.It - Solusi terpadu Anda untuk diagnosa teknologi dan panduan perbaikan yang terukur.
                         </p>
                     </div>
 
                     {/* Links columns */}
                     <div>
                         <h3 className="font-semibold mb-4">Fitur</h3>
-                        <ul className="space-y-2">
-                            <li><Link href="#features" className="text-foreground/70 hover:text-primary text-sm">Fitur</Link></li>
-                            <li><Link href="#benefits" className="text-foreground/70 hover:text-primary text-sm">Manfaat</Link></li>
-                            <li><Link href="#testimonials" className="text-foreground/70 hover:text-primary text-sm">Testimoni</Link></li>
-                            <li><Link href="#support" className="text-foreground/70 hover:text-primary text-sm">Dukungan</Link></li>
-                        </ul>
+                        <div className="flex space-y-2 flex-col">
+                            <Link href="#features" className="text-foreground/70 hover:text-primary text-sm">Fitur</Link>
+                            <Link href="#benefits" className="text-foreground/70 hover:text-primary text-sm">Manfaat</Link>
+                            <Link href="#testimonials" className="text-foreground/70 hover:text-primary text-sm">Testimoni</Link>
+                            <Link href="#support" className="text-foreground/70 hover:text-primary text-sm">Dukungan</Link>
+                        </div>
                     </div>
 
                     {/* Inspiration Apps column */}
                     <div>
                         <h3 className="font-semibold mb-4">Aplikasi Inspirasi</h3>
-                        <ul className="space-y-2">
+                        <div className="space-y-2">
                             {inspirationApps.map((app, i) => (
-                                <li key={i}>
+                                <div key={i}>
                                     <Link href={app.link} className="text-foreground/70 hover:text-primary text-sm" target="_blank" rel="noopener noreferrer">
                                         {app.name}
                                     </Link>
-                                </li>
+                                </div>
                             ))}
-                        </ul>
+                        </div>
                     </div>
 
                     {/* Kontak & Dukungan */}
@@ -82,8 +74,8 @@ export default function Footer() {
                             Butuh bantuan lebih lanjut? Hubungi kami langsung.
                         </p>
                         <div className="flex flex-col gap-2">
-                            <Link href="mailto:support@dailycek.it" className="text-foreground/70 hover:text-primary text-sm flex items-center gap-2">
-                                <Mail className="h-4 w-4" /> support@dailycek.it
+                            <Link href="mailto:juandailyprojects@gmail.com" className="text-foreground/70 hover:text-primary text-sm flex items-center gap-2">
+                                <Mail className="h-4 w-4" /> juandailyprojects@gmail.com
                             </Link>
                         </div>
                     </div>

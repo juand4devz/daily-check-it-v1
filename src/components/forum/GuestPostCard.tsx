@@ -49,8 +49,8 @@ export function GuestPostCard({ post, onClick }: GuestPostCardProps) {
                 <div className="relative h-48 overflow-hidden">
                     {post.thumbnail ? (
                         <Image
-                            height={500}
-                            width={500}
+                            height={200}
+                            width={200}
                             // Perbaikan: Pastikan src adalah string
                             src={post.thumbnail}
                             alt={post.title || "Forum post thumbnail"}
@@ -99,7 +99,7 @@ export function GuestPostCard({ post, onClick }: GuestPostCardProps) {
                     <div className="flex items-start gap-3 mb-3">
                         <Avatar className="h-8 w-8">
                             <AvatarImage src={post.authorAvatar || ""} />
-                            <AvatarFallback>{post.authorUsername?.[0] || "?"}</AvatarFallback>
+                            <AvatarFallback className="uppercase">{post.authorUsername?.[0] || "?"}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium">{post.authorUsername}</p>

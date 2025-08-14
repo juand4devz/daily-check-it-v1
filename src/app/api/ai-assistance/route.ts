@@ -236,7 +236,7 @@ Pastikan tabel selesai sampai akhir dan tidak terpotong di tengah.`
 }
 
 // Specialized offline response for diagnosis context
-function generateOfflineDiagnosisResponse(message: string): string {
+function generateOfflineDiagnosisResponse(): string {
     return `**Penjelasan Diagnosa (Mode Offline)**
 
 Berdasarkan hasil diagnosa yang telah dilakukan, berikut penjelasan singkat:

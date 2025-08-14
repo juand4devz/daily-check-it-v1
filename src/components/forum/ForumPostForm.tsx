@@ -100,7 +100,6 @@ export function ForumPostForm({
     isSubmitting,
     pageTitle,
     pageDescription,
-    backUrl,
     isModal = false,
     onClose,
     showRightSidebar = true,
@@ -603,7 +602,7 @@ export function ForumPostForm({
     };
 
     const isAnyMediaUploading = mediaFiles.some(mf => mf.uploading);
-    const isUploadDisabled = isSubmitting || isThumbnailUploading || isAnyMediaUploading || mediaFiles.filter(mf => mf.uploadedUrl).length >= MAX_MEDIA_FILES;
+    // const isUploadDisabled = isSubmitting || isThumbnailUploading || isAnyMediaUploading || mediaFiles.filter(mf => mf.uploadedUrl).length >= MAX_MEDIA_FILES;
 
     if (isLoadingPage || isLoadingInitialData) {
         return (
@@ -711,7 +710,7 @@ export function ForumPostForm({
                                             render={({ field }) => (
                                                 <FormItem className="space-y-3 col-span-1">
                                                     <FormLabel htmlFor="type">Tipe Diskusi *</FormLabel>
-                                                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting}>
+                                                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmitting} className="truncate">
                                                         <FormControl>
                                                             <SelectTrigger className="w-full">
                                                                 <SelectValue placeholder="Pilih tipe diskusi" />
@@ -912,13 +911,13 @@ export function ForumPostForm({
                                                                             title="Upload Gambar/Video"
                                                                         >
                                                                             {isAnyMediaUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                                                                            <span className="sr-only">Upload Gambar/Video</span>
+                                                                            <span className="sr-only">Upload Gambar</span>
                                                                         </Button>
                                                                         <input
                                                                             type="file"
                                                                             ref={fileInputRef}
                                                                             onChange={(e) => processAndAddFiles(e.target.files)}
-                                                                            accept="image/*,video/*"
+                                                                            accept="image/*"
                                                                             multiple={true}
                                                                             className="hidden"
                                                                             disabled={isSubmitting || isAnyMediaUploading || mediaFiles.filter(mf => mf.uploadedUrl || mf.uploading).length >= MAX_MEDIA_FILES}
@@ -1119,24 +1118,24 @@ export function ForumPostForm({
                                 <CardContent className="space-y-3 text-sm">
                                     <div className="space-y-2">
                                         <h4 className="font-medium">Tips untuk diskusi yang baik:</h4>
-                                        <ul className="space-y-1 text-gray-600 dark:text-gray-400 list-disc list-inside">
+                                        <div className="space-y-1 text-gray-600 dark:text-gray-400 list-disc list-inside">
                                             <li>Gunakan judul yang jelas dan deskriptif</li>
                                             <li>Berikan konteks yang cukup dalam konten</li>
                                             <li>Gunakan tag yang relevan</li>
                                             <li>Sertakan screenshot jika diperlukan</li>
                                             <li>Bersikap sopan dan konstruktif</li>
-                                        </ul>
+                                        </div>
                                     </div>
 
                                     {selectedType?.id === "pertanyaan" && (
                                         <div className="space-y-2">
                                             <h4 className="font-medium">Khusus untuk pertanyaan:</h4>
-                                            <ul className="space-y-1 text-gray-600 dark:text-gray-400 list-disc list-inside">
+                                            <div className="space-y-1 text-gray-600 dark:text-gray-400 list-disc list-inside">
                                                 <li>Jelaskan masalah dengan detail</li>
                                                 <li>Sebutkan apa yang sudah dicoba</li>
                                                 <li>Sertakan spesifikasi sistem jika relevan</li>
                                                 <li>Tandai jawaban terbaik sebagai solusi</li>
-                                            </ul>
+                                            </div>
                                         </div>
                                     )}
                                 </CardContent>

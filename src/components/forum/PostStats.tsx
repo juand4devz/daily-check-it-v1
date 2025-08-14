@@ -17,7 +17,7 @@ interface PostStatsProps {
     isLoading: boolean;
 }
 
-export function PostStats({ post, views, isLiked, isLoading }: PostStatsProps) {
+export function PostStats({ post, views, isLoading }: PostStatsProps) {
     if (isLoading) {
         return <SidebarSkeleton />;
     }

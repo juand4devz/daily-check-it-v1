@@ -7,7 +7,7 @@ import Testimonials from "@/components/landing-page/Testimonials";
 import CTA from "@/components/landing-page/CTA";
 import Footer from "@/components/landing-page/Footer";
 
-export default function LandingPage() {
+export default function Page() {
     return (
         <div className="relative w-full">
             <Navbar />

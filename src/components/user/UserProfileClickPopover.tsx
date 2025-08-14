@@ -120,7 +120,7 @@ export function UserProfileClickPopover({ children, userId }: UserProfileClickPo
                             )}
                             <Avatar className="absolute -bottom-8 left-1/2 -translate-x-1/2 h-16 w-16 border-2 border-background shadow-md">
                                 <AvatarImage src={userData.avatar || ""} alt={userData.username} />
-                                <AvatarFallback className="flex h-full w-full items-center justify-center bg-gray-200 text-gray-800 text-2xl font-semibold">
+                                <AvatarFallback className="flex h-full w-full items-center justify-center bg-gray-200 text-gray-800 text-2xl font-semibold uppercase">
                                     {userData.username?.[0] || '?'}
                                 </AvatarFallback>
                             </Avatar>

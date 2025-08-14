@@ -87,7 +87,7 @@ export default function AddKerusakanPage() {
         loadInitialData();
     }, [loadInitialData]);
 
-    const handleSave = async (data: Omit<Kerusakan, "id">, id?: string): Promise<void> => {
+    const handleSave = async (data: Omit<Kerusakan, "id">): Promise<void> => {
         setIsSubmitting(true);
         try {
             const response = await fetch("/api/diagnose/damages", {

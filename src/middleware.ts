@@ -75,7 +75,7 @@ export async function middleware(req: NextRequest) {
             !matchPath(pathname, userPaths) &&
             !isUserDetailPage(pathname)
         ) {
-            return NextResponse.redirect(new URL("/profile", req.url));
+            return NextResponse.redirect(new URL("/forum-feed", req.url));
         }
         return NextResponse.next();
     }
@@ -86,7 +86,7 @@ export async function middleware(req: NextRequest) {
             !matchPath(pathname, [...userPaths, ...adminPaths]) &&
             !isUserDetailPage(pathname)
         ) {
-            return NextResponse.redirect(new URL("/profile", req.url));
+            return NextResponse.redirect(new URL("/admin/symptoms", req.url));
         }
         return NextResponse.next();
     }

@@ -8,11 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Filter, RefreshCw, Grid3X3, List, Search, Eye, EyeOff, WifiOff, Loader2 } from "lucide-react";
+import { Download, Filter, Grid3X3, List, Search, Eye, EyeOff, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import Fuse from "fuse.js";
 import { Gejala, Kerusakan, ApiResponse } from "@/types/diagnose";
-import { cn } from "@/lib/utils";
 import Loading from "./loading";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 

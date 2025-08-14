@@ -1,0 +1,474 @@
+[
+  {
+    "id": "hqGzKRS798lMlpNpkbJq",
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755137388303-90_zx-kJdKKs.webp",
+    "nama": "Komputer/laptop tidak menyala sama sekali",
+    "updatedAt": "2025-08-14T02:10:45.414Z",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "deskripsi": "Perangkat tidak memberikan respon apapun saat tombol power ditekan, tidak ada LED yang menyala, tidak ada suara kipas",
+    "mass_function": {
+      "KK6": 0.5,
+      "KK1": 0.8,
+      "KK7": 0.3
+    },
+    "kode": "G1",
+    "kategori": "Power",
+    "createdAt": "2025-08-14T02:09:02.568Z"
+  },
+  {
+    "id": "yj2B1dMhx7OUru00fsfb",
+    "mass_function": {
+      "KK3": 0.7,
+      "KK12": 0.6,
+      "KK1": 0.3,
+      "KK2": 0.5
+    },
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755137466920-Lampu-Indikator-Laptop-Tidak-Menyala-Cek-Kondisi-Adapter__tbkrDOS0.jpg",
+    "updatedAt": "2025-08-14T02:11:11.711Z",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "kode": "G2",
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "deskripsi": "Lampu indikator power menyala namun monitor/layar tidak menampilkan apapun, layar tetap hitam atau blank",
+    "nama": "LED power menyala tapi tidak ada tampilan",
+    "kategori": "Display"
+  },
+  {
+    "id": "8o3dmFP6iQncmZUUPoho",
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755138480033-Copilot_20250810_193141_tyCsPBcAA.png",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "deskripsi": "Terdengar bunyi beep dengan pola tertentu saat perangkat dinyalakan, biasanya indikasi error hardware dari BIOS/UEFI",
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "kode": "G3",
+    "kategori": "Hardware",
+    "nama": "Bunyi beep berulang saat startup",
+    "mass_function": {
+      "KK2": 0.6,
+      "KK7": 0.5,
+      "KK1": 0.7
+    },
+    "updatedAt": "2025-08-14T02:28:06.899Z"
+  },
+  {
+    "id": "r16ybwrf4XPbFGbZAyNJ",
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755138510837-OIP_PwtG73HIQ.jpg",
+    "kode": "G4",
+    "mass_function": {
+      "KK2": 0.6,
+      "KK4": 0.4,
+      "KK8": 0.5,
+      "KK9": 0.3
+    },
+    "nama": "Blue Screen of Death (BSOD)",
+    "deskripsi": "Layar biru dengan pesan error yang muncul secara tiba-tiba, biasanya disertai kode error dan restart otomatis",
+    "kategori": "System",
+    "updatedAt": "2025-08-14T02:28:36.229Z"
+  },
+  {
+    "id": "kJnahJcfsB9GrmbZT0v4",
+    "mass_function": {
+      "KK5": 0.7,
+      "KK10": 0.4,
+      "KK6": 0.5,
+      "KK8": 0.3
+    },
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755138547689-OIP__3__5Hpnz7SgO.webp",
+    "kode": "G5",
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "nama": "Restart otomatis tanpa peringatan",
+    "kategori": "System",
+    "deskripsi": "Perangkat melakukan restart otomatis tanpa perintah user, bisa terjadi saat idle, gaming, atau bekerja",
+    "updatedAt": "2025-08-14T02:29:12.638Z"
+  },
+  {
+    "id": "dAgzjsi5q9bz8G4nLaXp",
+    "deskripsi": "Sistem berjalan sangat lambat, aplikasi lama untuk membuka, respon sistem tertunda, multitasking terganggu",
+    "kode": "G6",
+    "mass_function": {
+      "KK5": 0.5,
+      "KK8": 0.6,
+      "KK4": 0.7,
+      "KK2": 0.4
+    },
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755138581539-download_sSHts6q0j.webp",
+    "updatedAt": "2025-08-14T02:29:46.748Z",
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "nama": "Performa sangat lambat dan lag",
+    "kategori": "Performance"
+  },
+  {
+    "id": "cnSU3C7CFPxmeixJ8Nr3",
+    "mass_function": {
+      "KK5": 0.8,
+      "KK6": 0.3,
+      "KK3": 0.2
+    },
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755138607855-hukum-perdata-1280x720-1_2lGconwGN.webp",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "updatedAt": "2025-08-14T02:30:12.054Z",
+    "deskripsi": "Fan CPU, GPU, atau case berputar dengan kecepatan maksimal dan mengeluarkan suara bising yang tidak normal",
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "kategori": "Cooling",
+    "nama": "Kipas berputar sangat kencang dan bising",
+    "kode": "G7"
+  },
+  {
+    "id": "zCWhnp0khzb8YavzqJhb",
+    "kategori": "Storage",
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "updatedAt": "2025-08-14T02:30:43.120Z",
+    "kode": "G8",
+    "nama": "Suara aneh dari hard disk/storage",
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755138635522-suara-aneh-dari-Hardisk_qdkTdhGAa.jpg",
+    "mass_function": {
+      "KK4": 0.9
+    },
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "deskripsi": "Terdengar suara clicking, grinding, scratching, atau suara tidak normal lainnya dari area hard disk atau SSD"
+  },
+  {
+    "id": "3LpQ5pu0ER6oYUcU0KQJ",
+    "nama": "Tidak bisa masuk ke BIOS/UEFI",
+    "mass_function": {
+      "KK7": 0.8,
+      "KK6": 0.3,
+      "KK1": 0.6
+    },
+    "deskripsi": "Perangkat tidak merespon saat menekan tombol untuk masuk BIOS/UEFI (F2, F12, Del, Esc, dll)",
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755138662971-Cara_Cek_BIOS_Komputer_5_TxCVFNHqO.jpg",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "kode": "G9",
+    "kategori": "BIOS",
+    "updatedAt": "2025-08-14T02:31:07.958Z",
+    "createdAt": "2025-08-14T02:09:02.568Z"
+  },
+  {
+    "id": "pnOUI5YLXjPRYhFHEF5c",
+    "deskripsi": "Port USB tidak mendeteksi perangkat yang dicolokkan, tidak ada respon sama sekali atau device not recognized",
+    "nama": "Port USB tidak berfungsi",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "mass_function": {
+      "KK1": 0.5,
+      "KK7": 0.3,
+      "KK9": 0.6
+    },
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755138697191-Sambungkan-USb_XpQLA3O-f.jpg",
+    "kategori": "Port",
+    "kode": "G10",
+    "updatedAt": "2025-08-14T02:31:41.554Z"
+  },
+  {
+    "id": "FoFXLuolybG4Fz8VXfJ5",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "kode": "G11",
+    "deskripsi": "Audio tidak keluar dari speaker internal, eksternal, atau headphone meskipun volume sudah diatur",
+    "mass_function": {
+      "KK9": 0.5,
+      "KK1": 0.3,
+      "KK11": 0.8
+    },
+    "updatedAt": "2025-08-14T02:32:49.253Z",
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755138735279-OIP_Mms15MFau.webp",
+    "nama": "Tidak ada suara dari speaker/headphone",
+    "kategori": "Audio"
+  },
+  {
+    "id": "j3HEqWZ6hU04nJuw6XxJ",
+    "deskripsi": "Audio keluar dengan suara pecah, berdecit, atau terdistorsi, tidak jernih",
+    "kode": "G12",
+    "nama": "Suara audio crackling atau distorsi",
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "kategori": "Audio",
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755138806192-7-9_H-3d65ill.webp",
+    "mass_function": {
+      "KK11": 0.7,
+      "KK9": 0.4,
+      "KK8": 0.3
+    },
+    "updatedAt": "2025-08-14T02:33:31.720Z"
+  },
+  {
+    "id": "xGJGiVQjWubfk71SoJJ3",
+    "nama": "Tidak bisa connect ke WiFi/Internet",
+    "kategori": "Network",
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "updatedAt": "2025-08-14T02:34:02.353Z",
+    "mass_function": {
+      "KK8": 0.3,
+      "KK9": 0.5,
+      "KK13": 0.8
+    },
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "deskripsi": "Tidak dapat terhubung ke jaringan WiFi atau internet, meskipun jaringan tersedia",
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755138835501-windows10-wifi-problems_rOZPsvObv.avif",
+    "kode": "G13"
+  },
+  {
+    "id": "na1AzV2MigE3ADXzkWa9",
+    "kode": "G14",
+    "kategori": "Network",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "nama": "Koneksi internet lambat atau putus-putus",
+    "deskripsi": "Internet berjalan sangat lambat atau sering terputus meskipun sinyal WiFi kuat",
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "updatedAt": "2025-08-14T02:35:00.187Z",
+    "mass_function": {
+      "KK8": 0.5,
+      "KK9": 0.4,
+      "KK13": 0.6
+    },
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755138891763-ilustrasi-internet-putus-tv-kabel_FyAcD3gOR.jpg"
+  },
+  {
+    "id": "X3j83Qz1kBjUMrsJ3xy4",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "updatedAt": "2025-08-14T02:35:38.491Z",
+    "kode": "G15",
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "kategori": "Input",
+    "mass_function": {
+      "KK14": 0.8,
+      "KK9": 0.4,
+      "KK1": 0.2
+    },
+    "deskripsi": "Keyboard tidak berfungsi, beberapa tombol tidak merespon, atau tombol terasa macet",
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755138932574-OIP__1__c9vtvFkQ2.webp",
+    "nama": "Keyboard tidak merespon atau tombol macet"
+  },
+  {
+    "id": "pzMnTaTAefCMUy7kA567",
+    "deskripsi": "Mouse atau touchpad tidak merespon, kursor tidak bergerak, atau klik tidak berfungsi",
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755138962655-OIP__2__lzBgW3Fot.webp",
+    "kode": "G16",
+    "mass_function": {
+      "KK15": 0.8,
+      "KK1": 0.2,
+      "KK9": 0.5
+    },
+    "kategori": "Input",
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "updatedAt": "2025-08-14T02:36:06.976Z",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "nama": "Mouse/touchpad tidak berfungsi"
+  },
+  {
+    "id": "LRirfA6oFB3rCplmiyhI",
+    "nama": "Webcam tidak terdeteksi atau gambar buram",
+    "mass_function": {
+      "KK1": 0.2,
+      "KK9": 0.4,
+      "KK16": 0.8
+    },
+    "kategori": "Camera",
+    "kode": "G17",
+    "updatedAt": "2025-08-14T02:36:35.114Z",
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755138989934-Webcam_-_Body_1__windows_central___TUMy9ezJ.jpg",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "deskripsi": "Kamera tidak terdeteksi oleh aplikasi atau menghasilkan gambar buram/gelap"
+  },
+  {
+    "id": "My8YUGVorI1t174sd3LQ",
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755139010422-baterai-laptop-tidak-mengisi-1360x766_u8VjB_wQh.png",
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "perangkat": [
+      "laptop"
+    ],
+    "nama": "Baterai laptop cepat habis atau tidak mengisi",
+    "kode": "G18",
+    "deskripsi": "Baterai laptop habis dalam waktu singkat atau tidak bisa diisi meskipun charger terpasang",
+    "updatedAt": "2025-08-14T02:36:57.560Z",
+    "kategori": "Battery",
+    "mass_function": {
+      "KK6": 0.3,
+      "KK17": 0.9
+    }
+  },
+  {
+    "id": "x9sj65JtkdtwrBCIVCQ5",
+    "kategori": "Display",
+    "kode": "G19",
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755139054819-3481315f-d9d3-4ccf-8253-23f234d50c3f_uSIASoyIf.jpg",
+    "mass_function": {
+      "KK3": 0.4,
+      "KK18": 0.8,
+      "KK2": 0.3
+    },
+    "deskripsi": "Layar menampilkan garis-garis, berkedip, atau ada area yang tidak menampilkan warna dengan benar",
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "perangkat": [
+      "laptop"
+    ],
+    "nama": "Layar laptop berkedip atau bergaris",
+    "updatedAt": "2025-08-14T02:37:39.110Z"
+  },
+  {
+    "id": "F6xGIa9aEOxTDk60JQoF",
+    "deskripsi": "Program/aplikasi sering berhenti bekerja, freeze, atau menampilkan pesan error",
+    "updatedAt": "2025-08-14T02:38:24.977Z",
+    "mass_function": {
+      "KK2": 0.3,
+      "KK19": 0.7,
+      "KK8": 0.5
+    },
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755139099325-thumbnail-17_PqCIAscQD.jpg",
+    "kode": "G20",
+    "nama": "Aplikasi sering crash atau not responding",
+    "kategori": "Software",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "createdAt": "2025-08-14T02:09:02.568Z"
+  },
+  {
+    "id": "VUKc3R757sKfcgVLQCID",
+    "kategori": "OS",
+    "mass_function": {
+      "KK8": 0.4,
+      "KK4": 0.5,
+      "KK20": 0.8
+    },
+    "kode": "G21",
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755139153681-OIP__3__xWaSL43dk.webp",
+    "updatedAt": "2025-08-14T02:39:18.782Z",
+    "nama": "Windows boot lambat atau gagal",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "deskripsi": "Sistem operasi membutuhkan waktu lama untuk boot atau gagal masuk ke desktop"
+  },
+  {
+    "id": "PKCgPFHOMUDifqtbj7RK",
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "mass_function": {
+      "KK21": 0.5,
+      "KK4": 0.7,
+      "KK8": 0.6
+    },
+    "updatedAt": "2025-08-14T02:39:47.813Z",
+    "kode": "G22",
+    "kategori": "Storage",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755139181345-8_Best_Ways_to_Fix_Corrupt_Files_on_Windows_11_Gc34cOSna.jpg",
+    "deskripsi": "File penting hilang, tidak bisa dibuka, atau menampilkan pesan file corrupt",
+    "nama": "File atau folder hilang/corrupt"
+  },
+  {
+    "id": "depU3RKSIQZmeBHuZFem",
+    "updatedAt": "2025-08-14T02:40:12.458Z",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "kategori": "Security",
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "mass_function": {
+      "KK8": 0.9,
+      "KK22": 0.7
+    },
+    "kode": "G23",
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755139207517-3_TTOuVn5_lTti8kiiT.jpg",
+    "deskripsi": "Muncul iklan pop-up yang tidak diinginkan atau browser diarahkan ke situs yang tidak dikenal",
+    "nama": "Pop-up iklan atau browser redirect"
+  },
+  {
+    "id": "lQwnrGl5JqLjdZM5IzV9",
+    "deskripsi": "Printer tidak muncul di daftar device atau tidak bisa mencetak meskipun sudah terhubung",
+    "updatedAt": "2025-08-14T02:40:47.861Z",
+    "mass_function": {
+      "KK23": 0.8,
+      "KK9": 0.5
+    },
+    "kategori": "Peripheral",
+    "nama": "Printer tidak terdeteksi atau tidak bisa print",
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755139240046-01ga58qsde9m37fznf4q3xp5g9_o1uyqGjvq.jpg",
+    "kode": "G24",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "createdAt": "2025-08-14T02:09:02.568Z"
+  },
+  {
+    "id": "CNkRc1eaLJNDBW6fq9YR",
+    "kategori": "Graphics",
+    "kode": "G25",
+    "deskripsi": "Game atau aplikasi yang membutuhkan grafis tinggi berjalan tersendat atau frame rate rendah",
+    "perangkat": [
+      "computer",
+      "laptop"
+    ],
+    "mass_function": {
+      "KK5": 0.4,
+      "KK3": 0.8,
+      "KK2": 0.3
+    },
+    "createdAt": "2025-08-14T02:09:02.568Z",
+    "nama": "Game atau aplikasi grafis lag/stuttering",
+    "gambar": "https://ik.imagekit.io/ycyq5snxf3/gejala-media/gejala-media-pgoDTJDjIpe4prJD96rA-1755139278654-1610069524177_Owvh4Ix8U.jpg",
+    "updatedAt": "2025-08-14T02:41:25.010Z"
+  }
+]

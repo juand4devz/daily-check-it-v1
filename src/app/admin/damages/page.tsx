@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Edit, Trash2, DollarSign, Clock, AlertTriangle, Download, Upload, Search, RefreshCw, Loader2, WifiOff } from "lucide-react";
+import { Plus, Edit, Trash2, DollarSign, Clock, AlertTriangle, Download, Upload, Search, RefreshCw, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import type { Kerusakan, ApiResponse } from "@/types/diagnose";
 import { cn } from "@/lib/utils";

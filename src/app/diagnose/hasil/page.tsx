@@ -302,13 +302,13 @@ export default function HasilDiagnosaPage() {
                                 </div>
                                 <div className="bg-white rounded-lg p-3 border">
                                   <h4 className="font-medium mb-2">Langkah Umum Perbaikan</h4>
-                                  <ul className="text-sm space-y-1 text-gray-600">
+                                  <div className="text-sm space-y-1 text-gray-600 list-inside">
                                     <li>• Cadangkan data penting sebelum melakukan perbaikan.</li>
                                     <li>• Matikan perangkat dan cabut kabel daya.</li>
                                     <li>• Periksa koneksi perangkat keras yang longgar.</li>
                                     <li>• Konsultasikan dengan teknisi jika diperlukan.</li>
                                     <li>• Gunakan alat diagnostik untuk konfirmasi.</li>
-                                  </ul>
+                                  </div>
                                 </div>
                               </div>
                             )}
@@ -368,8 +368,8 @@ export default function HasilDiagnosaPage() {
                     <Card key={gejala.kode} className="flex flex-col items-start gap-2 p-3 rounded-lg">
                       {gejala.gambar && gejala.gambar !== "" ? (
                         <Image
-                          height={500}
-                          width={500}
+                          height={200}
+                          width={200}
                           src={gejala.gambar}
                           alt={gejala.nama || gejala.kode}
                           className="h-42 w-full object-cover rounded-md"

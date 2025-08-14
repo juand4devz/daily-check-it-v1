@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Expand, Play, X } from "lucide-react";
+import { Expand, Play } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { ForumMedia } from "@/types/forum"; // Import ForumMedia langsung

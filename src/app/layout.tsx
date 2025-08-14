@@ -63,12 +63,12 @@ export const metadata: Metadata = {
     title: "DailyCek.It - Diagnosa Laptop & PC Berbasis AI",
     description:
       "Platform cerdas untuk diagnosa kerusakan laptop & PC berbasis AI. Temukan solusi instan, panduan teknis, dan tips perawatan perangkat.",
-    images: ["/logos/daily-cek-it-logo.svg"],
+    images: ["/logos/DailyCekItLogo.png"],
     creator: "@dailycekit",
   },
   icons: {
-    icon: "/logos/daily-cek-it-logo.svg",
-    apple: "/logos/daily-cek-it-logo.svg",
+    icon: "/logos/DailyCekItLogo.png",
+    apple: "/logos/DailyCekItLogo.png",
   },
 };
 
