@@ -2,7 +2,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { diagnosisExplainerRole } from "./role-ai/diagnosis-explainer"
 import { detectContradictions, suggestAlternativeDiagnosis } from "./role-ai/logical-rules"
-import gejalaData from "@/data/gejala.json"
+// Menghapus import gejalaData statis
+// import gejalaData from "@/data/gejala.json"
 
 // Available AI Models Configuration - Updated with new models
 export const AI_MODELS = {
@@ -394,6 +395,35 @@ interface GejalaDetail {
   perangkat: string[]
 }
 
+// FUNGSI BARU: Mengambil data gejala dari API atau Firebase
+async function fetchGejala(): Promise<GejalaDetail[]> {
+  try {
+    // Ambil data dari endpoint API
+    const response = await fetch("/api/diagnose/symptoms")
+    if (!response.ok) {
+      throw new Error(`API error: ${response.statusText}`)
+    }
+    const data = await response.json()
+    if (data.status && data.data) {
+      if (DEBUG_MODE) console.log("✅ Gejala berhasil diambil dari API")
+      return data.data
+    }
+    throw new Error("API response format is invalid")
+  } catch (error) {
+    console.warn("⚠️ Gagal mengambil gejala dari API, mencoba fallback ke Firebase...", error)
+    try {
+      // Fallback ke fungsi Firebase langsung
+      const { getAllGejala } = await import("./firebase/diagnose-service")
+      const firebaseGejala = await getAllGejala()
+      if (DEBUG_MODE) console.log("✅ Gejala berhasil diambil dari Firebase secara langsung")
+      return firebaseGejala
+    } catch (firebaseError) {
+      console.error("❌ Gagal mengambil gejala dari Firebase:", firebaseError)
+      return []
+    }
+  }
+}
+
 // User-friendly mock response generator
 const generateUserFriendlyMockResponse = (diagnosisData: DiagnosisData, gejalaDetails: GejalaDetail[]): string => {
   const topResult = diagnosisData.result.sort((a, b) => b.belief - a.belief)[0]
@@ -465,6 +495,9 @@ export async function generateDiagnosisExplanation(
   diagnosisData: DiagnosisData,
 ): Promise<{ content: string; model?: AIModelType }> {
   try {
+    // Mengambil data gejala dinamis
+    const gejalaData = await fetchGejala()
+
     // Get detailed symptom information
     const gejalaDetails: GejalaDetail[] = diagnosisData.input.map((kode: string) => {
       const gejala = gejalaData.find((g) => g.kode === kode)
@@ -519,6 +552,8 @@ export async function generateDiagnosisExplanation(
   } catch (error) {
     console.error("Error in generateDiagnosisExplanation:", error)
 
+    // Mengambil gejala untuk fallback
+    const gejalaData = await fetchGejala()
     // Get symptom details for fallback
     const gejalaDetails: GejalaDetail[] = diagnosisData.input.map((kode: string) => {
       const gejala = gejalaData.find((g) => g.kode === kode)
@@ -542,7 +577,10 @@ interface SymptomCorrelationAnalysis {
 }
 
 // Enhanced symptom correlation analysis with user-friendly language
-export function analyzeSymptomCorrelation(selectedSymptoms: string[]): SymptomCorrelationAnalysis {
+export async function analyzeSymptomCorrelation(selectedSymptoms: string[]): Promise<SymptomCorrelationAnalysis> {
+  // Mengambil data gejala dinamis
+  const gejalaData = await fetchGejala()
+
   const gejalaDetails = selectedSymptoms
     .map((kode) => {
       return gejalaData.find((g) => g.kode === kode)
