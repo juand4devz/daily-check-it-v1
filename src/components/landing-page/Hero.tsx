@@ -32,7 +32,7 @@ function VideoModal({ isOpen, onClose, title, videoId }: { isOpen: boolean; onCl
 // Komponen Hero yang memanggil VideoModal
 export default function Hero() {
     const [showVideo, setShowVideo] = useState(false);
-    const youtubeVideoId = "hNMkpr4idb4"; // Menggunakan ID video dari URL yang Anda berikan
+    const youtubeVideoId = "V16buoYb6Rs"; // Menggunakan ID video dari URL yang Anda berikan
 
     return (
         <section id="hero" className="relative pt-32 pb-20 md:pt-32 md:pb-28 overflow-hidden">
