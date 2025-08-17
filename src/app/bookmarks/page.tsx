@@ -764,7 +764,7 @@ export default function BookmarksPage() {
     // If no bookmarks and no search/filter applied
     if (bookmarkedPosts.length === 0 && !searchQuery.trim() && selectedCategory === "all") {
         return (
-            <div className="container mx-auto px-4 py-8 max-w-7xl">
+            <div className="w-full px-4 py-8">
                 <Card className="text-center py-12">
                     <CardContent>
                         <BookmarkX className="h-20 w-20 text-gray-400 mx-auto mb-6" />
@@ -780,7 +780,7 @@ export default function BookmarksPage() {
     }
 
     return (
-        <div className="container mx-auto px-4 py-4 max-w-7xl">
+        <div className="w-full px-4 py-4">
             {/* Header Halaman */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                 <div className="flex items-center gap-4">

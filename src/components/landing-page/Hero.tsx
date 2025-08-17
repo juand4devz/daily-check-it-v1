@@ -3,20 +3,22 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play } from "lucide-react";
-import Image from "next/image";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import Image from "next/image";
 
-function VideoModal({ isOpen, onClose, title }: { isOpen: boolean; onClose: () => void; videoId: string; title: string; }) {
+// Komponen VideoModal yang diperbarui untuk menggunakan URL YouTube
+function VideoModal({ isOpen, onClose, title, videoId }: { isOpen: boolean; onClose: () => void; videoId: string; title: string; }) {
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogTitle className="hidden" />
             <DialogContent className={cn("max-w-2xl md:max-w-4xl p-0 border-0 bg-transparent shadow-none")}>
                 <div className="aspect-video w-full">
+                    {/* Menggunakan elemen iframe untuk memutar video dari YouTube */}
                     <iframe
                         className="w-full h-full rounded-lg"
-                        // src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`}
+                        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`}
                         title={title}
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                         allowFullScreen
@@ -27,8 +29,10 @@ function VideoModal({ isOpen, onClose, title }: { isOpen: boolean; onClose: () =
     );
 }
 
+// Komponen Hero yang memanggil VideoModal
 export default function Hero() {
     const [showVideo, setShowVideo] = useState(false);
+    const youtubeVideoId = "hNMkpr4idb4"; // Menggunakan ID video dari URL yang Anda berikan
 
     return (
         <section id="hero" className="relative pt-32 pb-20 md:pt-32 md:pb-28 overflow-hidden">
@@ -61,7 +65,7 @@ export default function Hero() {
                         onClick={() => setShowVideo(true)}
                     >
                         <Image
-                            src="/placeholder.svg"
+                            src="/forum-feed.png"
                             alt="Tampilan platform DailyCek.It"
                             width={1600}
                             height={900}
@@ -79,7 +83,7 @@ export default function Hero() {
             <VideoModal
                 isOpen={showVideo}
                 onClose={() => setShowVideo(false)}
-                videoId="dQw4w9WgXcQ"
+                videoId={youtubeVideoId}
                 title="DailyCek.It Demo"
             />
         </section>

@@ -51,7 +51,7 @@ export default function Benefits() {
                     <div className="order-2 md:order-1 relative">
                         <div className="relative rounded-xl overflow-hidden border shadow-xl">
                             <Image
-                                src="/placeholder.svg"
+                                src="/mengapa.png"
                                 alt="DailyCek.It Platform in Action"
                                 width={600}
                                 height={500}

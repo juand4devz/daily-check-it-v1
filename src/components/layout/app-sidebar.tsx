@@ -297,40 +297,38 @@ export function SidebarNav({ className, ...props }: SidebarNavProps) {
                 <DynamicSidebarContent />
             </SidebarContent>
 
-            <SidebarFooter className="p-1">
+            <SidebarFooter className="p-2">
                 <SidebarMenu>
                     <SidebarMenuItem>
-                        <SidebarMenuButton className="py-6 flex items-center">
+                        <SidebarMenuButton className="py-6 px-2 flex items-center justify-center">
                             <div className="flex w-full items-center justify-between">
                                 <div className="flex items-center justify-center gap-2">
-                                    <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-xl bg-zinc-100">
-                                        {/* Skeleton untuk avatar */}
-                                        {isLoading ? (
-                                            <Skeleton className="h-7 w-7 rounded-full" />
-                                        ) : (
-                                            <Avatar className="rounded-xl">
-                                                {session?.user?.avatar ? (
-                                                    <AvatarImage
-                                                        src={session?.user?.avatar}
-                                                        alt={session?.user.username}
-                                                        height={50}
-                                                        width={50}
-                                                    />
-                                                ) : (
-                                                    <AvatarFallback className="rounded-none">
-                                                        {(() => {
-                                                            const username = session?.user?.username || "";
-                                                            const words = username.trim().split(" ");
-                                                            if (words.length >= 2) {
-                                                                return (words[0][0] + words[1][0]).toUpperCase();
-                                                            }
-                                                            return username.slice(0, 2).toUpperCase();
-                                                        })()}
-                                                    </AvatarFallback>
-                                                )}
-                                            </Avatar>
-                                        )}
-                                    </div>
+                                    {/* Skeleton untuk avatar */}
+                                    {isLoading ? (
+                                        <Skeleton className="h-7 w-7 rounded-full" />
+                                    ) : (
+                                        <Avatar className="rounded-xl">
+                                            {session?.user?.avatar ? (
+                                                <AvatarImage
+                                                    src={session?.user?.avatar}
+                                                    alt={session?.user.username}
+                                                    height={50}
+                                                    width={50}
+                                                />
+                                            ) : (
+                                                <AvatarFallback className="rounded-none">
+                                                    {(() => {
+                                                        const username = session?.user?.username || "";
+                                                        const words = username.trim().split(" ");
+                                                        if (words.length >= 2) {
+                                                            return (words[0][0] + words[1][0]).toUpperCase();
+                                                        }
+                                                        return username.slice(0, 2).toUpperCase();
+                                                    })()}
+                                                </AvatarFallback>
+                                            )}
+                                        </Avatar>
+                                    )}
                                     <div className="flex flex-col items-start gap-y-1">
                                         <span className="text-sm font-medium">
                                             {/* Skeleton untuk nama pengguna */}

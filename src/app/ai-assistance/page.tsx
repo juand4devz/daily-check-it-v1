@@ -389,7 +389,7 @@ export default function AIChatPage() {
                 if (isGeminiPro) {
                     toast.success(`✨ Respon AI berhasil dimuat menggunakan Gemini Pro 2.5 (Model Utama)`);
                 } else {
-                    toast.success(`Respon AI berhasil dimuat menggunakan ${currentModel} (Fallback)`);
+                    toast.success(`Respon AI berhasil dimuat menggunakan ${currentModel}`);
                 }
             } else if (currentModel === "offline") {
                 toast.success("Respon berhasil dimuat (Mode Offline)");

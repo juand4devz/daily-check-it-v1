@@ -1221,13 +1221,13 @@ export default function ForumDetailContent({ postId, isModal = false }: { postId
                                             />
                                             <div className="flex justify-between text-sm text-gray-500 mt-1">
                                                 <span>Mendukung Markdown formatting</span>
-                                                {mainCommentUploadState.uploading && (
+                                                {/* {mainCommentUploadState.uploading && (
                                                     <div className="flex items-center gap-2">
                                                         <Loader2 className="h-4 w-4 animate-spin text-primary" />
                                                         <Progress value={mainCommentUploadState.progress} className="w-24 h-2" />
                                                         <span>{Math.round(mainCommentUploadState.progress)}%</span>
                                                     </div>
-                                                )}
+                                                )} */}
                                                 {mainCommentUploadState.error && (
                                                     <p className="text-red-500 text-xs mt-1">{mainCommentUploadState.error}</p>
                                                 )}

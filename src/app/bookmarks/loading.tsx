@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function BookmarksSkeleton() {
     return (
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="px-4 py-8 w-full">
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                 <div className="flex items-center gap-4">

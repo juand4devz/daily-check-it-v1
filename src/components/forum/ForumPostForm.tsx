@@ -850,7 +850,7 @@ export function ForumPostForm({
                                 <CardHeader>
                                     <CardTitle>Konten Diskusi *</CardTitle>
                                 </CardHeader>
-                                <CardContent>
+                                <CardContent className="px-2">
                                     <Tabs value={activeTab} onValueChange={setActiveTab}>
                                         <TabsList className="absolute top-0 right-0">
                                             <TabsTrigger value="write">
@@ -924,25 +924,33 @@ export function ForumPostForm({
                                                                         />
                                                                     </div>
                                                                 </div>
-                                                                <Textarea
-                                                                    ref={textareaRef}
-                                                                    placeholder="Tulis konten diskusi Anda di sini... Anda dapat menggunakan Markdown untuk formatting. Drop gambar di sini untuk mengunggah."
-                                                                    value={field.value}
-                                                                    onChange={field.onChange}
-                                                                    rows={10}
-                                                                    className={cn(
-                                                                        "resize-none border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-4 text-sm h-full min-h-[100px]",
-                                                                        isDragOver ? 'border-2 border-blue-500 bg-blue-50' : '',
-                                                                        {
-                                                                            'cursor-wait': isAnyMediaUploading
-                                                                        }
-                                                                    )}
-                                                                    disabled={isSubmitting || isAnyMediaUploading}
-                                                                    onPaste={handlePasteOnTextarea}
-                                                                    onDrop={handleDropOnTextarea}
-                                                                    onDragOver={handleDragOverOnTextarea}
-                                                                    onDragLeave={handleDragLeaveOnTextarea}
-                                                                />
+                                                                <ScrollArea className={cn(
+                                                                    "max-h-[300px] w-full",
+                                                                    isDragOver ? 'border-2 border-blue-500' : ''
+                                                                )}>
+                                                                    <Textarea
+                                                                        ref={textareaRef}
+                                                                        placeholder="Tulis konten diskusi Anda di sini... Anda dapat menggunakan Markdown untuk formatting. Drop gambar di sini untuk mengunggah."
+                                                                        value={field.value}
+                                                                        onChange={field.onChange}
+                                                                        // Menghapus 'rows' karena akan bertentangan dengan 'h-full'
+                                                                        className={cn(
+                                                                            // Menambahkan 'h-full' agar Textarea memenuhi tinggi ScrollArea
+                                                                            // Menghapus 'resize-none' karena ScrollArea yang mengatur ukuran
+                                                                            "h-full min-h-36 border-none focus-visible:ring-0 focus-visible:ring-offset-0 p-4 text-sm resize-none",
+                                                                            isDragOver ? 'border-none' : '',
+                                                                            {
+                                                                                'cursor-wait': isAnyMediaUploading
+                                                                            }
+                                                                        )}
+                                                                        disabled={isSubmitting || isAnyMediaUploading}
+                                                                        onPaste={handlePasteOnTextarea}
+                                                                        onDrop={handleDropOnTextarea}
+                                                                        onDragOver={handleDragOverOnTextarea}
+                                                                        onDragLeave={handleDragLeaveOnTextarea}
+                                                                    />
+                                                                    <ScrollBar orientation="vertical" />
+                                                                </ScrollArea>
                                                             </div>
                                                         </FormControl>
                                                         <div className="flex justify-between text-sm text-gray-500">
@@ -956,96 +964,96 @@ export function ForumPostForm({
                                             {mediaFiles.length > 0 && (
                                                 <div className="mt-4 border-t pt-4">
                                                     <h4 className="font-medium mb-3">Media Terlampir:</h4>
-                                                    <ScrollArea className="w-full whitespace-nowrap rounded-md border">
-                                                        <div className="flex w-max space-x-4 p-4">
-                                                            {finalMediaPreviewsForTab.map((media) => (
-                                                                <div key={media.id} className="relative group w-[150px] h-[150px] flex-shrink-0">
-                                                                    <div className="relative w-full h-full overflow-hidden rounded-md border border-gray-200">
-                                                                        {media.type === "image" ? (
-                                                                            <Image
-                                                                                src={media.url}
-                                                                                alt={media.filename}
-                                                                                layout="fill"
-                                                                                objectFit="cover"
-                                                                            />
-                                                                        ) : (
-                                                                            <video
-                                                                                src={media.url}
-                                                                                className="w-full h-full object-cover"
-                                                                                poster={media.uploadedUrl ? `${media.uploadedUrl}?tr=f-jpg` : undefined}
-                                                                                muted
-                                                                                loop
-                                                                            />
-                                                                        )}
-                                                                        {media.uploading && (
-                                                                            <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white">
-                                                                                <Loader2 className="h-8 w-8 animate-spin mb-2" />
-                                                                                <span className="text-sm">{Math.round(media.progress || 0)}%</span>
-                                                                                <Progress value={media.progress} className="w-3/4 mt-2 h-1" />
+                                                    <div className="flex w-max space-x-4 p-4">
+                                                        {finalMediaPreviewsForTab.map((media) => (
+                                                            <div key={media.id} className="relative group w-[150px] h-[150px] flex-shrink-0">
+                                                                <div className="relative w-full h-full overflow-hidden rounded-md border border-gray-200">
+                                                                    {media.type === "image" ? (
+                                                                        <Image
+                                                                            src={media.url}
+                                                                            alt={media.filename}
+                                                                            layout="fill"
+                                                                            objectFit="cover"
+                                                                        />
+                                                                    ) : (
+                                                                        <video
+                                                                            src={media.url}
+                                                                            className="w-full h-full object-cover"
+                                                                            poster={media.uploadedUrl ? `${media.uploadedUrl}?tr=f-jpg` : undefined}
+                                                                            muted
+                                                                            loop
+                                                                        />
+                                                                    )}
+                                                                    {media.uploading && (
+                                                                        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white">
+                                                                            <Loader2 className="h-8 w-8 animate-spin mb-2" />
+                                                                            <span className="text-sm">{Math.round(media.progress || 0)}%</span>
+                                                                            <Progress value={media.progress} className="w-3/4 mt-2 h-1" />
+                                                                        </div>
+                                                                    )}
+                                                                    {!media.uploading && media.uploadedUrl === undefined && (
+                                                                        <div className="absolute inset-0 bg-red-500/80 flex flex-col items-center justify-center text-white">
+                                                                            <X className="h-8 w-8 mb-2" />
+                                                                            <span className="text-sm text-center">Upload Gagal</span>
+                                                                        </div>
+                                                                    )}
+                                                                    {/* Tombol Sisipkan/Salin Link di sini */}
+                                                                    {media.uploadedUrl && (
+                                                                        <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4">
+                                                                            <h3 className="text-white text-md font-semibold mb-3 text-center truncate w-full">{media.filename}</h3>
+                                                                            <div className="flex flex-col gap-2 w-full max-w-[200px]">
+                                                                                <Button
+                                                                                    type="button"
+                                                                                    variant="secondary"
+                                                                                    size="sm"
+                                                                                    className="w-full h-9 px-3 text-sm bg-white/80 text-gray-900 hover:bg-white"
+                                                                                    onClick={(e) => handleInsertMediaToContent(media.id, e)}
+                                                                                >
+                                                                                    <Link className="h-4 w-4 mr-2" /> Sisipkan
+                                                                                </Button>
+                                                                                <Button
+                                                                                    type="button"
+                                                                                    variant="secondary"
+                                                                                    size="sm"
+                                                                                    className="w-full h-9 px-3 text-sm bg-white/80 text-gray-900 hover:bg-white"
+                                                                                    onClick={(e) => handleCopyMediaUrl(media.uploadedUrl!, e)}
+                                                                                >
+                                                                                    <Copy className="h-4 w-4 mr-2" /> Salin URL
+                                                                                </Button>
                                                                             </div>
-                                                                        )}
-                                                                        {!media.uploading && media.uploadedUrl === undefined && (
-                                                                            <div className="absolute inset-0 bg-red-500/80 flex flex-col items-center justify-center text-white">
-                                                                                <X className="h-8 w-8 mb-2" />
-                                                                                <span className="text-sm text-center">Upload Gagal</span>
-                                                                            </div>
-                                                                        )}
-                                                                        {/* Tombol Sisipkan/Salin Link di sini */}
-                                                                        {media.uploadedUrl && (
-                                                                            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4">
-                                                                                <h3 className="text-white text-md font-semibold mb-3 text-center truncate w-full">{media.filename}</h3>
-                                                                                <div className="flex flex-col gap-2 w-full max-w-[200px]">
-                                                                                    <Button
-                                                                                        type="button"
-                                                                                        variant="secondary"
-                                                                                        size="sm"
-                                                                                        className="w-full h-9 px-3 text-sm bg-white/80 text-gray-900 hover:bg-white"
-                                                                                        onClick={(e) => handleInsertMediaToContent(media.id, e)}
-                                                                                    >
-                                                                                        <Link className="h-4 w-4 mr-2" /> Sisipkan
-                                                                                    </Button>
-                                                                                    <Button
-                                                                                        type="button"
-                                                                                        variant="secondary"
-                                                                                        size="sm"
-                                                                                        className="w-full h-9 px-3 text-sm bg-white/80 text-gray-900 hover:bg-white"
-                                                                                        onClick={(e) => handleCopyMediaUrl(media.uploadedUrl!, e)}
-                                                                                    >
-                                                                                        <Copy className="h-4 w-4 mr-2" /> Salin URL
-                                                                                    </Button>
-                                                                                </div>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                    <Button
-                                                                        type="button"
-                                                                        variant="destructive"
-                                                                        size="icon"
-                                                                        className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-80 hover:opacity-100 z-10"
-                                                                        onClick={() => handleRemoveMedia(media.id)}
-                                                                        disabled={isSubmitting || media.uploading}
-                                                                    >
-                                                                        <X className="h-3 w-3" />
-                                                                        <span className="sr-only">Hapus media</span>
-                                                                    </Button>
-                                                                    <div className="p-2 text-sm text-center text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1">
-                                                                        {media.type === "image" ? <ImageIcon className="h-4 w-4 text-primary" /> : <Video className="h-4 w-4 text-primary" />}
-                                                                        <span className="truncate">{media.filename}</span>
-                                                                    </div>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
-                                                            ))}
-                                                        </div>
-                                                        <ScrollBar orientation="horizontal" />
-                                                    </ScrollArea>
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="destructive"
+                                                                    size="icon"
+                                                                    className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-80 hover:opacity-100 z-10"
+                                                                    onClick={() => handleRemoveMedia(media.id)}
+                                                                    disabled={isSubmitting || media.uploading}
+                                                                >
+                                                                    <X className="h-3 w-3" />
+                                                                    <span className="sr-only">Hapus media</span>
+                                                                </Button>
+                                                                <div className="p-2 text-sm text-center text-gray-600 dark:text-gray-300 flex items-center justify-center gap-1">
+                                                                    {media.type === "image" ? <ImageIcon className="h-4 w-4 text-primary" /> : <Video className="h-4 w-4 text-primary" />}
+                                                                    <span className="truncate">{media.filename}</span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             )}
                                         </TabsContent>
                                         <TabsContent value="preview">
-                                            <div className="min-h-[300px] p-4 border rounded-lg bg-gray-50 dark:bg-neutral-800">
+                                            <div className="p-4 border rounded-lg bg-gray-50 dark:bg-neutral-800">
                                                 {form.watch("content") ? (
-                                                    <div className="prose prose-sm max-w-none dark:prose-invert">
-                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{form.watch("content")}</ReactMarkdown>
-                                                    </div>
+                                                    <ScrollArea className="prose prose-sm max-w-none dark:prose-invert h-[350px]">
+                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                            {form.watch("content")}
+                                                        </ReactMarkdown>
+                                                        <ScrollBar orientation="vertical" />
+                                                    </ScrollArea>
                                                 ) : (
                                                     <p className="text-gray-500 italic">Tidak ada konten untuk di-preview</p>
                                                 )}
