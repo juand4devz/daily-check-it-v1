@@ -80,6 +80,9 @@ export const metadata: Metadata = {
     ],
     shortcut: ["/logos/DailyCekItLogo.png"],
   },
+  verification: {
+    google: "ZbSwvrHd1CKa2aspwE9ljfVWUAECQllgkyAsvMIx_Us",
+  },
 };
 
 export default function RootLayout({
