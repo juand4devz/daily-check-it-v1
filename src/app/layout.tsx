@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  verification: {
+    google: "google-site-verification=7tbPxMdahN7T2hEfSUz8HBxw131JXFSCAGxvgozxGhU", // Ganti dengan kode yang Anda salin
+  },
   title: "DailyCek.It - Diagnosa Kerusakan Laptop & PC Berbasis AI",
   description:
     "DailyCek.It adalah platform cerdas untuk mendiagnosa kerusakan laptop dan PC secara cepat, akurat, dan berbasis AI. Temukan solusi instan, panduan teknis, dan tips perawatan perangkat.",
