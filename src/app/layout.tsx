@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     "DailyCek.It",
     "diagnosa kerusakan perangkat",
     "panduan teknis komputer",
-    "tips perawatan laptop"
+    "tips perawatan laptop",
   ],
   authors: [{ name: "JuandaDevz" }],
   creator: "JuandaDevz",
@@ -67,8 +67,18 @@ export const metadata: Metadata = {
     creator: "@dailycekit",
   },
   icons: {
-    icon: "/logos/DailyCekItLogo.png",
-    apple: "/logos/DailyCekItLogo.png",
+    icon: [
+      { url: "/logos/DailyCekItLogo.png", type: "image/png", sizes: "32x32" },
+      { url: "/logos/DailyCekItLogo.png", type: "image/png", sizes: "16x16" },
+    ],
+    apple: [
+      {
+        url: "/logos/DailyCekItLogo.png",
+        type: "image/png",
+        sizes: "180x180",
+      },
+    ],
+    shortcut: ["/logos/DailyCekItLogo.png"],
   },
 };
 
@@ -79,9 +89,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <GeneralLayout>
           {children}
           <Toaster position="top-center" />
