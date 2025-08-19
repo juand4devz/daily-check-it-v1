@@ -44,7 +44,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "DailyCek.It - Diagnosa Laptop & PC Berbasis AI",
     description:
-      "Diagnosa kerusakan laptop dan PC secara cepat, akurat, dan berbasis AI. Solusi instan, panduan teknis, dan tips perawatan perangkat hanya di DailyCek.It.",
+      "Diagnosa kerusakan laptop dan PC secara cepat, terukur, dan berbasis AI. Solusi instan, panduan teknis, dan tips perawatan perangkat hanya di DailyCek.It.",
     url: "https://daily-cekit.vercel.app",
     siteName: "DailyCek.It",
     images: [

@@ -119,7 +119,7 @@ export default function Testimonials() {
                     <h2 className="text-3xl md:text-4xl font-bold mb-4">Apa Kata Pengguna Kami</h2>
                     <p className="text-foreground/70 text-lg">Umpan balik nyata dari pengguna kami nantinnya.</p>
                     <Button variant="outline" className="mt-6 gap-2" asChild>
-                        <Link href="https://forms.gle/your-form-link" target="_blank" rel="noopener noreferrer">
+                        <Link href="https://docs.google.com/forms/d/e/1FAIpQLSd-Nv5556fHGL98gi8casPL2Mzdgqc-HmbivyqGDxPR0nqiyQ/viewform?usp=header" target="_blank" rel="noopener noreferrer">
                             <MessageSquarePlus className="h-4 w-4" />
                             Bagikan Umpan Balik Anda
                         </Link>
